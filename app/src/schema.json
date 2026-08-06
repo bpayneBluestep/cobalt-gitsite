@@ -1,0 +1,291 @@
+{
+  "org": "U142140",
+  "extractedAt": "2026-08-06T14:23:24.838Z",
+  "source": "https://gateway.bluestep.net/mcp (invoke_org_tool)",
+  "stats": {
+    "recordTypes": 4,
+    "baseTypes": 2,
+    "categories": 2,
+    "forms": 3,
+    "fields": 22,
+    "unlinkedForms": 1,
+    "fieldTypeCounts": {
+      "TEXT": 11,
+      "MEMO": 2,
+      "DATE": 3,
+      "PASSWORD": 1,
+      "HEADER": 2,
+      "BOOLEAN": 3
+    }
+  },
+  "recordTypes": [
+    {
+      "topId": "1000003___25001",
+      "name": "Individual",
+      "displayName": "Individual",
+      "description": null,
+      "baseType": true,
+      "displayOrder": 0,
+      "parents": [],
+      "subTypes": [
+        "1000003___25003"
+      ],
+      "requiredForms": [],
+      "optionalForms": [],
+      "status": "partial",
+      "error": "Error: Cannot invoke \"myassn.dynamicdata.RequiredDynoMetaMaster.getChildren()\" because the return value of \"myassn.relate.EntityType.getRequiredMetaMasters()\" is null"
+    },
+    {
+      "topId": "1000003___25003",
+      "name": "User",
+      "displayName": "User",
+      "description": null,
+      "baseType": false,
+      "displayOrder": 0,
+      "parents": [
+        "1000003___25001"
+      ],
+      "subTypes": [],
+      "requiredForms": [
+        "1000001__FID_onlineProfile"
+      ],
+      "optionalForms": [
+        "1000001___1100008"
+      ],
+      "status": "ok",
+      "error": null
+    },
+    {
+      "topId": "1000003___141049",
+      "name": "Staff",
+      "displayName": "Staff",
+      "description": "Staff Members",
+      "baseType": false,
+      "displayOrder": 0,
+      "parents": [],
+      "subTypes": [],
+      "requiredForms": [],
+      "optionalForms": [],
+      "status": "partial",
+      "error": "Error: Cannot invoke \"myassn.dynamicdata.RequiredDynoMetaMaster.getChildren()\" because the return value of \"myassn.relate.EntityType.getRequiredMetaMasters()\" is null"
+    },
+    {
+      "topId": "1000003__SID_ORGANIZATION",
+      "name": "Organization",
+      "displayName": "Organization",
+      "description": null,
+      "baseType": true,
+      "displayOrder": 0,
+      "parents": [],
+      "subTypes": [],
+      "requiredForms": [],
+      "optionalForms": [],
+      "status": "partial",
+      "error": "Error: Cannot invoke \"myassn.dynamicdata.RequiredDynoMetaMaster.getChildren()\" because the return value of \"myassn.relate.EntityType.getRequiredMetaMasters()\" is null"
+    }
+  ],
+  "forms": [
+    {
+      "topId": "1000001__SID_CONTACT",
+      "displayName": "Contact Info",
+      "singleEntry": true,
+      "fieldCount": 6,
+      "fields": [
+        {
+          "fieldId": "1000101__SID_CONTACT-MOBILE-PHONE",
+          "label": "Mobile Phone",
+          "columnName": "Mobile Phone",
+          "dbColumnName": "C1611",
+          "fieldType": "TEXT"
+        },
+        {
+          "fieldId": "1000101__SID_CONTACT-ADDRESS-STREET",
+          "label": "Address",
+          "columnName": "Address, Street",
+          "dbColumnName": "C1599",
+          "fieldType": "MEMO"
+        },
+        {
+          "fieldId": "1000101__SID_CONTACT-ADDRESS-CITY",
+          "label": "City",
+          "columnName": "Address, City",
+          "dbColumnName": "C1612",
+          "fieldType": "TEXT"
+        },
+        {
+          "fieldId": "1000101__SID_CONTACT-ADDRESS-STATE",
+          "label": "State",
+          "columnName": "Address, State",
+          "dbColumnName": "C1613",
+          "fieldType": "TEXT"
+        },
+        {
+          "fieldId": "1000101__SID_CONTACT-ADDRESS-POSTAL-CODE",
+          "label": "Postal Code",
+          "columnName": "Address, Postal Code",
+          "dbColumnName": "C1600",
+          "fieldType": "TEXT"
+        },
+        {
+          "fieldId": "1000101__SID_CONTACT-ADDRESS-COUNTRY",
+          "label": "Country",
+          "columnName": "Address, Country",
+          "dbColumnName": "C1614",
+          "fieldType": "TEXT"
+        }
+      ],
+      "status": "ok",
+      "error": null,
+      "usedBy": []
+    },
+    {
+      "topId": "1000001___1100008",
+      "displayName": "Credentials",
+      "singleEntry": false,
+      "fieldCount": 3,
+      "fields": [
+        {
+          "fieldId": "1000101__SID_CREDENTIAL",
+          "label": "Credential",
+          "columnName": "Credential",
+          "dbColumnName": "C1602",
+          "fieldType": "TEXT"
+        },
+        {
+          "fieldId": "1000101__SID_CREDENTIAL-DATE",
+          "label": "Effective Date",
+          "columnName": "Effective Date",
+          "dbColumnName": "C1603",
+          "fieldType": "DATE"
+        },
+        {
+          "fieldId": "1000101__SID_CREDENTIAL_END_DATE",
+          "label": "Expiration Date",
+          "columnName": "Expiration Date",
+          "dbColumnName": "C1604",
+          "fieldType": "DATE"
+        }
+      ],
+      "status": "ok",
+      "error": null,
+      "usedBy": [
+        {
+          "recordTypeId": "1000003___25003",
+          "requirement": "optional"
+        }
+      ]
+    },
+    {
+      "topId": "1000001__FID_onlineProfile",
+      "displayName": "Online Profile",
+      "singleEntry": true,
+      "fieldCount": 13,
+      "fields": [
+        {
+          "fieldId": "1000101__SID_USERNAME",
+          "label": "Username",
+          "columnName": "Username",
+          "dbColumnName": "C1582",
+          "fieldType": "TEXT"
+        },
+        {
+          "fieldId": "1000101__SID_PASSWORD",
+          "label": "Password",
+          "columnName": "Password",
+          "dbColumnName": "C1583",
+          "fieldType": "PASSWORD"
+        },
+        {
+          "fieldId": "1000101__SID_LINKED-ACCOUNTS",
+          "label": "Linked Accounts",
+          "columnName": "Linked Accounts",
+          "dbColumnName": "C1619",
+          "fieldType": "MEMO"
+        },
+        {
+          "fieldId": "1000101__SID_FORGET-HEADER",
+          "label": "In case you forget...",
+          "columnName": "Header--In case you forget...",
+          "dbColumnName": null,
+          "fieldType": "HEADER"
+        },
+        {
+          "fieldId": "1000101__SID_PASSWORD-QUESTION",
+          "label": "Question We'll Ask",
+          "columnName": "Password Question",
+          "dbColumnName": "C1584",
+          "fieldType": "TEXT"
+        },
+        {
+          "fieldId": "1000101__SID_PASSWORD-ANSWER",
+          "label": "Your Answer",
+          "columnName": "Password Answer",
+          "dbColumnName": "C1585",
+          "fieldType": "TEXT"
+        },
+        {
+          "fieldId": "1000101__SID_HEADER-SUB-PREFS",
+          "label": "Subscription Preferences",
+          "columnName": "Header--Subscription Preferences",
+          "dbColumnName": null,
+          "fieldType": "HEADER"
+        },
+        {
+          "fieldId": "1000101__SID_EMAIL-FORMAT",
+          "label": "Email Format",
+          "columnName": "HTML Email",
+          "dbColumnName": "C1586",
+          "fieldType": "BOOLEAN"
+        },
+        {
+          "fieldId": "1000101__SID_REMOTE-USER-KEY",
+          "label": "Remote User Key",
+          "columnName": "RemoteUserKey",
+          "dbColumnName": "C1587",
+          "fieldType": "TEXT"
+        },
+        {
+          "fieldId": "1000101__SID_PASSWORD-EXPIRE-START",
+          "label": "Password Expire Start",
+          "columnName": "Password Expire Start",
+          "dbColumnName": "C1588",
+          "fieldType": "DATE"
+        },
+        {
+          "fieldId": "1000101__SID_EMAIL-VALIDATED",
+          "label": "Email Validated",
+          "columnName": "Email Validated",
+          "dbColumnName": "C1589",
+          "fieldType": "BOOLEAN"
+        },
+        {
+          "fieldId": "1000101__SID_PLATFORM-ENDORSE",
+          "label": "Platform Endorsements",
+          "columnName": "Platform Endorsements",
+          "dbColumnName": "C1590",
+          "fieldType": "TEXT"
+        },
+        {
+          "fieldId": "1000101__SID_MOBILE-PHONE-VALIDATED",
+          "label": "Mobile Phone Validated",
+          "columnName": "Mobile Phone Validated",
+          "dbColumnName": "C1598",
+          "fieldType": "BOOLEAN"
+        }
+      ],
+      "status": "ok",
+      "error": null,
+      "usedBy": [
+        {
+          "recordTypeId": "1000003___25003",
+          "requirement": "required"
+        }
+      ]
+    }
+  ],
+  "warnings": [
+    "get_record_type failed for \"Individual\" (1000003___25001): Error: Cannot invoke \"myassn.dynamicdata.RequiredDynoMetaMaster.getChildren()\" because the return value of \"myassn.relate.EntityType.getRequiredMetaMasters()\" is null",
+    "get_record_type failed for \"Staff\" (1000003___141049): Error: Cannot invoke \"myassn.dynamicdata.RequiredDynoMetaMaster.getChildren()\" because the return value of \"myassn.relate.EntityType.getRequiredMetaMasters()\" is null",
+    "get_record_type failed for \"Organization\" (1000003__SID_ORGANIZATION): Error: Cannot invoke \"myassn.dynamicdata.RequiredDynoMetaMaster.getChildren()\" because the return value of \"myassn.relate.EntityType.getRequiredMetaMasters()\" is null"
+  ]
+}

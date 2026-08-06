@@ -6,6 +6,7 @@
   "description": "Cobalt — static SPA deployed as a BlueStep GitSite (served at the domain root).",
   "scripts": {
     "dev": "vite",
+    "extract-schema": "node scripts/extract-schema.mjs",
     "build": "node scripts/clean-artifact.mjs && tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit"
