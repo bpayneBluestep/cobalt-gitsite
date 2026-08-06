@@ -4,13 +4,11 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import './styles.css'
 
-// The app is served under "/spa/", so React Router's basename must match the
-// Vite `base`. import.meta.env.BASE_URL is "/spa/" — trim the trailing slash.
-const basename = import.meta.env.BASE_URL.replace(/\/$/, '')
+// The app is served at the domain root, so BrowserRouter needs no basename.
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter basename={basename}>
+    <BrowserRouter>
       <App />
     </BrowserRouter>
   </StrictMode>,

@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Cobalt — static SPA deployed as a BlueStep GitSite (served under /spa/).",
+  "description": "Cobalt — static SPA deployed as a BlueStep GitSite (served at the domain root).",
   "scripts": {
     "dev": "vite",
     "build": "node scripts/clean-artifact.mjs && tsc -b && vite build",

@@ -3,7 +3,7 @@ export default function Status() {
     ['Base path', import.meta.env.BASE_URL],
     ['Mode', import.meta.env.MODE],
     ['Current path', window.location.pathname],
-    ['Build hash assets', 'resolved under /spa/assets/ ✓'],
+    ['Build hash assets', 'resolved under /assets/ ✓'],
   ]
 
   return (

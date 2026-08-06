@@ -1,6 +1,6 @@
 # Cobalt
 
-Static SPA deployable as a BlueStep GitSite, served under `/spa/`.
+Static SPA deployable as a BlueStep GitSite, served at the domain root.
 
 The committed build artifact at the repo root (`index.html` + `assets/`) **is** what
 gets served — there is no server-side build. Source lives in `app/`.
@@ -17,8 +17,8 @@ npm run preview  # preview the built artifact
 ## Deploy
 
 Commit the build output and push to `main`. The BlueStep GitSite
-(`cobalt.bluestep.net`) clones the repo and serves the root artifact; a GitHub
-push webhook triggers redeploy.
+(`cobalt.bluestep.net`) clones the repo and serves the root artifact at `/`; a
+GitHub push webhook triggers redeploy.
 
 - Git Ref: `main`
 - Index Path: `index.html`
