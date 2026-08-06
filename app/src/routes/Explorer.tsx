@@ -44,13 +44,28 @@ function TypeDetail({ t }: { t: RecordType }) {
         )}
       </dl>
 
+      {!t.inList && (
+        <div className="callout">
+          <p className="callout__title">No base form wired yet</p>
+          <p>
+            <strong>{t.displayName}</strong> exists, but the platform's own record-type
+            list leaves it out — the signature of a type with no base form set. It was
+            recovered from the relationship graph, which is where everything in this
+            tree comes from. Set a base form and display field on it in Relate admin and
+            it will appear normally.
+          </p>
+        </div>
+      )}
+
       {t.status === 'partial' && (
         <div className="callout">
-          <p className="callout__title">Form list unavailable for this type</p>
+          <p className="callout__title">Required vs optional unknown</p>
           <p>
-            The platform returned an error instead of this type's forms, so the middle
-            column may be incomplete for it. Any category that named{' '}
-            <strong>{t.displayName}</strong> as its parent is still shown in the tree.
+            The platform threw rather than returning this type's form list, so its forms
+            are shown as <strong>attached</strong> without saying which are required. The
+            links themselves are accurate — they come from the relationship graph, not
+            from this call. It throws for any type with no required form, including the
+            built-in Individual and Organization.
           </p>
           <pre className="callout__pre">{t.error}</pre>
         </div>
@@ -99,11 +114,12 @@ function Overview() {
       {schema.warnings.length > 0 && (
         <div className="callout">
           <p className="callout__title">
-            {schema.warnings.length} thing{schema.warnings.length === 1 ? '' : 's'} the platform would not return
+            {schema.warnings.length} note{schema.warnings.length === 1 ? '' : 's'} from the extract
           </p>
           <p>
-            These are gaps in the extract, not gaps in the org. Everything else on this
-            page came back clean.
+            Where a platform call refused to answer, the structure was read from the
+            relationship graph instead — so the tree and the form links are complete.
+            These say what had to be worked around.
           </p>
           <ul className="callout__list">
             {schema.warnings.map((w, i) => <li key={i}>{w}</li>)}
@@ -147,9 +163,7 @@ export default function Explorer() {
       return {
         rows: attached.map(({ form, requirement }) => ({ form, requirement })),
         heading: `${attached.length} form${attached.length === 1 ? '' : 's'} on ${selectedType.displayName}`,
-        emptyMessage: selectedType.status === 'partial'
-          ? 'The platform would not return this type\'s forms — see the panel on the right.'
-          : 'No forms are attached to this record type.',
+        emptyMessage: 'No forms are attached to this record type.',
         fieldHits: [],
       }
     }

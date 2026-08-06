@@ -1,10 +1,10 @@
 import { NavLink } from 'react-router-dom'
 import CompositionBar from './CompositionBar'
-import type { Form } from '../schema'
+import type { Form, Requirement } from '../schema'
 
 export interface FormRow {
   form: Form
-  requirement?: 'required' | 'optional'
+  requirement?: Requirement
 }
 
 export default function FormList({ rows, emptyMessage }: { rows: FormRow[]; emptyMessage: string }) {

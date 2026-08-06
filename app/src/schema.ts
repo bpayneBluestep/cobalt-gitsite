@@ -8,9 +8,13 @@ export interface Field {
   fieldType: string
 }
 
+/** 'attached' means the link is real but the platform wouldn't tell us whether
+ *  the form is required or optional for that type. */
+export type Requirement = 'required' | 'optional' | 'attached'
+
 export interface FormUse {
   recordTypeId: string
-  requirement: 'required' | 'optional'
+  requirement: Requirement
 }
 
 export interface Form {
@@ -35,6 +39,11 @@ export interface RecordType {
   subTypes: string[]
   requiredForms: string[]
   optionalForms: string[]
+  /** Forms linked to this type whose requirement the platform wouldn't report. */
+  attachedForms: string[]
+  /** False when the type exists but list_record_types omits it — the signature of
+   *  a record type with no base form wired yet. */
+  inList: boolean
   status: 'ok' | 'partial'
   error: string | null
 }
@@ -79,18 +88,26 @@ export const childrenOf = (t: RecordType): RecordType[] =>
   t.subTypes.map(id => typeById.get(id)).filter((x): x is RecordType => !!x).sort(byName)
 
 /** Every form a record type touches, with how it is attached. */
-export function formsForType(t: RecordType): Array<{ form: Form; requirement: 'required' | 'optional' }> {
-  const out: Array<{ form: Form; requirement: 'required' | 'optional' }> = []
-  for (const id of t.requiredForms) {
-    const form = formById.get(id)
-    if (form) out.push({ form, requirement: 'required' })
-  }
-  for (const id of t.optionalForms) {
-    const form = formById.get(id)
-    if (form) out.push({ form, requirement: 'optional' })
+export function formsForType(t: RecordType): Array<{ form: Form; requirement: Requirement }> {
+  const out: Array<{ form: Form; requirement: Requirement }> = []
+  const groups: Array<[Requirement, string[]]> = [
+    ['required', t.requiredForms],
+    ['optional', t.optionalForms],
+    ['attached', t.attachedForms],
+  ]
+  const taken = new Set<string>()
+  for (const [requirement, ids] of groups) {
+    for (const id of ids) {
+      if (taken.has(id)) continue
+      const form = formById.get(id)
+      if (form) { taken.add(id); out.push({ form, requirement }) }
+    }
   }
   return out.sort((a, b) => byName(a.form, b.form))
 }
+
+export const formCount = (t: RecordType): number =>
+  new Set([...t.requiredForms, ...t.optionalForms, ...t.attachedForms]).size
 
 export const allForms = [...schema.forms].sort(byName)
 export const unattachedForms = allForms.filter(f => f.usedBy.length === 0)

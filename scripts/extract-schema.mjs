@@ -131,11 +131,66 @@ function gatewayClient() {
     return { ok: !isError && !softError, error: softError || (isError ? text : null), data: data?.data ?? data, text };
   }
 
-  return { init, callOrg };
+  /** Run a GraphQL query through the org's graphql_query tool. */
+  async function gql(org, query) {
+    const r = await callOrg(org, 'graphql_query', { query });
+    if (!r.ok) return { ok: false, error: r.error, data: null };
+    // graphql_query returns the raw GraphQL envelope; surface field errors.
+    let env = null;
+    try { env = JSON.parse(r.text); } catch { /* not JSON */ }
+    if (env?.errors?.length) return { ok: false, error: env.errors[0]?.message || 'graphql error', data: null };
+    return { ok: true, error: null, data: env?.data ?? r.data };
+  }
+
+  return { init, callOrg, gql };
 }
 
 // ---------------------------------------------------------------- extraction
 const cleanErr = e => String(e || '').replace(/\s+/g, ' ').trim().slice(0, 300);
+
+// Relate object class ids, used by the children()/parents() graph queries.
+const CLASS_RECORD_TYPE = 1000003;
+const CLASS_RELATE_APP = 530002;
+
+/*
+ * Record-type structure comes from the relationship graph, not from
+ * list_record_types / get_record_type. Both of those under-report on this
+ * platform: get_record_type throws (RequiredDynoMetaMaster … null) for every type
+ * with no required form — which includes the built-in Individual and Organization
+ * — and list_record_types omits categories of any type that throws. The graph is
+ * authoritative and always answers.
+ *
+ *   children(<relate app>, 1000003) -> every record type in the org
+ *   children(<record type>, 1000003) -> that type's categories
+ *   children(<form>,        1000003) -> the record types a form is attached to
+ *
+ * A type is a CATEGORY iff it appears as another type's child; everything else is
+ * a base type. (Depth alone won't do it — the Relate app lists every type as a
+ * child, categories included.)
+ */
+async function readTypeGraph(gw, org, warnings) {
+  const app = await gw.gql(org, `{ remoteObjectsByName(classId:${CLASS_RELATE_APP}, name:"Relate"){ ... on Relate { topId } } }`);
+  const relateAppId = app.data?.remoteObjectsByName?.[0]?.topId;
+  if (!relateAppId) {
+    warnings.push('Could not resolve the Relate app id, so record-type structure fell back to list_record_types alone (categories may be missing).');
+    return null;
+  }
+
+  const kidsOf = async id => {
+    const r = await gw.gql(org, `{ children(parentId:"${id}", classId:${CLASS_RECORD_TYPE}, start:0, count:200){ ... on RelateRecordType { topId displayName } } }`);
+    if (!r.ok) {
+      warnings.push(`children() failed for ${id}: ${cleanErr(r.error)}`);
+      return []
+    }
+    return (r.data?.children || []).filter(c => c && c.topId)
+  }
+
+  const all = await kidsOf(relateAppId)
+  const childrenById = new Map()
+  for (const t of all) childrenById.set(t.topId, await kidsOf(t.topId))
+
+  return { relateAppId, all, childrenById }
+}
 
 async function extract(org) {
   const gw = gatewayClient();
@@ -145,59 +200,90 @@ async function extract(org) {
   console.log(`[extract] org ${org}`);
 
   // --- record types -------------------------------------------------
+  // list_record_types supplies metadata (name, description); the relationship
+  // graph supplies the structure and catches types the list omits entirely.
   const rtRes = await gw.callOrg(org, 'list_record_types', { limit: 100 });
   if (!rtRes.ok) throw new Error(`list_record_types failed: ${cleanErr(rtRes.error)}`);
-  const rawTypes = rtRes.data?.items || [];
-  console.log(`[extract] ${rawTypes.length} record types`);
+  const listed = new Map((rtRes.data?.items || []).map(t => [t.topId, t]));
 
-  const recordTypes = rawTypes.map(t => ({
-    topId: t.topId,
-    name: t.name,
-    displayName: t.displayName,
-    description: t.description || null,
-    baseType: !!t.baseType,
-    displayOrder: t.displayOrder ?? 0,
-    parents: [],
-    subTypes: [],
-    requiredForms: [],
-    optionalForms: [],
-    status: 'pending',
-    error: null,
-  }));
+  const graph = await readTypeGraph(gw, org, warnings);
+  const seen = new Map();
+  const add = t => {
+    if (!seen.has(t.topId)) seen.set(t.topId, { topId: t.topId, displayName: t.displayName });
+  };
+  if (graph) for (const t of graph.all) add(t);
+  for (const t of listed.values()) add(t);
+  if (graph) for (const kids of graph.childrenById.values()) for (const k of kids) add(k);
+
+  const categoryIds = new Set();
+  if (graph) for (const kids of graph.childrenById.values()) for (const k of kids) categoryIds.add(k.topId);
+
+  const recordTypes = [...seen.values()].map(t => {
+    const meta = listed.get(t.topId) || {};
+    const subTypes = (graph?.childrenById.get(t.topId) || []).map(k => k.topId);
+    return {
+      topId: t.topId,
+      name: meta.name || t.displayName,
+      displayName: meta.displayName || t.displayName,
+      description: meta.description || null,
+      // Derived from the graph, not the platform's baseType flag — that flag
+      // reads false for a type whose base form isn't wired yet.
+      baseType: graph ? !categoryIds.has(t.topId) : !!meta.baseType,
+      displayOrder: meta.displayOrder ?? 0,
+      parents: [],
+      subTypes,
+      requiredForms: [],
+      optionalForms: [],
+      attachedForms: [],
+      inList: listed.has(t.topId),
+      status: 'pending',
+      error: null,
+    };
+  });
   const byId = new Map(recordTypes.map(t => [t.topId, t]));
 
-  // --- per-type detail (parent links + form associations) ------------
-  for (const rt of recordTypes) {
-    const r = await gw.callOrg(org, 'get_record_type', { recordTypeId: rt.topId });
-    if (!r.ok) {
-      rt.status = 'partial';
-      rt.error = cleanErr(r.error);
-      warnings.push(`get_record_type failed for "${rt.displayName}" (${rt.topId}): ${rt.error}`);
-      continue;
-    }
-    const d = r.data || {};
-    rt.status = 'ok';
-    rt.parents = (d.applicableBaseTypes || []).map(b => b.topId);
-    rt.subTypes = (d.subTypes || []).map(s => s.topId);
-    rt.requiredForms = (d.requiredForms || []).map(f => f.topId);
-    rt.optionalForms = (d.optionalForms || []).map(f => f.topId);
-    if (d.description && !rt.description) rt.description = d.description;
-  }
-
-  // Backfill: base types whose own lookup NPE'd still learn their children
-  // from the categories that resolved and named them as a parent.
-  for (const rt of recordTypes) {
-    for (const parentId of rt.parents) {
-      const parent = byId.get(parentId);
-      if (parent && !parent.subTypes.includes(rt.topId)) parent.subTypes.push(rt.topId);
-    }
-  }
-  // And children learn parents from a base type that DID resolve its subTypes.
   for (const rt of recordTypes) {
     for (const childId of rt.subTypes) {
       const child = byId.get(childId);
       if (child && !child.parents.includes(rt.topId)) child.parents.push(rt.topId);
     }
+  }
+
+  const hidden = recordTypes.filter(t => !t.inList);
+  console.log(`[extract] ${recordTypes.length} record types` +
+    (hidden.length ? ` (${hidden.length} found only via the relationship graph)` : ''));
+  if (hidden.length) {
+    warnings.push(
+      `${hidden.length} record type(s) exist but are missing from list_record_types — ` +
+      `${hidden.map(t => `"${t.displayName}"`).join(', ')}. They were recovered from the ` +
+      `relationship graph. This is what a record type with no base form wired looks like.`,
+    );
+  }
+
+  // --- per-type detail: required vs optional forms, where obtainable ---
+  for (const rt of recordTypes) {
+    const r = await gw.callOrg(org, 'get_record_type', { recordTypeId: rt.topId });
+    if (!r.ok) {
+      rt.status = 'partial';
+      rt.error = cleanErr(r.error);
+      continue;
+    }
+    const d = r.data || {};
+    rt.status = 'ok';
+    rt.requiredForms = (d.requiredForms || []).map(f => f.topId);
+    rt.optionalForms = (d.optionalForms || []).map(f => f.topId);
+    if (d.description && !rt.description) rt.description = d.description;
+  }
+  const partial = recordTypes.filter(t => t.status === 'partial');
+  if (partial.length) {
+    warnings.push(
+      `get_record_type failed for ${partial.length} type(s) — ` +
+      `${partial.map(t => `"${t.displayName}"`).join(', ')} — so their forms are shown as ` +
+      `"attached" without a required/optional distinction. The platform throws ` +
+      `RequiredDynoMetaMaster…getRequiredMetaMasters() is null for any type with no ` +
+      `required form, including the built-in Individual and Organization. Structure is ` +
+      `unaffected: it comes from the relationship graph.`,
+    );
   }
 
   // --- forms + fields ----------------------------------------------
@@ -241,17 +327,39 @@ async function extract(org) {
     });
   }
 
-  // --- reverse index: form -> record types that use it --------------
-  const usedBy = new Map();
+  // --- form <-> record type links -----------------------------------
+  // A form's attachment shows up as the record type being a CHILD of the form,
+  // so children(<form>) is the authoritative link — it resolves even for types
+  // whose get_record_type throws. Requirement comes from get_record_type where
+  // that worked, otherwise the link is reported as plain "attached".
+  const requirementOf = new Map();
   for (const rt of recordTypes) {
     for (const [kind, ids] of [['required', rt.requiredForms], ['optional', rt.optionalForms]]) {
-      for (const id of ids) {
-        if (!usedBy.has(id)) usedBy.set(id, []);
-        usedBy.get(id).push({ recordTypeId: rt.topId, requirement: kind });
+      for (const id of ids) requirementOf.set(`${id}:${rt.topId}`, kind);
+    }
+  }
+
+  for (const f of forms) {
+    const r = await gw.gql(org, `{ children(parentId:"${f.topId}", classId:${CLASS_RECORD_TYPE}, start:0, count:200){ ... on RelateRecordType { topId } } }`);
+    if (!r.ok) {
+      warnings.push(`Could not read record-type links for form "${f.displayName}": ${cleanErr(r.error)}`);
+      f.usedBy = [];
+      continue;
+    }
+    f.usedBy = (r.data?.children || [])
+      .filter(c => c && c.topId && byId.has(c.topId))
+      .map(c => ({
+        recordTypeId: c.topId,
+        requirement: requirementOf.get(`${f.topId}:${c.topId}`) || 'attached',
+      }));
+    // Mirror the link onto the record type so the tree can count its forms.
+    for (const use of f.usedBy) {
+      const rt = byId.get(use.recordTypeId);
+      if (rt && use.requirement === 'attached' && !rt.attachedForms.includes(f.topId)) {
+        rt.attachedForms.push(f.topId);
       }
     }
   }
-  for (const f of forms) f.usedBy = usedBy.get(f.topId) || [];
 
   const fieldTypeCounts = {};
   for (const f of forms) for (const fl of f.fields) {

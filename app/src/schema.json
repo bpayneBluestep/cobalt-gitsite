@@ -1,16 +1,16 @@
 {
   "org": "U142140",
-  "extractedAt": "2026-08-06T14:23:24.838Z",
+  "extractedAt": "2026-08-06T21:04:52.451Z",
   "source": "https://gateway.bluestep.net/mcp (invoke_org_tool)",
   "stats": {
-    "recordTypes": 4,
-    "baseTypes": 2,
-    "categories": 2,
-    "forms": 3,
-    "fields": 22,
-    "unlinkedForms": 1,
+    "recordTypes": 8,
+    "baseTypes": 3,
+    "categories": 5,
+    "forms": 4,
+    "fields": 28,
+    "unlinkedForms": 0,
     "fieldTypeCounts": {
-      "TEXT": 11,
+      "TEXT": 17,
       "MEMO": 2,
       "DATE": 3,
       "PASSWORD": 1,
@@ -28,10 +28,15 @@
       "displayOrder": 0,
       "parents": [],
       "subTypes": [
-        "1000003___25003"
+        "1000003___25003",
+        "1000003___141049"
       ],
       "requiredForms": [],
       "optionalForms": [],
+      "attachedForms": [
+        "1000001__SID_CONTACT"
+      ],
+      "inList": true,
       "status": "partial",
       "error": "Error: Cannot invoke \"myassn.dynamicdata.RequiredDynoMetaMaster.getChildren()\" because the return value of \"myassn.relate.EntityType.getRequiredMetaMasters()\" is null"
     },
@@ -52,6 +57,8 @@
       "optionalForms": [
         "1000001___1100008"
       ],
+      "attachedForms": [],
+      "inList": true,
       "status": "ok",
       "error": null
     },
@@ -62,10 +69,14 @@
       "description": "Staff Members",
       "baseType": false,
       "displayOrder": 0,
-      "parents": [],
+      "parents": [
+        "1000003___25001"
+      ],
       "subTypes": [],
       "requiredForms": [],
       "optionalForms": [],
+      "attachedForms": [],
+      "inList": true,
       "status": "partial",
       "error": "Error: Cannot invoke \"myassn.dynamicdata.RequiredDynoMetaMaster.getChildren()\" because the return value of \"myassn.relate.EntityType.getRequiredMetaMasters()\" is null"
     },
@@ -80,11 +91,147 @@
       "subTypes": [],
       "requiredForms": [],
       "optionalForms": [],
+      "attachedForms": [],
+      "inList": true,
+      "status": "partial",
+      "error": "Error: Cannot invoke \"myassn.dynamicdata.RequiredDynoMetaMaster.getChildren()\" because the return value of \"myassn.relate.EntityType.getRequiredMetaMasters()\" is null"
+    },
+    {
+      "topId": "1000003___141050",
+      "name": "Company",
+      "displayName": "Company",
+      "description": "Organizations BlueStep sells to and serves — leads, active clients, and former clients.",
+      "baseType": true,
+      "displayOrder": 0,
+      "parents": [],
+      "subTypes": [
+        "1000003___141070",
+        "1000003___141090",
+        "1000003___141091"
+      ],
+      "requiredForms": [],
+      "optionalForms": [],
+      "attachedForms": [
+        "1000001___2197271"
+      ],
+      "inList": true,
+      "status": "partial",
+      "error": "Error: Cannot invoke \"myassn.dynamicdata.RequiredDynoMetaMaster.getChildren()\" because the return value of \"myassn.relate.EntityType.getRequiredMetaMasters()\" is null"
+    },
+    {
+      "topId": "1000003___141070",
+      "name": "Lead",
+      "displayName": "Lead",
+      "description": null,
+      "baseType": false,
+      "displayOrder": 0,
+      "parents": [
+        "1000003___141050"
+      ],
+      "subTypes": [],
+      "requiredForms": [],
+      "optionalForms": [],
+      "attachedForms": [],
+      "inList": false,
+      "status": "partial",
+      "error": "Error: Cannot invoke \"myassn.dynamicdata.RequiredDynoMetaMaster.getChildren()\" because the return value of \"myassn.relate.EntityType.getRequiredMetaMasters()\" is null"
+    },
+    {
+      "topId": "1000003___141090",
+      "name": "Client",
+      "displayName": "Client",
+      "description": null,
+      "baseType": false,
+      "displayOrder": 0,
+      "parents": [
+        "1000003___141050"
+      ],
+      "subTypes": [],
+      "requiredForms": [],
+      "optionalForms": [],
+      "attachedForms": [],
+      "inList": false,
+      "status": "partial",
+      "error": "Error: Cannot invoke \"myassn.dynamicdata.RequiredDynoMetaMaster.getChildren()\" because the return value of \"myassn.relate.EntityType.getRequiredMetaMasters()\" is null"
+    },
+    {
+      "topId": "1000003___141091",
+      "name": "Former Client",
+      "displayName": "Former Client",
+      "description": null,
+      "baseType": false,
+      "displayOrder": 0,
+      "parents": [
+        "1000003___141050"
+      ],
+      "subTypes": [],
+      "requiredForms": [],
+      "optionalForms": [],
+      "attachedForms": [],
+      "inList": false,
       "status": "partial",
       "error": "Error: Cannot invoke \"myassn.dynamicdata.RequiredDynoMetaMaster.getChildren()\" because the return value of \"myassn.relate.EntityType.getRequiredMetaMasters()\" is null"
     }
   ],
   "forms": [
+    {
+      "topId": "1000001___2197271",
+      "displayName": "Company",
+      "singleEntry": true,
+      "fieldCount": 6,
+      "fields": [
+        {
+          "fieldId": "1000101___3673689",
+          "label": "Name",
+          "columnName": "Name",
+          "dbColumnName": "C1629",
+          "fieldType": "TEXT"
+        },
+        {
+          "fieldId": "1000101___3673690",
+          "label": "Website",
+          "columnName": "Website",
+          "dbColumnName": "C1630",
+          "fieldType": "TEXT"
+        },
+        {
+          "fieldId": "1000101___3673691",
+          "label": "Street",
+          "columnName": "Street",
+          "dbColumnName": "C1631",
+          "fieldType": "TEXT"
+        },
+        {
+          "fieldId": "1000101___3673692",
+          "label": "City",
+          "columnName": "City",
+          "dbColumnName": "C1632",
+          "fieldType": "TEXT"
+        },
+        {
+          "fieldId": "1000101___3673693",
+          "label": "State",
+          "columnName": "State",
+          "dbColumnName": "C1633",
+          "fieldType": "TEXT"
+        },
+        {
+          "fieldId": "1000101___3673694",
+          "label": "Postal Code",
+          "columnName": "Postal Code",
+          "dbColumnName": "C1634",
+          "fieldType": "TEXT"
+        }
+      ],
+      "status": "ok",
+      "error": null,
+      "usedBy": [
+        {
+          "recordTypeId": "1000003___141050",
+          "requirement": "attached"
+        }
+      ]
+    },
     {
       "topId": "1000001__SID_CONTACT",
       "displayName": "Contact Info",
@@ -136,7 +283,12 @@
       ],
       "status": "ok",
       "error": null,
-      "usedBy": []
+      "usedBy": [
+        {
+          "recordTypeId": "1000003___25001",
+          "requirement": "attached"
+        }
+      ]
     },
     {
       "topId": "1000001___1100008",
@@ -284,8 +436,7 @@
     }
   ],
   "warnings": [
-    "get_record_type failed for \"Individual\" (1000003___25001): Error: Cannot invoke \"myassn.dynamicdata.RequiredDynoMetaMaster.getChildren()\" because the return value of \"myassn.relate.EntityType.getRequiredMetaMasters()\" is null",
-    "get_record_type failed for \"Staff\" (1000003___141049): Error: Cannot invoke \"myassn.dynamicdata.RequiredDynoMetaMaster.getChildren()\" because the return value of \"myassn.relate.EntityType.getRequiredMetaMasters()\" is null",
-    "get_record_type failed for \"Organization\" (1000003__SID_ORGANIZATION): Error: Cannot invoke \"myassn.dynamicdata.RequiredDynoMetaMaster.getChildren()\" because the return value of \"myassn.relate.EntityType.getRequiredMetaMasters()\" is null"
+    "3 record type(s) exist but are missing from list_record_types — \"Lead\", \"Client\", \"Former Client\". They were recovered from the relationship graph. This is what a record type with no base form wired looks like.",
+    "get_record_type failed for 7 type(s) — \"Individual\", \"Staff\", \"Organization\", \"Company\", \"Lead\", \"Client\", \"Former Client\" — so their forms are shown as \"attached\" without a required/optional distinction. The platform throws RequiredDynoMetaMaster…getRequiredMetaMasters() is null for any type with no required form, including the built-in Individual and Organization. Structure is unaffected: it comes from the relationship graph."
   ]
 }

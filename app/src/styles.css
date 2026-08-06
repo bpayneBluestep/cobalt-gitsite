@@ -569,6 +569,13 @@ main { flex: 1; min-height: 0; display: flex; }
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cobalt) 40%, transparent);
 }
 
+/* The link is real, but the platform wouldn't say required or optional. */
+.tag[data-req="attached"] {
+  color: var(--text-dim);
+  background: var(--bg-sunk);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+
 .tag--warn {
   color: var(--warn);
   background: color-mix(in srgb, var(--warn) 12%, transparent);
