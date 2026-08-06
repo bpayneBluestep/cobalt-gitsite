@@ -4,9 +4,11 @@ A visual map of a BlueStep org's Relate schema: record types and their categorie
 every form, and each form's fields. Built to answer "what's actually in this org?"
 and "which form owns `C1611`?" without digging through the platform UI.
 
-Static SPA deployable as a BlueStep GitSite, served at the domain root. The
-committed build artifact at the repo root (`index.html` + `assets/`) **is** what
-gets served — there is no server-side build. Source lives in `app/`.
+**Live at <https://cobalt.bluestep.net/spa/>.**
+
+Static SPA deployed as a BlueStep GitSite under the `/spa/` prefix. The committed
+build artifact at the repo root (`index.html` + `assets/`) **is** what gets served
+— there is no server-side build. Source lives in `app/`.
 
 ## What it shows
 
@@ -71,9 +73,16 @@ npm run preview         # preview the built artifact
 
 ## Deploy
 
-Commit the build output and push to `main`. The BlueStep GitSite
-(`cobalt.bluestep.net`) clones the repo and serves the root artifact at `/`; a
-GitHub push webhook triggers redeploy.
+Commit the build output and push to `main`. The BlueStep GitSite clones the repo
+and serves the root artifact under `/spa/`; the GitHub push webhook triggers
+redeploy.
 
 - Git Ref: `main`
 - Index Path: `index.html`
+- Served at: `https://cobalt.bluestep.net/spa/`
+
+**`base` must stay `/spa/`.** The domain root serves the org's own login page, not
+this app — only `/spa/assets/…` is mounted. Building with the default `base: '/'`
+produces an `index.html` that requests `/assets/…`, which 404s and leaves a blank
+page. `main.tsx` derives the router `basename` from the same value, so deep links
+like `/spa/form/<topId>` survive a hard refresh.
