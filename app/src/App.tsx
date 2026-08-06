@@ -1,6 +1,7 @@
 import { Link, Route, Routes } from 'react-router-dom'
 import Explorer from './routes/Explorer'
 import ThemeToggle from './components/ThemeToggle'
+import ToolsMenu from './components/ToolsMenu'
 import { schema, formatWhen } from './schema'
 
 export default function App() {
@@ -24,6 +25,7 @@ export default function App() {
             <span className="stamp__org">{schema.org}</span>
             <span className="stamp__when">{formatWhen(schema.extractedAt)}</span>
           </span>
+          <ToolsMenu />
           <ThemeToggle />
         </div>
       </header>
