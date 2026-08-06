@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+
+# Logs / editor cruft
+*.log
+.DS_Store
+.vscode/
+.idea/
+
+# TS build info
+*.tsbuildinfo
+
+# NOTE: the built SPA artifact (/index.html and /assets/) is intentionally
+# NOT ignored — the committed build output at the repo root IS the GitSite
+# deploy artifact. Do not add it here.
