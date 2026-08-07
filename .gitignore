@@ -10,6 +10,10 @@ node_modules/
 # TS build info
 *.tsbuildinfo
 
+# Ledger of seeded record ids, written by scripts/seed-companies.mjs so --undo can
+# find them again. Machine-local: the ids only mean anything against one org.
+seeded-companies.json
+
 # NOTE: the built SPA artifact (/index.html and /assets/) is intentionally
 # NOT ignored — the committed build output at the repo root IS the GitSite
 # deploy artifact. Do not add it here.
