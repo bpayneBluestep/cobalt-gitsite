@@ -26,6 +26,24 @@ function TypeDetail({ t }: { t: RecordType }) {
       <dl className="facts">
         <div><dt>Internal name</dt><dd><code>{t.name}</code></dd></div>
         <div><dt>Top id</dt><dd><CopyId value={t.topId} label="record type id" /></dd></div>
+        {t.baseType && (
+          <div>
+            <dt>Base form</dt>
+            <dd>
+              {t.baseFormId && formById.get(t.baseFormId)
+                ? <Link to={`/schema/form/${encodeURIComponent(t.baseFormId)}`} className="inlink">
+                    {formById.get(t.baseFormId)!.displayName}
+                  </Link>
+                : <span className="muted">none — this type has no identity form</span>}
+            </dd>
+          </div>
+        )}
+        {t.displayFieldLabel && (
+          <div>
+            <dt>Display field</dt>
+            <dd><code>{t.displayFieldLabel}</code> <span className="muted">— the record’s title</span></dd>
+          </div>
+        )}
         {parents.length > 0 && (
           <div>
             <dt>Extends</dt>

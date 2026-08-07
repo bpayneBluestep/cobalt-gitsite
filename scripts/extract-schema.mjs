@@ -232,6 +232,8 @@ async function extract(org) {
       displayOrder: meta.displayOrder ?? 0,
       parents: [],
       subTypes,
+      baseFormId: null,
+      displayFieldLabel: null,
       requiredForms: [],
       optionalForms: [],
       attachedForms: [],
@@ -260,6 +262,28 @@ async function extract(org) {
     );
   }
 
+  /*
+   * A base record type's identity form is its `baseForm`, and that association is
+   * NOT a parent/child link — so the children() graph can't see it, and
+   * list_forms doesn't necessarily list the form either (Cobalt's "Company Info"
+   * base form is absent from it). Read baseForm + allForms per type over GraphQL
+   * and treat those as form discovery as well as linkage; otherwise the most
+   * important form in the org goes missing from the picture.
+   */
+  const extraForms = new Map();
+  for (const rt of recordTypes) {
+    const r = await gw.gql(org, `{ remoteObject(id:"${rt.topId}"){ ... on RelateRecordType { baseForm { ... on RelateForm { topId displayName } } displayField { ... on RelateFieldWrapper { topId } } allForms { ... on RelateForm { topId displayName } } } } }`);
+    const d = r.data?.remoteObject;
+    if (!d) continue;
+    if (d.baseForm?.topId) {
+      rt.baseFormId = d.baseForm.topId;
+      extraForms.set(d.baseForm.topId, d.baseForm.displayName);
+    }
+    for (const f of d.allForms || []) {
+      if (f?.topId) extraForms.set(f.topId, f.displayName);
+    }
+  }
+
   // --- per-type detail: required vs optional forms, where obtainable ---
   for (const rt of recordTypes) {
     const r = await gw.callOrg(org, 'get_record_type', { recordTypeId: rt.topId });
@@ -272,6 +296,8 @@ async function extract(org) {
     rt.status = 'ok';
     rt.requiredForms = (d.requiredForms || []).map(f => f.topId);
     rt.optionalForms = (d.optionalForms || []).map(f => f.topId);
+    if (d.baseForm?.topId) rt.baseFormId = d.baseForm.topId;
+    if (d.displayField) rt.displayFieldLabel = d.displayField.label || d.displayField.name || null;
     if (d.description && !rt.description) rt.description = d.description;
   }
   const partial = recordTypes.filter(t => t.status === 'partial');
@@ -289,11 +315,30 @@ async function extract(org) {
   // --- forms + fields ----------------------------------------------
   const formRes = await gw.callOrg(org, 'list_forms', { limit: 100 });
   if (!formRes.ok) throw new Error(`list_forms failed: ${cleanErr(formRes.error)}`);
-  let rawForms = formRes.data?.items || [];
+  const rawForms = formRes.data?.items || [];
   if (formRes.data?.hasMore) {
     warnings.push(`list_forms reported hasMore with ${rawForms.length} returned; the tool caps at 100 per call and exposes no cursor, so forms beyond the first 100 are NOT in this snapshot.`);
   }
-  console.log(`[extract] ${rawForms.length} forms${formRes.data?.hasMore ? ' (truncated at 100 — see warnings)' : ''}`);
+
+  // Fold in forms the record types reference but list_forms doesn't return.
+  const seenForms = new Set(rawForms.map(f => f.topId));
+  const missed = [];
+  for (const [topId, displayName] of extraForms) {
+    if (seenForms.has(topId)) continue;
+    seenForms.add(topId);
+    rawForms.push({ topId, displayName });
+    missed.push(displayName);
+  }
+  if (missed.length) {
+    warnings.push(
+      `${missed.length} form(s) are referenced by a record type but missing from list_forms — ` +
+      `${missed.map(n => `"${n}"`).join(', ')}. Recovered from the record types' baseForm/allForms. ` +
+      `A base form in particular can be absent from that list.`,
+    );
+  }
+  console.log(`[extract] ${rawForms.length} forms` +
+    (missed.length ? ` (${missed.length} recovered from record types)` : '') +
+    (formRes.data?.hasMore ? ' (list truncated at 100 — see warnings)' : ''));
 
   const forms = [];
   let done = 0;
@@ -334,8 +379,14 @@ async function extract(org) {
   // that worked, otherwise the link is reported as plain "attached".
   const requirementOf = new Map();
   for (const rt of recordTypes) {
+    // A base form is the type's identity form — the strongest link there is, and
+    // it must win over any weaker attachment for the same pair.
+    if (rt.baseFormId) requirementOf.set(`${rt.baseFormId}:${rt.topId}`, 'base');
     for (const [kind, ids] of [['required', rt.requiredForms], ['optional', rt.optionalForms]]) {
-      for (const id of ids) requirementOf.set(`${id}:${rt.topId}`, kind);
+      for (const id of ids) {
+        const key = `${id}:${rt.topId}`
+        if (requirementOf.get(key) !== 'base') requirementOf.set(key, kind)
+      }
     }
   }
 
@@ -346,13 +397,17 @@ async function extract(org) {
       f.usedBy = [];
       continue;
     }
-    f.usedBy = (r.data?.children || [])
-      .filter(c => c && c.topId && byId.has(c.topId))
-      .map(c => ({
-        recordTypeId: c.topId,
-        requirement: requirementOf.get(`${f.topId}:${c.topId}`) || 'attached',
-      }));
-    // Mirror the link onto the record type so the tree can count its forms.
+    const linked = new Map()
+    for (const c of r.data?.children || []) {
+      if (c?.topId && byId.has(c.topId)) linked.set(c.topId, requirementOf.get(`${f.topId}:${c.topId}`) || 'attached')
+    }
+    // baseForm is not a parent/child link, so add those pairs explicitly.
+    for (const rt of recordTypes) {
+      if (rt.baseFormId === f.topId) linked.set(rt.topId, 'base')
+    }
+    f.usedBy = [...linked.entries()].map(([recordTypeId, requirement]) => ({ recordTypeId, requirement }));
+    // Mirror weaker links onto the record type so the tree can count its forms.
+    // base/required/optional already live on the type from get_record_type.
     for (const use of f.usedBy) {
       const rt = byId.get(use.recordTypeId);
       if (rt && use.requirement === 'attached' && !rt.attachedForms.includes(f.topId)) {

@@ -674,6 +674,13 @@ main { flex: 1; min-height: 0; display: flex; }
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cobalt) 40%, transparent);
 }
 
+/* The type's identity form — the strongest link a form can have. */
+.tag[data-req="base"] {
+  color: #fff;
+  background: var(--cobalt);
+  box-shadow: inset 0 0 0 1px var(--cobalt);
+}
+
 /* The link is real, but the platform wouldn't say required or optional. */
 .tag[data-req="attached"] {
   color: var(--text-dim);

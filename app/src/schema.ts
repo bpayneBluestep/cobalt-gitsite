@@ -10,7 +10,7 @@ export interface Field {
 
 /** 'attached' means the link is real but the platform wouldn't tell us whether
  *  the form is required or optional for that type. */
-export type Requirement = 'required' | 'optional' | 'attached'
+export type Requirement = 'base' | 'required' | 'optional' | 'attached'
 
 export interface FormUse {
   recordTypeId: string
@@ -37,6 +37,10 @@ export interface RecordType {
   displayOrder: number
   parents: string[]
   subTypes: string[]
+  /** The type's identity form. Not a parent/child link — read separately. */
+  baseFormId: string | null
+  /** Label of the field used as the record's title. */
+  displayFieldLabel: string | null
   requiredForms: string[]
   optionalForms: string[]
   /** Forms linked to this type whose requirement the platform wouldn't report. */
@@ -91,6 +95,7 @@ export const childrenOf = (t: RecordType): RecordType[] =>
 export function formsForType(t: RecordType): Array<{ form: Form; requirement: Requirement }> {
   const out: Array<{ form: Form; requirement: Requirement }> = []
   const groups: Array<[Requirement, string[]]> = [
+    ['base', t.baseFormId ? [t.baseFormId] : []],
     ['required', t.requiredForms],
     ['optional', t.optionalForms],
     ['attached', t.attachedForms],
@@ -107,7 +112,10 @@ export function formsForType(t: RecordType): Array<{ form: Form; requirement: Re
 }
 
 export const formCount = (t: RecordType): number =>
-  new Set([...t.requiredForms, ...t.optionalForms, ...t.attachedForms]).size
+  new Set([
+    ...(t.baseFormId ? [t.baseFormId] : []),
+    ...t.requiredForms, ...t.optionalForms, ...t.attachedForms,
+  ]).size
 
 export const allForms = [...schema.forms].sort(byName)
 export const unattachedForms = allForms.filter(f => f.usedBy.length === 0)
