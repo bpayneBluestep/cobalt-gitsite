@@ -15,17 +15,27 @@
  *   2. form_entry UPDATE -> the Company form row (single-entry forms create their
  *      row lazily on UPDATE, so CREATE is not the right action here)
  *
- * BLOCKED until the Company record type has a base form
- * ------------------------------------------------------
- * Right now step 1 fails with "Cannot set the record's type to a record
- * category" — the platform does not treat Company as a base record type until a
- * base form and display field are set on it in Relate admin. A genuine base type
- * (Organization) fails differently ("Cannot create an Entity w/o any form
- * entries"), which is how we know the type, not the tool, is the problem. Wire the
- * base form, then run this.
+ * DO NOT RUN THIS YET. Records cannot be deleted.
+ * ------------------------------------------------
+ * `record DELETE` is refused — "AI tools are not permitted to perform DELETE
+ * operations" — the same restriction that blocks deleting schema objects. So every
+ * record this creates is PERMANENT until a human removes it in Relate. There is no
+ * working --undo; the flag is kept only to report that.
  *
- * Records, unlike schema objects, CAN be removed: `record DELETE` soft-deletes.
- * So a bad seed here is recoverable — see --undo.
+ * Two blockers remain, in order:
+ *
+ *  1. `record CREATE` (the MCP tool) always fails with "Cannot create an Entity
+ *     w/o any form entries". The GraphQL `createRecord` mutation does work and is
+ *     what this script uses.
+ *  2. A created record has NO unit/org parent, and passing
+ *     `parents: [{topId: <unit>}]` does not set one. Without a unit the record
+ *     cannot take a category ("Entity … has no unit/org parent") and does not
+ *     appear in `listRecordsOfType`, so it is useless for the Clients page.
+ *
+ * The sanctioned path for seeding is through the endpoint's own BSJS
+ * (`query.newRecord()` + field writes + `B.commit()`), which creates the record in
+ * the right unit. That needs the Maestro compiled — i.e. it waits on b6p reaching
+ * this org. Prefer adding one record by hand in Relate over running this.
  *
  * Credentials: never in this repo. Reads the global b6pt_ bearer from
  * $B6PT_TOKEN, or discovers it from ~/.claude.json.
@@ -39,20 +49,20 @@ import process from 'node:process'
 const GATEWAY_HOST = 'gateway.bluestep.net'
 const ORG = 'U142140'
 
-const RECORD_TYPE_COMPANY = '1000003___141050'
-const FORM_COMPANY = '1000001___2197271'
+const RECORD_TYPE_COMPANY = '1000003__FID_company'
+const FORM_COMPANY = '1000001___2197371' // Company Info — the base form
 const CATEGORY = {
-  Lead: '1000003___141070',
-  Client: '1000003___141090',
-  'Former Client': '1000003___141091',
+  Lead: '1000003___141112',
+  Client: '1000003___141130',
+  'Former Client': '1000003___141114',
 }
 const FIELD = {
-  name: '1000101___3673689',
-  website: '1000101___3673690',
-  street: '1000101___3673691',
-  city: '1000101___3673692',
-  state: '1000101___3673693',
-  postalCode: '1000101___3673694',
+  name: '1000101___3674329',
+  website: '1000101___3674469',
+  street: '1000101___3674470',
+  city: '1000101___3674471',
+  state: '1000101___3674472',
+  postalCode: '1000101___3674473',
 }
 
 // Deliberately fictional — example.com domains, invented names — so nothing in
@@ -170,16 +180,17 @@ const gw = client()
 await gw.init()
 
 if (undo) {
-  if (!fs.existsSync(LEDGER)) {
-    console.error(`[seed] no ledger at ${LEDGER} — nothing to undo.`)
-    process.exit(1)
+  // Kept so the flag reports the truth rather than appearing to work: the platform
+  // refuses DELETE from AI tools, so there is no programmatic undo.
+  console.error('[seed] --undo cannot work: the platform refuses DELETE from AI tools')
+  console.error('[seed] ("AI tools are not permitted to perform DELETE operations").')
+  if (fs.existsSync(LEDGER)) {
+    console.error(`[seed] delete these by hand in Relate:`)
+    for (const { id, name } of JSON.parse(fs.readFileSync(LEDGER, 'utf8'))) {
+      console.error(`  ${id}  ${name}`)
+    }
   }
-  const ids = JSON.parse(fs.readFileSync(LEDGER, 'utf8'))
-  for (const { id, name } of ids) {
-    const r = await gw.call('record', { action: 'DELETE', recordId: id })
-    console.log(`${r.ok ? 'deleted' : 'FAILED '} ${id}  ${name}${r.ok ? '' : '  ' + clean(r.error)}`)
-  }
-  process.exit(0)
+  process.exit(1)
 }
 
 const created = []

@@ -1,16 +1,16 @@
 {
   "org": "U142140",
-  "extractedAt": "2026-08-07T15:21:40.752Z",
+  "extractedAt": "2026-08-07T17:12:35.057Z",
   "source": "https://gateway.bluestep.net/mcp (invoke_org_tool)",
   "stats": {
     "recordTypes": 8,
     "baseTypes": 3,
     "categories": 5,
     "forms": 7,
-    "fields": 37,
+    "fields": 42,
     "unlinkedForms": 1,
     "fieldTypeCounts": {
-      "TEXT": 25,
+      "TEXT": 30,
       "MEMO": 2,
       "DATE": 3,
       "PASSWORD": 1,
@@ -191,59 +191,6 @@
   ],
   "forms": [
     {
-      "topId": "1000001___2197271",
-      "displayName": "Company",
-      "singleEntry": true,
-      "fieldCount": 6,
-      "fields": [
-        {
-          "fieldId": "1000101___3673689",
-          "label": "Name",
-          "columnName": "Name",
-          "dbColumnName": "C1629",
-          "fieldType": "TEXT"
-        },
-        {
-          "fieldId": "1000101___3673690",
-          "label": "Website",
-          "columnName": "Website",
-          "dbColumnName": "C1630",
-          "fieldType": "TEXT"
-        },
-        {
-          "fieldId": "1000101___3673691",
-          "label": "Street",
-          "columnName": "Street",
-          "dbColumnName": "C1631",
-          "fieldType": "TEXT"
-        },
-        {
-          "fieldId": "1000101___3673692",
-          "label": "City",
-          "columnName": "City",
-          "dbColumnName": "C1632",
-          "fieldType": "TEXT"
-        },
-        {
-          "fieldId": "1000101___3673693",
-          "label": "State",
-          "columnName": "State",
-          "dbColumnName": "C1633",
-          "fieldType": "TEXT"
-        },
-        {
-          "fieldId": "1000101___3673694",
-          "label": "Postal Code",
-          "columnName": "Postal Code",
-          "dbColumnName": "C1634",
-          "fieldType": "TEXT"
-        }
-      ],
-      "status": "ok",
-      "error": null,
-      "usedBy": []
-    },
-    {
       "topId": "1000001__SID_CONTACT",
       "displayName": "Contact Info",
       "singleEntry": true,
@@ -337,6 +284,59 @@
           "requirement": "optional"
         }
       ]
+    },
+    {
+      "topId": "1000001___2197271",
+      "displayName": "DELETE ME — orphaned old Company form",
+      "singleEntry": true,
+      "fieldCount": 6,
+      "fields": [
+        {
+          "fieldId": "1000101___3673689",
+          "label": "Name",
+          "columnName": "Name",
+          "dbColumnName": "C1629",
+          "fieldType": "TEXT"
+        },
+        {
+          "fieldId": "1000101___3673690",
+          "label": "Website",
+          "columnName": "Website",
+          "dbColumnName": "C1630",
+          "fieldType": "TEXT"
+        },
+        {
+          "fieldId": "1000101___3673691",
+          "label": "Street",
+          "columnName": "Street",
+          "dbColumnName": "C1631",
+          "fieldType": "TEXT"
+        },
+        {
+          "fieldId": "1000101___3673692",
+          "label": "City",
+          "columnName": "City",
+          "dbColumnName": "C1632",
+          "fieldType": "TEXT"
+        },
+        {
+          "fieldId": "1000101___3673693",
+          "label": "State",
+          "columnName": "State",
+          "dbColumnName": "C1633",
+          "fieldType": "TEXT"
+        },
+        {
+          "fieldId": "1000101___3673694",
+          "label": "Postal Code",
+          "columnName": "Postal Code",
+          "dbColumnName": "C1634",
+          "fieldType": "TEXT"
+        }
+      ],
+      "status": "ok",
+      "error": null,
+      "usedBy": []
     },
     {
       "topId": "1000001__FID_onlineProfile",
@@ -541,13 +541,48 @@
       "topId": "1000001___2197371",
       "displayName": "Company Info",
       "singleEntry": true,
-      "fieldCount": 1,
+      "fieldCount": 6,
       "fields": [
         {
           "fieldId": "1000101___3674329",
           "label": "Name",
           "columnName": "Name",
           "dbColumnName": "C1639",
+          "fieldType": "TEXT"
+        },
+        {
+          "fieldId": "1000101___3674469",
+          "label": "Website",
+          "columnName": "Website",
+          "dbColumnName": "C1649",
+          "fieldType": "TEXT"
+        },
+        {
+          "fieldId": "1000101___3674470",
+          "label": "Street",
+          "columnName": "Street",
+          "dbColumnName": "C1650",
+          "fieldType": "TEXT"
+        },
+        {
+          "fieldId": "1000101___3674471",
+          "label": "City",
+          "columnName": "City",
+          "dbColumnName": "C1651",
+          "fieldType": "TEXT"
+        },
+        {
+          "fieldId": "1000101___3674472",
+          "label": "State",
+          "columnName": "State",
+          "dbColumnName": "C1652",
+          "fieldType": "TEXT"
+        },
+        {
+          "fieldId": "1000101___3674473",
+          "label": "Postal Code",
+          "columnName": "Postal Code",
+          "dbColumnName": "C1653",
           "fieldType": "TEXT"
         }
       ],
