@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 
 /*
  * Native BlueStep admin tools, folded into this SPA's toolbar — the same idea as
@@ -117,6 +118,15 @@ export default function ToolsMenu() {
 
       {open && (
         <div className="tools__menu" role="menu">
+          {/* In-app tools come first and route internally — no new tab. */}
+          <div className="tools__group">
+            <p className="tools__heading">In this app</p>
+            <Link className="tools__item" role="menuitem" to="/schema" onClick={() => setOpen(false)}>
+              <span className="tools__label">Schema explorer</span>
+              <span className="tools__note">record types &amp; fields</span>
+            </Link>
+          </div>
+
           {GROUPS.map(group => (
             <div className="tools__group" key={group.heading}>
               <p className="tools__heading">{group.heading}</p>

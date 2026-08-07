@@ -7,7 +7,7 @@ function TypeRow({ t, depth }: { t: RecordType; depth: number }) {
   return (
     <li>
       <NavLink
-        to={`/type/${encodeURIComponent(t.topId)}`}
+        to={`/schema/type/${encodeURIComponent(t.topId)}`}
         className="typerow"
         data-depth={depth}
         data-kind={t.baseType ? 'base' : 'category'}

@@ -1,8 +1,8 @@
-import { Link, Route, Routes } from 'react-router-dom'
+import { Link, NavLink, Route, Routes } from 'react-router-dom'
+import Clients from './routes/Clients'
 import Explorer from './routes/Explorer'
 import ThemeToggle from './components/ThemeToggle'
 import ToolsMenu from './components/ToolsMenu'
-import { schema, formatWhen } from './schema'
 
 export default function App() {
   return (
@@ -11,20 +11,14 @@ export default function App() {
         <Link to="/" className="brand">
           <span className="brand__mark" aria-hidden="true" />
           <span className="brand__name">Cobalt</span>
-          <span className="brand__sub">schema</span>
+          <span className="brand__sub">ERP</span>
         </Link>
 
-        <dl className="stats" aria-label="Schema totals">
-          <div><dt>Record types</dt><dd>{schema.stats.recordTypes}</dd></div>
-          <div><dt>Forms</dt><dd>{schema.stats.forms}</dd></div>
-          <div><dt>Fields</dt><dd>{schema.stats.fields}</dd></div>
-        </dl>
+        <nav className="mainnav" aria-label="Sections">
+          <NavLink to="/" end>Clients</NavLink>
+        </nav>
 
         <div className="topbar__end">
-          <span className="stamp">
-            <span className="stamp__org">{schema.org}</span>
-            <span className="stamp__when">{formatWhen(schema.extractedAt)}</span>
-          </span>
           <ToolsMenu />
           <ThemeToggle />
         </div>
@@ -32,20 +26,16 @@ export default function App() {
 
       <main>
         <Routes>
-          <Route path="/" element={<Explorer />} />
-          <Route path="/type/:typeId" element={<Explorer />} />
-          <Route path="/form/:formId" element={<Explorer />} />
-          <Route path="*" element={<Explorer />} />
+          <Route path="/" element={<Clients />} />
+          {/* The schema explorer is a tool, not a section — reached from the
+              Tools menu. Its deep links live under /schema so they stay
+              bookmarkable. */}
+          <Route path="/schema" element={<Explorer />} />
+          <Route path="/schema/type/:typeId" element={<Explorer />} />
+          <Route path="/schema/form/:formId" element={<Explorer />} />
+          <Route path="*" element={<Clients />} />
         </Routes>
       </main>
-
-      <footer className="footer">
-        <span>
-          Snapshot of <code>{schema.org}</code> — regenerate with{' '}
-          <code>npm run extract-schema</code>.
-        </span>
-        <span className="muted">{schema.source}</span>
-      </footer>
     </div>
   )
 }

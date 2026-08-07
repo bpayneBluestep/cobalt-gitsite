@@ -282,6 +282,111 @@ code { font-family: var(--font-display); font-size: 0.9em; }
 
 main { flex: 1; min-height: 0; display: flex; }
 
+/* ---------------------------------------------------------------- main nav */
+
+.mainnav { display: flex; gap: 0.25rem; }
+
+.mainnav a {
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--text-mute);
+  padding: 0.3rem 0.5rem;
+  border-radius: var(--r);
+}
+
+.mainnav a:hover { color: var(--text); background: var(--bg-raise); }
+
+.mainnav a.active {
+  color: var(--text);
+  box-shadow: inset 0 -2px 0 var(--cobalt);
+}
+
+/* ------------------------------------------------------------ content pages */
+
+.page {
+  flex: 1;
+  min-width: 0;
+  padding: 1.5rem 1.75rem 3rem;
+  overflow-y: auto;
+}
+
+.page__head { margin-bottom: 1.25rem; }
+
+.page__head h1 {
+  margin: 0 0 0.3rem;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.page__sub-text { margin: 0; max-width: 62ch; font-size: 0.85rem; color: var(--text-dim); }
+
+.page__count {
+  margin: 0 0 0.5rem;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+
+.btn {
+  display: inline-block;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: #fff;
+  background: var(--cobalt);
+  border: 1px solid var(--cobalt);
+  border-radius: var(--r);
+  padding: 0.35rem 0.7rem;
+  cursor: pointer;
+}
+
+.btn:hover { filter: brightness(1.08); }
+.callout__actions { margin-top: 0.6rem; }
+.callout--plain {
+  background: var(--bg-panel);
+  border-color: var(--line);
+  border-left-color: var(--line-strong);
+}
+.callout--plain .callout__title { color: var(--text-dim); }
+
+/* ---------------------------------------------------------- schema page bar */
+
+.schemapage { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+.schemabar {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  padding: 0.5rem 1.25rem;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--line);
+}
+
+.schemabar__title {
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.schemabar__stamp {
+  margin-left: auto;
+  font-size: 0.68rem;
+  color: var(--text-mute);
+}
+
 .footer {
   display: flex;
   justify-content: space-between;

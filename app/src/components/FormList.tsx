@@ -14,7 +14,7 @@ export default function FormList({ rows, emptyMessage }: { rows: FormRow[]; empt
     <ul className="formlist">
       {rows.map(({ form, requirement }) => (
         <li key={form.topId}>
-          <NavLink to={`/form/${encodeURIComponent(form.topId)}`} className="formcard">
+          <NavLink to={`/schema/form/${encodeURIComponent(form.topId)}`} className="formcard">
             <span className="formcard__head">
               <span className="formcard__name">{form.displayName}</span>
               {requirement && (

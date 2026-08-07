@@ -8,7 +8,7 @@ import CopyId from '../components/CopyId'
 import { pigment, typeTally } from '../pigments'
 import {
   schema, formById, typeById, formsForType, allForms, unattachedForms, search,
-  childrenOf, type RecordType, type FieldHit,
+  childrenOf, formatWhen, type RecordType, type FieldHit,
 } from '../schema'
 
 function TypeDetail({ t }: { t: RecordType }) {
@@ -30,7 +30,7 @@ function TypeDetail({ t }: { t: RecordType }) {
           <div>
             <dt>Extends</dt>
             <dd>{parents.map(p => (
-              <Link key={p.topId} to={`/type/${encodeURIComponent(p.topId)}`} className="inlink">{p.displayName}</Link>
+              <Link key={p.topId} to={`/schema/type/${encodeURIComponent(p.topId)}`} className="inlink">{p.displayName}</Link>
             ))}</dd>
           </div>
         )}
@@ -38,7 +38,7 @@ function TypeDetail({ t }: { t: RecordType }) {
           <div>
             <dt>Categories</dt>
             <dd className="facts__wrap">{kids.map(k => (
-              <Link key={k.topId} to={`/type/${encodeURIComponent(k.topId)}`} className="inlink">{k.displayName}</Link>
+              <Link key={k.topId} to={`/schema/type/${encodeURIComponent(k.topId)}`} className="inlink">{k.displayName}</Link>
             ))}</dd>
           </div>
         )}
@@ -102,7 +102,7 @@ function Overview() {
       <ul className="widest">
         {[...allForms].sort((a, b) => b.fields.length - a.fields.length).slice(0, 6).map(f => (
           <li key={f.topId}>
-            <Link to={`/form/${encodeURIComponent(f.topId)}`} className="widest__row">
+            <Link to={`/schema/form/${encodeURIComponent(f.topId)}`} className="widest__row">
               <span className="widest__name">{f.displayName}</span>
               <span className="widest__bar"><CompositionBar fields={f.fields} height={10} /></span>
               <span className="widest__n">{f.fields.length}</span>
@@ -176,7 +176,21 @@ export default function Explorer() {
   }, [query, onlyUnattached, selectedType])
 
   return (
-    <div className="explorer">
+    <div className="schemapage">
+      <div className="schemabar">
+        <span className="schemabar__title">Schema</span>
+        <dl className="stats" aria-label="Schema totals">
+          <div><dt>Record types</dt><dd>{schema.stats.recordTypes}</dd></div>
+          <div><dt>Forms</dt><dd>{schema.stats.forms}</dd></div>
+          <div><dt>Fields</dt><dd>{schema.stats.fields}</dd></div>
+        </dl>
+        <span className="schemabar__stamp">
+          Snapshot of <code>{schema.org}</code> · {formatWhen(schema.extractedAt)} · regenerate with{' '}
+          <code>npm run extract-schema</code>
+        </span>
+      </div>
+
+      <div className="explorer">
       <section className="pane pane--types" aria-labelledby="pane-types">
         <h2 className="pane__title" id="pane-types">Record types</h2>
         <p className="pane__sub">
@@ -212,7 +226,7 @@ export default function Explorer() {
             <span className="filter__n">{unattachedForms.length}</span>
           </button>
           {(selectedType || onlyUnattached || query) && (
-            <Link to="/" className="filter filter--reset" onClick={() => { setQuery(''); setOnlyUnattached(false) }}>
+            <Link to="/schema" className="filter filter--reset" onClick={() => { setQuery(''); setOnlyUnattached(false) }}>
               Reset
             </Link>
           )}
@@ -229,7 +243,7 @@ export default function Explorer() {
             <ul className="hits">
               {fieldHits.slice(0, 40).map(({ form, field }) => (
                 <li key={`${form.topId}:${field.fieldId}`}>
-                  <Link to={`/form/${encodeURIComponent(form.topId)}`} className="hit">
+                  <Link to={`/schema/form/${encodeURIComponent(form.topId)}`} className="hit">
                     <span className="hit__spine" style={{ background: pigment(field.fieldType) }} aria-hidden="true" />
                     <span className="hit__label">{field.label || field.columnName}</span>
                     {field.dbColumnName && <code className="hit__db">{field.dbColumnName}</code>}
@@ -272,7 +286,7 @@ export default function Explorer() {
                     : selectedForm.usedBy.map(u => {
                       const t = typeById.get(u.recordTypeId)
                       return t ? (
-                        <Link key={u.recordTypeId} to={`/type/${encodeURIComponent(t.topId)}`} className="inlink">
+                        <Link key={u.recordTypeId} to={`/schema/type/${encodeURIComponent(t.topId)}`} className="inlink">
                           {t.displayName}
                           <span className="tag" data-req={u.requirement}>{u.requirement}</span>
                         </Link>
@@ -297,6 +311,7 @@ export default function Explorer() {
           <Overview />
         )}
       </section>
+      </div>
     </div>
   )
 }
