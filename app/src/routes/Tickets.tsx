@@ -5,9 +5,9 @@ import { maestroGet, ApiError } from '../api'
 /*
  * Tickets — the "ClickUp killer" board, scoped to a company record.
  *
- * Reads `action=tickets` from the Maestro. That action does not exist yet: the
- * endpoint cannot compile on this org until BlueHQ registers it, so the page shows
- * an honest failure state rather than pretending.
+ * Reads `action=tickets` from the Maestro. The Maestro is live, but this action is
+ * not built yet — there is no ticket schema on the org — so the page shows an
+ * honest failure state rather than pretending.
  *
  * `?demo=1` renders sample rows instead, so the layout and interactions can be
  * reviewed before the data path is live. The banner makes clear it is not real.
@@ -86,8 +86,9 @@ export default function Tickets() {
           </p>
           <p>{state.error.message}</p>
           <p>
-            The board itself is built. Once the Maestro compiles and its{' '}
-            <code>tickets</code> action lands, this fills in with no further work here.
+            The board itself is built. The Maestro is live — it just has no{' '}
+            <code>tickets</code> action yet, because the ticket schema hasn't been
+            created. Once both land, this fills in with no further work here.
           </p>
           <p className="callout__actions">
             {state.error.needsLogin
