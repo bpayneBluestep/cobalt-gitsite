@@ -1,26 +1,22 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
+import { Link, Outlet, useLocation, useOutletContext, useParams } from 'react-router-dom'
 import {
-  ApiError, getCompany, updateCompany, setCategory,
-  COMPANY_FIELDS, COMPANY_CATEGORIES, type Company, type CompanyFieldKey,
+  ApiError, getCompany, setCategory,
+  COMPANY_CATEGORIES, type Company,
 } from '../api'
-import ContactsPanel from '../components/ContactsPanel'
-import FilesPanel from '../components/FilesPanel'
 import AccountOwnerCard from '../components/AccountOwnerCard'
 import RecordTabs from '../components/RecordTabs'
 
 /*
- * The company record — reached by clicking a row on the Clients table.
+ * The company record — the shell every one of its sections renders inside.
  *
- * One editable card, 1:1 with the real BlueStep form (Company Info), following
- * the eccrm pattern: render the live values as inputs, send ONLY the fields the
- * user actually changed, and re-render from the record the server echoes back
- * rather than from what we hoped we sent.
+ * The name, the facts, the stage control and the tab strip belong to the RECORD, not to
+ * any one section, so they live here and each tab is a child route that fills in below.
+ * Tickets used to be a route of its own and lost all of this, which made opening the
+ * board feel like leaving the company rather than moving around inside it.
  *
- * The stage control moves the company between Lead / Client / Former Client.
- * Unlike eccrm's person stages, these are mutually exclusive — a company sits in
- * exactly one. Moving requires the platform's Category Editor permission; when
- * the caller lacks it the endpoint says so and the message lands inline.
+ * Children read the loaded company (and a way to re-read it) from the outlet context
+ * rather than fetching it again.
  */
 
 type State =
@@ -31,25 +27,16 @@ type State =
 const LOGIN_URL = '/shared/login/login.jsp?desturl=' +
   encodeURIComponent(window.location.pathname + window.location.search)
 
-/** Values as edited in the form, keyed the same as the endpoint's field catalog. */
-type Draft = Record<CompanyFieldKey, string>
-
-function draftOf(c: Company): Draft {
-  const d = {} as Draft
-  for (const f of COMPANY_FIELDS) d[f.key] = (c[f.key] || '') as string
-  return d
+export interface RecordContext {
+  company: Company
+  /** Re-read the record — for a child that changed something the header shows. */
+  reload: () => void
+  /** Replace the header's copy from a child's own fresh reply. */
+  setCompany: (c: Company) => void
 }
 
-/** Only the keys whose value differs from the saved record. */
-function changedKeys(draft: Draft, saved: Company): Partial<Record<CompanyFieldKey, string>> {
-  const out: Partial<Record<CompanyFieldKey, string>> = {}
-  for (const f of COMPANY_FIELDS) {
-    const now = draft[f.key] ?? ''
-    const was = (saved[f.key] || '') as string
-    if (now !== was) out[f.key] = now
-  }
-  return out
-}
+/** For a child route: the company this section belongs to. */
+export const useRecord = () => useOutletContext<RecordContext>()
 
 export default function CompanyRecord() {
   const { id = '' } = useParams()
@@ -57,27 +44,15 @@ export default function CompanyRecord() {
   // client exists, so this is a warning about what's missing, not an error.
   const arrivalWarning = (useLocation().state as { warning?: string } | null)?.warning || ''
   const [state, setState] = useState<State>({ phase: 'loading' })
-  // Which panel is open lives in the URL, so the strip works the same here as it does
-  // on the ticket board and a tab can be linked to. Same route either way, so switching
-  // tabs costs nothing — the record is not re-fetched.
-  const [params, setParams] = useSearchParams()
-  const asked = params.get('tab')
-  const tab: 'info' | 'contacts' | 'files' =
-    asked === 'contacts' || asked === 'files' ? asked : 'info'
-  const setTab = (next: 'info' | 'contacts' | 'files') =>
-    setParams(next === 'info' ? {} : { tab: next }, { replace: true })
-  const [draft, setDraft] = useState<Draft | null>(null)
-  const [saving, setSaving] = useState(false)
   const [moving, setMoving] = useState('')
   const [notice, setNotice] = useState('')
   const [failure, setFailure] = useState('')
 
   const load = useCallback(() => {
     setState({ phase: 'loading' })
-    setNotice('')
-    setFailure('')
+    setNotice(''); setFailure('')
     getCompany(id)
-      .then(company => { setState({ phase: 'ready', company }); setDraft(draftOf(company)) })
+      .then(company => setState({ phase: 'ready', company }))
       .catch(err => setState({
         phase: 'error',
         error: err instanceof ApiError ? err : new ApiError(String(err)),
@@ -87,48 +62,13 @@ export default function CompanyRecord() {
   useEffect(load, [load])
 
   const company = state.phase === 'ready' ? state.company : null
-  const pending = company && draft ? changedKeys(draft, company) : {}
-  const dirty = Object.keys(pending).length > 0
-
-  function edit(key: CompanyFieldKey, value: string) {
-    setDraft(d => (d ? { ...d, [key]: value } : d))
-    setNotice('')
-    setFailure('')
-  }
-
-  function save() {
-    if (!company || !dirty) return
-    setSaving(true)
-    setFailure('')
-    setNotice('')
-    updateCompany(company.id, pending)
-      .then(fresh => {
-        setState({ phase: 'ready', company: fresh })
-        setDraft(draftOf(fresh))
-        const n = Object.keys(pending).length
-        setNotice(`Saved ${n} field${n === 1 ? '' : 's'}.`)
-      })
-      .catch(err => setFailure(err instanceof ApiError ? err.message : String(err)))
-      .finally(() => setSaving(false))
-  }
-
-  function revert() {
-    if (company) setDraft(draftOf(company))
-    setNotice('')
-    setFailure('')
-  }
 
   function move(category: string) {
     if (!company) return
     setMoving(category)
-    setFailure('')
-    setNotice('')
+    setFailure(''); setNotice('')
     setCategory(company.id, category)
-      .then(fresh => {
-        setState({ phase: 'ready', company: fresh })
-        setDraft(draftOf(fresh))
-        setNotice(`Moved to ${category}.`)
-      })
+      .then(fresh => { setState({ phase: 'ready', company: fresh }); setNotice(`Moved to ${category}.`) })
       .catch(err => setFailure(err instanceof ApiError ? err.message : String(err)))
       .finally(() => setMoving(''))
   }
@@ -159,7 +99,7 @@ export default function CompanyRecord() {
         </div>
       )}
 
-      {company && draft && (
+      {company && (
         <>
           <header className="page__head">
             <p className="eyebrow">Company</p>
@@ -177,6 +117,9 @@ export default function CompanyRecord() {
             </div>
           )}
 
+          {failure && <p className="editcard__err" role="alert">{failure}</p>}
+          {notice && <p className="board2__notice" role="status">{notice}</p>}
+
           <div className="reccard">
             <dl className="facts">
               <div>
@@ -191,9 +134,7 @@ export default function CompanyRecord() {
                       )}
                     </>
                   ) : (
-                    <button type="button" className="linkbtn" onClick={() => setTab('contacts')}>
-                      Add a contact
-                    </button>
+                    <Link className="linkbtn" to={`/clients/${company.id}/contacts`}>Add a contact</Link>
                   )}
                 </dd>
               </div>
@@ -239,69 +180,21 @@ export default function CompanyRecord() {
             </div>
           </div>
 
-          <RecordTabs companyId={company.id} active={tab} />
+          <RecordTabs companyId={company.id} />
 
-          {tab === 'contacts' && (
-            <ContactsPanel companyId={company.id} onMirror={load} />
-          )}
-
-          {tab === 'files' && (
-            <FilesPanel companyId={company.id} />
-          )}
-
-          {tab === 'info' && (
-            <AccountOwnerCard companyId={company.id} onChanged={load} />
-          )}
-
-          {tab === 'info' && (
-          <div className="editcard">
-            <div className="editcard__head">
-              <h2>Company Info</h2>
-              <p className="note">
-                The record's base form. Only the fields you change are written.
-              </p>
-            </div>
-
-            {failure && (
-              <p className="editcard__err" role="alert">{failure}</p>
-            )}
-
-            <div className="efgrid">
-              {COMPANY_FIELDS.map(f => (
-                <div className="ef" key={f.key}>
-                  <label htmlFor={`ef-${f.key}`}>
-                    {f.label}
-                    {'required' in f && f.required && <span className="ef__req" aria-hidden="true">*</span>}
-                  </label>
-                  <input
-                    id={`ef-${f.key}`}
-                    type="text"
-                    value={draft[f.key]}
-                    placeholder={'placeholder' in f ? f.placeholder : ''}
-                    autoComplete="off"
-                    onChange={e => edit(f.key, e.target.value)}
-                  />
-                </div>
-              ))}
-            </div>
-
-            <div className="editcard__foot">
-              <span className="editcard__status">
-                {saving ? 'Saving…' : notice ? notice : dirty
-                  ? `${Object.keys(pending).length} unsaved change${Object.keys(pending).length === 1 ? '' : 's'}`
-                  : ''}
-              </span>
-              <button type="button" className="btn btn--ghost" onClick={revert} disabled={!dirty || saving}>
-                Revert
-              </button>
-              <button type="button" className="btn" onClick={save} disabled={!dirty || saving}>
-                Save changes
-              </button>
-            </div>
-          </div>
-          )}
+          <Outlet context={{
+            company,
+            reload: load,
+            setCompany: (c: Company) => setState({ phase: 'ready', company: c }),
+          } as RecordContext} />
         </>
       )}
     </section>
   )
+}
+
+/** The account owner belongs to the record, but only the Info tab has room for it. */
+export function RecordOwnerCard() {
+  const { company, reload } = useRecord()
+  return <AccountOwnerCard companyId={company.id} onChanged={reload} />
 }

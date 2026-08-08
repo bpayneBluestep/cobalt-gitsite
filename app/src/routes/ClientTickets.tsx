@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { ApiError, getClientList, getTickets, type List, type Ticket } from '../api'
 import TicketBoard from '../components/TicketBoard'
-import RecordTabs from '../components/RecordTabs'
+import { useRecord } from './CompanyRecord'
 
 /*
- * A client's tickets, at /clients/<id>/tickets.
+ * The Tickets tab of a company record.
  *
- * The list is resolved through `clientList`, which returns the client's list or
- * creates it on first ask — so a client added before the list feature existed
- * still lands on a working board rather than an error.
+ * A child route, so the company's name, facts and tab strip stay above it — the board is
+ * a section of the record, not a place you go instead of it.
+ *
+ * The list is resolved through `clientList`, which returns the client's list or creates
+ * it on first ask, so a client added before the list feature existed still lands on a
+ * working board rather than an error.
  */
 
 type State =
@@ -21,7 +24,8 @@ const LOGIN_URL = '/shared/login/login.jsp?desturl=' +
   encodeURIComponent(window.location.pathname + window.location.search)
 
 export default function ClientTickets() {
-  const { id = '' } = useParams()
+  const { company } = useRecord()
+  const id = company.id
   const [state, setState] = useState<State>({ phase: 'loading' })
 
   const load = useCallback(() => {
@@ -56,17 +60,7 @@ export default function ClientTickets() {
   }, [])
 
   return (
-    <section className="page">
-      <nav className="crumb" aria-label="Breadcrumb">
-        <Link to="/clients">Clients</Link>
-        <span aria-hidden="true">/</span>
-        <Link to={`/clients/${id}`}>
-          {state.phase === 'ready' ? state.list.clientName || state.list.listName : 'Client'}
-        </Link>
-        <span aria-hidden="true">/</span>
-        <span>Tickets</span>
-      </nav>
-
+    <>
       {state.phase === 'loading' && <p className="empty">Loading tickets…</p>}
 
       {state.phase === 'error' && (
@@ -87,18 +81,11 @@ export default function ClientTickets() {
 
       {state.phase === 'ready' && (
         <>
-          <header className="page__head">
-            <p className="eyebrow">{state.list.kind || 'List'}</p>
-            <h1>{state.list.listName || 'Tickets'}</h1>
-            <p className="page__sub-text">
-              Work tracked against this client — the internal replacement for ClickUp.
-              {state.created && ' This list was created just now.'}
+          {state.created && (
+            <p className="board2__notice" role="status">
+              This client had no ticket list, so one was created just now.
             </p>
-          </header>
-
-          {/* The same strip as the record itself, so the other three sections are one
-              click away rather than a trip back through the breadcrumb. */}
-          <RecordTabs companyId={id} active="tickets" />
+          )}
 
           <TicketBoard
             list={state.list}
@@ -108,6 +95,6 @@ export default function ClientTickets() {
           />
         </>
       )}
-    </section>
+    </>
   )
 }

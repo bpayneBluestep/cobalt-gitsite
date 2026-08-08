@@ -203,10 +203,14 @@ export const updateCompany = (
 export const TICKET_STATUSES = ['Open', 'Up Next', 'In Progress', 'In Review', 'Complete'] as const
 export const TICKET_PRIORITIES = ['Low', 'Normal', 'High', 'Critical'] as const
 
+/*
+ * Two tabs, not one per status: what is still to do, and what is finished. Splitting the
+ * open work across Open / Ready / Current hid it — a board is for seeing everything
+ * outstanding at once. The statuses still matter, so the Open tab GROUPS by them, in the
+ * order of TICKET_STATUSES.
+ */
 export const TICKET_TABS = [
-  { key: 'open', label: 'Open', statuses: ['Open'] },
-  { key: 'ready', label: 'Ready', statuses: ['Up Next'] },
-  { key: 'current', label: 'Current', statuses: ['In Progress', 'In Review'] },
+  { key: 'open', label: 'Open', statuses: ['Open', 'Up Next', 'In Progress', 'In Review'] },
   { key: 'completed', label: 'Completed', statuses: ['Complete'] },
 ] as const
 

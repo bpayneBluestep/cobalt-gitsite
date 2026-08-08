@@ -2,6 +2,9 @@ import { Link, NavLink, Route, Routes } from 'react-router-dom'
 import Clients from './routes/Clients'
 import ClientTickets from './routes/ClientTickets'
 import CompanyRecord from './routes/CompanyRecord'
+import CompanyInfo from './routes/CompanyInfo'
+import CompanyContacts from './routes/CompanyContacts'
+import CompanyFiles from './routes/CompanyFiles'
 import Tickets from './routes/Tickets'
 import Explorer from './routes/Explorer'
 import UnderConstruction from './routes/UnderConstruction'
@@ -53,10 +56,18 @@ export default function App() {
           <Route path="/settings" element={<Settings />} />
 
           {/* Clients is live. It sits under /clients rather than the root now that
-              Home has it, and is reached from Home and from CRM. */}
+              Home has it, and is reached from Home and from CRM.
+
+              A company record is a LAYOUT: its name, facts, stage control and tab strip
+              are rendered once, and each section below is a child route — so the header
+              stays put whichever tab you are on, tickets included. */}
           <Route path="/clients" element={<Clients />} />
-          <Route path="/clients/:id" element={<CompanyRecord />} />
-          <Route path="/clients/:id/tickets" element={<ClientTickets />} />
+          <Route path="/clients/:id" element={<CompanyRecord />}>
+            <Route index element={<CompanyInfo />} />
+            <Route path="tickets" element={<ClientTickets />} />
+            <Route path="contacts" element={<CompanyContacts />} />
+            <Route path="files" element={<CompanyFiles />} />
+          </Route>
 
           {/* A ticket is a page of its own, addressed by its org-wide number, so the
               link can be pasted into a chat and opened by whoever gets it. An entry id
