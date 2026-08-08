@@ -149,8 +149,13 @@ export default function CompanyRecord() {
       {company && draft && (
         <>
           <header className="page__head">
-            <p className="eyebrow">Company</p>
-            <h1>{company.name || <span className="muted">Untitled</span>}</h1>
+            <div className="page__headrow">
+              <div>
+                <p className="eyebrow">Company</p>
+                <h1>{company.name || <span className="muted">Untitled</span>}</h1>
+              </div>
+              <Link className="btn" to={`/clients/${company.id}/tickets`}>Tickets →</Link>
+            </div>
           </header>
 
           {arrivalWarning && (

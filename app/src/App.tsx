@@ -1,5 +1,6 @@
 import { Link, NavLink, Route, Routes } from 'react-router-dom'
 import Clients from './routes/Clients'
+import ClientTickets from './routes/ClientTickets'
 import CompanyRecord from './routes/CompanyRecord'
 import Tickets from './routes/Tickets'
 import Explorer from './routes/Explorer'
@@ -31,6 +32,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Clients />} />
           <Route path="/clients/:id" element={<CompanyRecord />} />
+          <Route path="/clients/:id/tickets" element={<ClientTickets />} />
           {/* The schema explorer is a tool, not a section — reached from the
               Tools menu. Its deep links live under /schema so they stay
               bookmarkable. */}

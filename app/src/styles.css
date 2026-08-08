@@ -1213,3 +1213,190 @@ main { flex: 1; min-height: 0; display: flex; }
   border-left: 2px solid var(--warn);
 }
 .callout--warn .callout__title { color: var(--warn); }
+
+/* --------------------------------------------------------------- ticket board
+
+   The Cobalt port of beh's Clickup Killer: status tabs with counts, a search +
+   filter row, and a table grouped by status with a priority-ranked body. Uses the
+   existing table and field vocabulary so it reads as one product.
+   -------------------------------------------------------------------------- */
+
+.board2__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.85rem;
+}
+
+.tabs { display: flex; gap: 0.25rem; flex-wrap: wrap; }
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.7rem;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  cursor: pointer;
+}
+.tab:hover { color: var(--text); background: var(--bg-raise); }
+.tab[data-on] {
+  color: var(--text);
+  background: var(--bg-panel);
+  border-color: var(--line-strong);
+  box-shadow: inset 0 -2px 0 var(--cobalt);
+}
+.tab__n {
+  font-size: 0.68rem;
+  color: var(--text-mute);
+  background: var(--bg-sunk);
+  border-radius: 999px;
+  padding: 0.05rem 0.4rem;
+}
+.tab[data-on] .tab__n { color: var(--cobalt); }
+
+.board2__tools { display: flex; gap: 0.4rem; align-items: center; margin-bottom: 0.6rem; }
+.board2__search {
+  flex: 1;
+  min-width: 0;
+  padding: 0.45rem 0.55rem;
+  font-family: inherit;
+  font-size: 0.82rem;
+  color: var(--text);
+  background: var(--bg-raise);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.board2__search::placeholder { color: var(--text-mute); }
+.board2__search:focus { border-color: var(--cobalt); outline: none; }
+
+.board2__filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 0.9rem;
+  padding: var(--pane-pad);
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.board2__filters select,
+.board2__filters input {
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  font-family: inherit;
+  font-size: 0.8rem;
+  color: var(--text);
+  background: var(--bg-raise);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+
+.board2__notice {
+  margin: 0 0 0.8rem;
+  font-size: 0.78rem;
+  color: var(--cobalt);
+}
+.board2__confirm { font-size: 0.78rem; color: var(--text-dim); }
+
+/* group header row inside the ticket table */
+.grouprow td {
+  padding: 0.55rem 0.6rem !important;
+  background: var(--bg-sunk);
+  border-bottom: 1px solid var(--line) !important;
+}
+.grouprow__n {
+  margin-left: 0.5rem;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  color: var(--text-mute);
+}
+
+.pill {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  color: var(--text-dim);
+}
+.pill[data-status="Open"]       { color: var(--text-dim); }
+.pill[data-status="UpNext"]     { color: #7a6bd8; border-color: #7a6bd8; }
+.pill[data-status="InProgress"] { color: var(--cobalt); border-color: var(--cobalt); }
+.pill[data-status="InReview"]   { color: var(--warn); border-color: var(--warn); }
+.pill[data-status="Complete"]   { color: #5AA33C; border-color: #5AA33C; }
+
+.pill[data-prio="Critical"] { color: #ce4a5b; border-color: #ce4a5b; }
+.pill[data-prio="High"]     { color: var(--warn); border-color: var(--warn); }
+.pill[data-prio="Normal"]   { color: var(--cobalt); border-color: var(--cobalt); }
+.pill[data-prio="Low"]      { color: var(--text-mute); }
+
+/* A priority spine on each row, so urgency reads before you parse the text. */
+.tickets tbody tr[data-prio] th { border-left: 2px solid transparent; padding-left: 0.6rem; }
+.tickets tbody tr[data-prio="Critical"] th { border-left-color: #ce4a5b; }
+.tickets tbody tr[data-prio="High"] th { border-left-color: var(--warn); }
+.tickets tbody tr[data-prio="Normal"] th { border-left-color: var(--cobalt); }
+
+.rowlink__btn {
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: none;
+  border-bottom: 1px solid transparent;
+  cursor: pointer;
+}
+.rowlink__btn:hover { color: var(--cobalt); border-bottom-color: var(--cobalt); }
+
+.tickets__move select {
+  padding: 0.2rem 0.3rem;
+  font-family: inherit;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  background: var(--bg-raise);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.tickets__move select:focus { border-color: var(--cobalt); outline: none; }
+
+.ef--wide { grid-column: 1 / -1; }
+.ef select,
+.ef textarea {
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  font-family: inherit;
+  font-size: 0.82rem;
+  color: var(--text);
+  background: var(--bg-raise);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.ef textarea { resize: vertical; }
+.ef select:focus, .ef textarea:focus { border-color: var(--cobalt); outline: none; }
+
+.btn--danger { background: #ce4a5b; }
+
+.checkline {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2rem;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  text-transform: none;
+  letter-spacing: 0;
+  font-family: var(--font-ui);
+  cursor: pointer;
+}
+.checkline input { width: auto; accent-color: var(--cobalt); }

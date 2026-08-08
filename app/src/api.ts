@@ -164,6 +164,74 @@ export type CompanyFieldKey = (typeof COMPANY_FIELDS)[number]['key']
 export const updateCompany = (id: string, fields: Partial<Record<CompanyFieldKey, string>>): Promise<Company> =>
   maestroPost('updateCompany', { id, fields })
 
+// ------------------------------------------------------------------- tickets
+// Vocabulary and tab mapping match the beh "Clickup Killer" exactly. The endpoint
+// is the authority — these are the client's copy for rendering controls, and the
+// endpoint validates every write against its own list.
+
+export const TICKET_STATUSES = ['Open', 'Up Next', 'In Progress', 'In Review', 'Complete'] as const
+export const TICKET_PRIORITIES = ['Low', 'Normal', 'High', 'Critical'] as const
+
+export const TICKET_TABS = [
+  { key: 'open', label: 'Open', statuses: ['Open'] },
+  { key: 'ready', label: 'Ready', statuses: ['Up Next'] },
+  { key: 'current', label: 'Current', statuses: ['In Progress', 'In Review'] },
+  { key: 'completed', label: 'Completed', statuses: ['Complete'] },
+] as const
+
+/** Priority order for sorting a group, highest first — beh's PRIORITY_RANK. */
+export const PRIORITY_RANK: Record<string, number> = { Critical: 4, High: 3, Normal: 2, Low: 1 }
+
+export interface Ticket {
+  entryId: string
+  title: string
+  status: string
+  priority: string
+  assignee: string
+  dueDate: string
+  sprint: string
+  details: string
+  createdBy: string
+  createdAt: string
+  completedAt: string
+  listId: string
+  listName: string
+  clientId: string
+  clientName: string
+}
+
+export interface TicketList {
+  statuses: string[]
+  priorities: string[]
+  listsScanned: number
+  total: number
+  rows: Ticket[]
+}
+
+/** The editable ticket fields — the server-stamped audit ones are excluded. */
+export type TicketFieldKey = 'title' | 'status' | 'priority' | 'assignee' | 'dueDate' | 'sprint' | 'details'
+
+export const getTickets = (params: { listId?: string; assignee?: string; sprint?: string; status?: string } = {}): Promise<TicketList> =>
+  maestroGet('tickets', params as Record<string, string>)
+
+export const getList = (id: string): Promise<List & { tickets: Ticket[] }> => maestroGet('list', { id })
+
+export const getLists = (params: { clientId?: string; kind?: string } = {}): Promise<{ total: number; rows: List[] }> =>
+  maestroGet('lists', params as Record<string, string>)
+
+/** Create or find the list for a client — how a client's board comes into being. */
+export const getClientList = (clientId: string): Promise<List & { created: boolean; tickets: Ticket[] }> =>
+  maestroPost('clientList', { clientId })
+
+export const addTicket = (listId: string, fields: Partial<Record<TicketFieldKey, string>>): Promise<Ticket> =>
+  maestroPost('addTicket', { listId, fields })
+
+export const updateTicket = (listId: string, entryId: string, fields: Partial<Record<TicketFieldKey, string>>): Promise<Ticket> =>
+  maestroPost('updateTicket', { listId, entryId, fields })
+
+export const deleteTicket = (listId: string, entryId: string): Promise<{ deleted: string; listId: string }> =>
+  maestroPost('deleteTicket', { listId, entryId })
+
 export const COMPANY_CATEGORIES = ['Lead', 'Client', 'Former Client'] as const
 
 /** Move a company to exactly one category. */
