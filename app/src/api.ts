@@ -121,6 +121,33 @@ export const getCompanies = (category?: string): Promise<CompanyList> =>
 
 export const getCompany = (id: string): Promise<Company> => maestroGet('company', { id })
 
+export interface List {
+  id: string
+  listName: string
+  desc: string
+  clientId: string
+  clientName: string
+  kind: string
+  archived: boolean
+  isClientList: boolean
+}
+
+export interface NewClient {
+  company: Company
+  /** The client's list, created alongside. Null only if that second step failed. */
+  list: List | null
+  inClientCategory: boolean
+  /** Set when the client was created but its list wasn't — the client still exists. */
+  listError: string | null
+}
+
+/**
+ * Add a client. This creates two records: the Company in the Client category and
+ * its List, whose clientId points back at the company.
+ */
+export const createClient = (fields: Partial<Record<CompanyFieldKey, string>>): Promise<NewClient> =>
+  maestroPost('createClient', { fields })
+
 /** The fields a company record exposes for editing, in display order. */
 export const COMPANY_FIELDS = [
   { key: 'name', label: 'Name', required: true },

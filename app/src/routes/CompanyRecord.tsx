@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import {
   ApiError, getCompany, updateCompany, setCategory,
   COMPANY_FIELDS, COMPANY_CATEGORIES, type Company, type CompanyFieldKey,
@@ -49,6 +49,9 @@ function changedKeys(draft: Draft, saved: Company): Partial<Record<CompanyFieldK
 
 export default function CompanyRecord() {
   const { id = '' } = useParams()
+  // Set when we arrive straight from "New client" and the list step failed — the
+  // client exists, so this is a warning about what's missing, not an error.
+  const arrivalWarning = (useLocation().state as { warning?: string } | null)?.warning || ''
   const [state, setState] = useState<State>({ phase: 'loading' })
   const [draft, setDraft] = useState<Draft | null>(null)
   const [saving, setSaving] = useState(false)
@@ -149,6 +152,17 @@ export default function CompanyRecord() {
             <p className="eyebrow">Company</p>
             <h1>{company.name || <span className="muted">Untitled</span>}</h1>
           </header>
+
+          {arrivalWarning && (
+            <div className="callout callout--warn">
+              <p className="callout__title">Client created, but its list wasn't</p>
+              <p>{arrivalWarning}</p>
+              <p>
+                The client itself is saved. Its ticket list can be created on the
+                next ask, so nothing is lost.
+              </p>
+            </div>
+          )}
 
           <div className="reccard">
             <dl className="facts">
