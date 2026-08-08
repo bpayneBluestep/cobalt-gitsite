@@ -1468,7 +1468,9 @@ main { flex: 1; min-height: 0; display: flex; }
 
 /* --- the ticket page ------------------------------------------------------- */
 
-.tpage { max-width: 78rem; }
+/* Capped, but CENTRED — a max-width alone leaves all the slack on the right, which
+   reads as a broken layout on a wide monitor rather than a deliberate measure. */
+.tpage { max-width: 78rem; margin-left: auto; margin-right: auto; }
 
 .tpage__head { margin-bottom: 1rem; }
 
@@ -1561,17 +1563,61 @@ main { flex: 1; min-height: 0; display: flex; }
 }
 .tpage__save .editcard__status { flex: 1 1 100%; }
 
-.railfacts { display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 0 0 0.6rem; }
-.railfacts div { display: flex; flex-direction: column; gap: 0.1rem; }
-.railfacts dt {
-  font-family: var(--font-display);
-  font-size: 0.62rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-mute);
+/* The one question an action asks, inline under the header rather than in a panel. */
+.tpage__ask {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+  padding: 0.55rem 0.65rem;
+  background: var(--bg-raise);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
 }
-.railfacts dd { margin: 0; font-family: var(--font-display); font-size: 1rem; color: var(--text); }
-.railfacts dd[data-over] { color: #ce4a5b; }
+.tpage__ask input[type="text"] {
+  flex: 1 1 18rem;
+  min-width: 0;
+  padding: 0.4rem 0.5rem;
+  font-family: inherit;
+  font-size: 0.82rem;
+  color: var(--text);
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.tpage__ask input[type="text"]:focus { border-color: var(--cobalt); outline: none; }
+.tpage__ask--danger { border-color: #ce4a5b; }
+.tpage__askq { flex: 1 1 14rem; font-size: 0.8rem; color: var(--text-dim); }
+
+/* --- time, in the rail ----------------------------------------------------- */
+
+.railtot { margin: 0 0 0.6rem; font-size: 0.8rem; }
+.railtot strong { font-family: var(--font-display); font-size: 1.05rem; color: var(--text); }
+.railtot strong[data-over] { color: #ce4a5b; }
+
+.railtime { margin-top: 0.7rem; padding-top: 0.7rem; border-top: 1px solid var(--line); }
+.railtime__row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+.railtime .ef { margin-bottom: 0.5rem; }
+.railtime__go { display: flex; align-items: center; gap: 0.4rem; }
+.railtime__go .checkline { min-height: 0; }
+
+/* The log: one entry per line, its note underneath — a table would not fit here. */
+.tlog { list-style: none; margin: 0.7rem 0 0; padding: 0.7rem 0 0; border-top: 1px solid var(--line); }
+.tlog__e {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.tlog__e:last-child { border-bottom: none; }
+.tlog__e[data-editing] { background: color-mix(in srgb, var(--cobalt) 8%, transparent); }
+.tlog__t { font-family: var(--font-display); font-size: 0.8rem; color: var(--text); }
+.tlog__d { font-size: 0.72rem; color: var(--text-mute); }
+.tlog__acts { margin-left: auto; display: flex; gap: 0.4rem; }
+.tlog__note { flex: 1 1 100%; font-size: 0.74rem; color: var(--text-dim); }
 
 .tsec { padding: 1rem 0; border-top: 1px solid var(--line); }
 .tsec:first-of-type { padding-top: 0; border-top: none; }
@@ -1718,25 +1764,6 @@ main { flex: 1; min-height: 0; display: flex; }
 
 /* --- time ---------------------------------------------------------------- */
 
-.timehead {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 1.1rem;
-  margin-bottom: 0.8rem;
-}
-.timestat { display: flex; flex-direction: column; gap: 0.15rem; }
-.timestat--grow { flex: 1 1 8rem; min-width: 8rem; }
-
-.timestat__k {
-  font-family: var(--font-display);
-  font-size: 0.64rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-mute);
-}
-.timestat__v { font-family: var(--font-display); font-size: 1.05rem; color: var(--text); }
-.timestat__v[data-over] { color: #ce4a5b; }
 
 .meter {
   display: block;

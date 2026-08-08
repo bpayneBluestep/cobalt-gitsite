@@ -332,7 +332,62 @@ export default function TicketPage() {
             {copied ? 'Link copied' : 'Copy link'}
           </button>
           <Link className="btn btn--ghost btn--sm" to={boardPath}>Back to board</Link>
+          {/* Roadblock and delete are actions, not sections — a button each, next to
+              the others, with their one question asked inline underneath. */}
+          {ticket.roadblocked ? (
+            <button type="button" className="linkbtn" disabled={!!busy}
+              onClick={() => run('block', setRoadblock(on, false), () => setNotice('Roadblock cleared.'))}>
+              {busy === 'block' ? 'Clearing…' : 'Clear roadblock'}
+            </button>
+          ) : (
+            <button type="button" className="linkbtn" disabled={!!busy}
+              onClick={() => { setConfirmDelete(false); setShowBlockForm(true) }}>
+              Flag roadblock
+            </button>
+          )}
+          <button type="button" className="linkbtn linkbtn--danger" disabled={!!busy}
+            onClick={() => { setShowBlockForm(false); setConfirmDelete(true) }}>
+            Delete
+          </button>
         </div>
+
+        {showBlockForm && !ticket.roadblocked && (
+          <div className="tpage__ask">
+            <input type="text" value={blockReason} autoFocus autoComplete="off"
+              aria-label="What is this blocked on?"
+              placeholder="What is this blocked on? e.g. waiting on the client's SFTP credentials"
+              onChange={e => setBlockReason(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Escape') { setShowBlockForm(false); setBlockReason('') }
+                if (e.key === 'Enter' && blockReason.trim()) {
+                  run('block', setRoadblock(on, true, blockReason.trim()),
+                    () => { setShowBlockForm(false); setBlockReason(''); setNotice('Flagged as roadblocked.') })
+                }
+              }} />
+            <button type="button" className="btn btn--ghost btn--sm" disabled={!!busy}
+              onClick={() => { setShowBlockForm(false); setBlockReason('') }}>
+              Cancel
+            </button>
+            <button type="button" className="btn btn--sm" disabled={!!busy || !blockReason.trim()}
+              onClick={() => run('block', setRoadblock(on, true, blockReason.trim()),
+                () => { setShowBlockForm(false); setBlockReason(''); setNotice('Flagged as roadblocked.') })}>
+              {busy === 'block' ? 'Flagging…' : 'Flag it'}
+            </button>
+          </div>
+        )}
+
+        {confirmDelete && (
+          <div className="tpage__ask tpage__ask--danger">
+            <span className="tpage__askq">Delete this ticket for good? Its time log goes with it.</span>
+            <button type="button" className="btn btn--ghost btn--sm" disabled={!!busy}
+              onClick={() => setConfirmDelete(false)}>
+              Keep it
+            </button>
+            <button type="button" className="btn btn--danger btn--sm" onClick={remove} disabled={!!busy}>
+              {busy === 'delete' ? 'Deleting…' : 'Delete ticket'}
+            </button>
+          </div>
+        )}
 
         {/* The title IS the heading. Editing it in place beats a labelled box on a
             page whose whole subject is this one ticket. */}
@@ -360,15 +415,11 @@ export default function TicketPage() {
 
       {/* Blocked is the most important thing about a blocked ticket, so it sits above
           the two columns rather than inside either. */}
+      {/* The reason is worth a banner; clearing it is the header's button, not a
+          second copy down here. */}
       {ticket.roadblocked && (
         <div className="block block--on tpage__block">
-          <div className="block__row">
-            <span className="block__flag">Roadblocked</span>
-            <button type="button" className="btn btn--ghost btn--sm" disabled={!!busy}
-              onClick={() => run('block', setRoadblock(on, false), () => setNotice('Roadblock cleared.'))}>
-              {busy === 'block' ? 'Clearing…' : 'Clear roadblock'}
-            </button>
-          </div>
+          <span className="block__flag">Roadblocked</span>
           <p className="block__why">{ticket.roadblockReason}</p>
           <p className="block__meta">
             Flagged by {ticket.roadblockedBy || 'unknown'}
@@ -430,118 +481,6 @@ export default function TicketPage() {
             )}
           </section>
 
-          <section className="tcard">
-            <div className="tcard__head">
-              <h2>Time</h2>
-              <p className="note">The log is the truth; the total is kept in step for reporting.</p>
-            </div>
-
-            {ticket.timerRunning ? (
-              <div className="timer timer--on">
-                <span className="timer__dot" aria-hidden="true" />
-                <span className="timer__t">{formatMinutes(liveMinutes)}</span>
-                <span className="timer__who">running{ticket.timerBy ? ` for ${ticket.timerBy}` : ''}</span>
-                <button type="button" className="btn btn--sm" disabled={!!busy}
-                  onClick={() => run('timer', stopTimer(on, timeNote), fresh => {
-                    setTimeNote('')
-                    setNotice(fresh.loggedMinutes > 0
-                      ? `Stopped — logged ${formatMinutes(fresh.loggedMinutes)}.`
-                      : 'Stopped. Under a minute, so nothing was logged.')
-                  })}>
-                  {busy === 'timer' ? 'Stopping…' : 'Stop timer'}
-                </button>
-              </div>
-            ) : (
-              <div className="timer">
-                <button type="button" className="btn btn--ghost btn--sm" disabled={!!busy}
-                  onClick={() => run('timer', startTimer(on), () => setNotice('Timer started.'))}>
-                  {busy === 'timer' ? 'Starting…' : 'Start timer'}
-                </button>
-                <span className="timer__hint">or log time you have already spent</span>
-              </div>
-            )}
-
-            <div className="timeform">
-              <div className="ef ef--narrow">
-                <label htmlFor="tp-amount">{editingTime ? 'New amount' : 'Amount'}</label>
-                <input id="tp-amount" type="text" value={timeAmount} autoComplete="off" placeholder="1h30m"
-                  onChange={e => setTimeAmount(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') submitTime() }} />
-              </div>
-              <div className="ef ef--narrow">
-                <label htmlFor="tp-date">Date</label>
-                <input id="tp-date" type="date" value={timeDate} onChange={e => setTimeDate(e.target.value)} />
-              </div>
-              <div className="ef">
-                <label htmlFor="tp-note">Note</label>
-                <input id="tp-note" type="text" value={timeNote} autoComplete="off" placeholder="What you did"
-                  onChange={e => setTimeNote(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') submitTime() }} />
-              </div>
-              <div className="ef ef--narrow">
-                <label htmlFor="tp-billable">Billable</label>
-                <label className="checkline">
-                  <input id="tp-billable" type="checkbox" checked={timeBillable}
-                    onChange={e => setTimeBillable(e.target.checked)} />
-                  <span>Yes</span>
-                </label>
-              </div>
-              <div className="ef ef--narrow">
-                <label>&nbsp;</label>
-                <div className="timeform__go">
-                  {editingTime && (
-                    <button type="button" className="btn btn--ghost btn--sm" disabled={!!busy}
-                      onClick={() => { setEditingTime(''); setTimeAmount(''); setTimeNote(''); setTimeBillable(true) }}>
-                      Cancel
-                    </button>
-                  )}
-                  <button type="button" className="btn btn--sm" onClick={submitTime}
-                    disabled={!!busy || !timeAmount.trim()}>
-                    {busy === 'time' ? 'Saving…' : editingTime ? 'Update' : 'Log time'}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {ticket.time.length === 0 ? (
-              <p className="muted tsec__empty">No time logged against this yet.</p>
-            ) : (
-              <div className="tablewrap">
-                <table className="fields timelog">
-                  <thead>
-                    <tr>
-                      <th scope="col">Date</th>
-                      <th scope="col">Time</th>
-                      <th scope="col">Who</th>
-                      <th scope="col">Note</th>
-                      <th scope="col"><span className="visually-hidden">Actions</span></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {ticket.time.slice().sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)).map(e => (
-                      <tr key={e.id} data-editing={editingTime === e.id ? '' : undefined}>
-                        <td className="nowrap">{e.date}</td>
-                        <td className="nowrap">
-                          {formatMinutes(e.minutes)}
-                          {e.billable === false && <span className="tag">unbilled</span>}
-                        </td>
-                        <td>{e.who || <span className="muted">—</span>}</td>
-                        <td>{e.note || <span className="muted">—</span>}</td>
-                        <td className="timelog__act">
-                          <button type="button" className="linkbtn" disabled={!!busy}
-                            onClick={() => startEditingTime(e)}>Edit</button>
-                          <button type="button" className="linkbtn linkbtn--danger" disabled={!!busy}
-                            onClick={() => run('time', deleteTime(on, e.id), () => setNotice('Time entry removed.'))}>
-                            Remove
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
         </div>
 
         {/* The properties rail: everything you SET, in one narrow column, so the
@@ -599,88 +538,107 @@ export default function TicketPage() {
             </div>
           </section>
 
+          {/* Time sits under the properties: it is something you record about the
+              ticket, not something you read it for. Stacked rather than a five-column
+              table, because the rail is narrow and a note deserves the full width. */}
           <section className="tcard tcard--rail">
-            <h2 className="tcard__railh">Effort</h2>
-            <dl className="railfacts">
-              <div>
-                <dt>Estimate</dt>
-                <dd>{formatHours(est)}</dd>
-              </div>
-              <div>
-                <dt>Logged</dt>
-                <dd data-over={overBudget ? '' : undefined}>{formatHours(logged)}</dd>
-              </div>
-              {est !== null && est > 0 && (
-                <div>
-                  <dt>{overBudget ? 'Over by' : 'Left'}</dt>
-                  <dd data-over={overBudget ? '' : undefined}>
-                    {formatHours(Math.round(Math.abs(est - logged) * 100) / 100)}
-                  </dd>
-                </div>
-              )}
-            </dl>
-            {est !== null && est > 0 && (
-              <span className="meter" data-over={overBudget ? '' : undefined}>
-                <span className="meter__fill" style={{ width: `${Math.min(100, (logged / est) * 100)}%` }} />
+            <h2 className="tcard__railh">Time</h2>
+
+            <p className="railtot">
+              <strong data-over={overBudget ? '' : undefined}>{formatHours(logged)}</strong>
+              <span className="muted">
+                {est === null || est === 0
+                  ? ' logged, no estimate'
+                  : ` of ${formatHours(est)}${overBudget ? ' — over' : ''}`}
               </span>
-            )}
-          </section>
+            </p>
 
-          {!ticket.roadblocked && (
-            <section className="tcard tcard--rail">
-              <h2 className="tcard__railh">Roadblock</h2>
-              {showBlockForm ? (
-                <>
-                  <div className="ef">
-                    <label htmlFor="tp-rb">What is this blocked on?</label>
-                    <input id="tp-rb" type="text" value={blockReason} autoFocus autoComplete="off"
-                      placeholder="Waiting on the client's SFTP credentials"
-                      onChange={e => setBlockReason(e.target.value)} />
-                  </div>
-                  <div className="block__row">
-                    <button type="button" className="btn btn--ghost btn--sm" disabled={!!busy}
-                      onClick={() => { setShowBlockForm(false); setBlockReason('') }}>
-                      Cancel
-                    </button>
-                    <button type="button" className="btn btn--sm" disabled={!!busy || !blockReason.trim()}
-                      onClick={() => run('block', setRoadblock(on, true, blockReason.trim()),
-                        () => { setShowBlockForm(false); setBlockReason(''); setNotice('Flagged as roadblocked.') })}>
-                      {busy === 'block' ? 'Flagging…' : 'Flag it'}
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <p className="note">Nothing is holding this up.</p>
-                  <button type="button" className="btn btn--ghost btn--sm" disabled={!!busy}
-                    onClick={() => setShowBlockForm(true)}>
-                    Flag a roadblock
-                  </button>
-                </>
-              )}
-            </section>
-          )}
-
-          <section className="tcard tcard--rail">
-            <h2 className="tcard__railh">Danger</h2>
-            {confirmDelete ? (
-              <>
-                <p className="note">Delete this ticket for good? Its time log goes with it.</p>
-                <div className="block__row">
-                  <button type="button" className="btn btn--ghost btn--sm" disabled={!!busy}
-                    onClick={() => setConfirmDelete(false)}>
-                    Keep it
-                  </button>
-                  <button type="button" className="btn btn--danger btn--sm" onClick={remove} disabled={!!busy}>
-                    {busy === 'delete' ? 'Deleting…' : 'Delete'}
-                  </button>
-                </div>
-              </>
+            {ticket.timerRunning ? (
+              <div className="timer timer--on">
+                <span className="timer__dot" aria-hidden="true" />
+                <span className="timer__t">{formatMinutes(liveMinutes)}</span>
+                <button type="button" className="btn btn--sm" disabled={!!busy}
+                  onClick={() => run('timer', stopTimer(on, timeNote), fresh => {
+                    setTimeNote('')
+                    setNotice(fresh.loggedMinutes > 0
+                      ? `Stopped — logged ${formatMinutes(fresh.loggedMinutes)}.`
+                      : 'Stopped. Under a minute, so nothing was logged.')
+                  })}>
+                  {busy === 'timer' ? 'Stopping…' : 'Stop'}
+                </button>
+              </div>
             ) : (
               <button type="button" className="btn btn--ghost btn--sm" disabled={!!busy}
-                onClick={() => setConfirmDelete(true)}>
-                Delete ticket
+                onClick={() => run('timer', startTimer(on), () => setNotice('Timer started.'))}>
+                {busy === 'timer' ? 'Starting…' : 'Start timer'}
               </button>
+            )}
+
+            <div className="railtime">
+              <div className="railtime__row">
+                <div className="ef">
+                  <label htmlFor="tp-amount">{editingTime ? 'New amount' : 'Amount'}</label>
+                  <input id="tp-amount" type="text" value={timeAmount} autoComplete="off" placeholder="1h30m"
+                    onChange={e => setTimeAmount(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') submitTime() }} />
+                </div>
+                <div className="ef">
+                  <label htmlFor="tp-date">Date</label>
+                  <input id="tp-date" type="date" value={timeDate} onChange={e => setTimeDate(e.target.value)} />
+                </div>
+              </div>
+              <div className="ef">
+                <label htmlFor="tp-note">Note</label>
+                <input id="tp-note" type="text" value={timeNote} autoComplete="off" placeholder="What you did"
+                  onChange={e => setTimeNote(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') submitTime() }} />
+              </div>
+              <div className="railtime__go">
+                <label className="checkline">
+                  <input type="checkbox" checked={timeBillable}
+                    onChange={e => setTimeBillable(e.target.checked)} />
+                  <span>Billable</span>
+                </label>
+                <span className="tpage__spacer" />
+                {editingTime && (
+                  <button type="button" className="btn btn--ghost btn--sm" disabled={!!busy}
+                    onClick={() => { setEditingTime(''); setTimeAmount(''); setTimeNote(''); setTimeBillable(true) }}>
+                    Cancel
+                  </button>
+                )}
+                <button type="button" className="btn btn--sm" onClick={submitTime}
+                  disabled={!!busy || !timeAmount.trim()}>
+                  {busy === 'time' ? 'Saving…' : editingTime ? 'Update' : 'Log'}
+                </button>
+              </div>
+            </div>
+
+            {ticket.time.length === 0 ? (
+              <p className="muted tsec__empty">Nothing logged yet.</p>
+            ) : (
+              <ul className="tlog">
+                {ticket.time.slice().sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)).map(e => (
+                  <li key={e.id} className="tlog__e" data-editing={editingTime === e.id ? '' : undefined}>
+                    <span className="tlog__t">{formatMinutes(e.minutes)}</span>
+                    <span className="tlog__d">{e.date}</span>
+                    {e.billable === false && <span className="tag">unbilled</span>}
+                    <span className="tlog__acts">
+                      <button type="button" className="linkbtn" disabled={!!busy}
+                        onClick={() => startEditingTime(e)}>Edit</button>
+                      <button type="button" className="linkbtn linkbtn--danger" disabled={!!busy}
+                        onClick={() => run('time', deleteTime(on, e.id), () => setNotice('Time entry removed.'))}>
+                        Remove
+                      </button>
+                    </span>
+                    {(e.note || e.who) && (
+                      <span className="tlog__note">
+                        {e.note}
+                        {e.who ? <span className="muted">{e.note ? ' · ' : ''}{e.who}</span> : null}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
             )}
           </section>
         </aside>
