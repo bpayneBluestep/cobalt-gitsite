@@ -160,9 +160,22 @@ export const COMPANY_FIELDS = [
 
 export type CompanyFieldKey = (typeof COMPANY_FIELDS)[number]['key']
 
+/**
+ * The CRM half of Company Info.
+ *
+ * Kept separate from COMPANY_FIELDS because that list drives the record page's plain
+ * text inputs, and these are not all text — two are dates and one is rich text. They
+ * write through the same `updateCompany` action; only the rendering differs.
+ */
+export type CrmFieldKey =
+  'contactName' | 'contactTitle' | 'contactEmail' | 'contactPhone' | 'owner'
+  | 'leadSource' | 'leadStatus' | 'beds' | 'lastTouch' | 'nextFollowUp' | 'crmNotes'
+
 /** Save only the keys that changed. The reply is the record as re-read server-side. */
-export const updateCompany = (id: string, fields: Partial<Record<CompanyFieldKey, string>>): Promise<Company> =>
-  maestroPost('updateCompany', { id, fields })
+export const updateCompany = (
+  id: string,
+  fields: Partial<Record<CompanyFieldKey | CrmFieldKey, string>>,
+): Promise<Company> => maestroPost('updateCompany', { id, fields })
 
 // ------------------------------------------------------------------- tickets
 // Vocabulary and tab mapping match the beh "Clickup Killer" exactly. The endpoint
@@ -345,6 +358,192 @@ export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
   return `${Math.round((bytes / (1024 * 1024)) * 10) / 10} MB`
+}
+
+// ----------------------------------------------------------------------- crm
+// Vocabularies match beh's CRM Intelligence Dashboard exactly — same phases, same
+// lead sources, same loss reasons — so the two tools describe one pipeline the same
+// way. The endpoint is the authority and validates every write against its own copy.
+
+export const DEAL_PHASES = [
+  'Open Lead', 'Contact Made', 'Scheduling Demo', 'Negotiating', 'Agreements', 'Won', 'Lost',
+] as const
+
+/** The phases a deal is still being worked in — the pipeline's columns. */
+export const OPEN_PHASES = [
+  'Open Lead', 'Contact Made', 'Scheduling Demo', 'Negotiating', 'Agreements',
+] as const
+
+export const DEAL_CONFIDENCE = ['Green', 'Yellow', 'Red'] as const
+export const LEAD_STATUSES = ['New', 'Contacted', 'Qualified', 'Nurturing', 'Unqualified'] as const
+
+export interface Deal {
+  entryId: string
+  title: string
+  phase: string
+  owner: string
+  leadSource: string
+  products: string
+  productList: string[]
+  mrr: number | null
+  fees: number | null
+  confidence: string
+  anticipatedDate: string
+  demoDate: string
+  nextStep: string
+  notes: string
+  lossReason: string
+  createdBy: string
+  createdAt: string
+  closedAt: string
+
+  /** Derived server-side from the phase — never stored, so they cannot disagree. */
+  isOpen: boolean
+  isWon: boolean
+  isLost: boolean
+  probability: number
+  annualValue: number
+  weightedMrr: number
+
+  companyId: string
+  companyName: string
+  companyCity: string
+  companyState: string
+  companyCategories: string[]
+}
+
+/** A company as the CRM sees it: Company Info plus its deal roll-up. */
+export interface Lead extends Company {
+  contactName: string
+  contactTitle: string
+  contactEmail: string
+  contactPhone: string
+  owner: string
+  leadSource: string
+  leadStatus: string
+  beds: number | null
+  lastTouch: string
+  nextFollowUp: string
+  crmNotes: string
+
+  dealCount: number
+  openDealCount: number
+  wonDealCount: number
+  lostDealCount: number
+  hasOpenDeal: boolean
+  /** No deal has ever been opened — a genuine first conversation. */
+  neverWorked: boolean
+  /** Has deals, but all decided — a re-approach, not a first call. */
+  decidedOnly: boolean
+  openMrr: number
+  weightedMrr: number
+  /** The furthest-along open phase, or '' when nothing is open. */
+  phase: string
+}
+
+export interface LeadList {
+  statuses: string[]
+  sources: string[]
+  categories: string[]
+  total: number
+  prospecting: number
+  neverWorked: number
+  decidedOnly: number
+  inPipeline: number
+  rows: Lead[]
+}
+
+export interface PipelineColumn {
+  phase: string
+  probability: number
+  count: number
+  mrr: number
+  weightedMrr: number
+  annualValue: number
+  rows: Deal[]
+}
+
+export interface Pipeline {
+  phases: string[]
+  openPhases: string[]
+  confidences: string[]
+  sources: string[]
+  products: string[]
+  lossReasons: string[]
+  owner: string | null
+  companiesScanned: number
+  openTotal: number
+  columns: PipelineColumn[]
+}
+
+export interface CrmSummary {
+  today: string
+  counts: {
+    companies: number; leads: number; clients: number
+    prospecting: number; neverWorked: number
+    openDeals: number; wonDeals: number; lostDeals: number
+  }
+  value: {
+    openMrr: number; weightedMrr: number; openAnnualValue: number; wonMrr: number
+    closingThisMonthCount: number; closingThisMonthMrr: number; averageOpenMrr: number
+  }
+  winRate: number | null
+  byPhase: { phase: string; count: number; mrr: number; probability: number }[]
+  bySource: { source: string; count: number; mrr: number }[]
+  byOwner: { owner: string; openDeals: number; mrr: number; weightedMrr: number; won: number }[]
+  losses: { reason: string; count: number }[]
+  hot: Deal[]
+  followUps: {
+    companyId: string; companyName: string; owner: string; contactName: string
+    leadStatus: string; nextFollowUp: string; lastTouch: string
+    overdue: boolean; hasOpenDeal: boolean
+  }[]
+  overdueFollowUps: number
+  vocabularies: {
+    phases: string[]; openPhases: string[]; statuses: string[]; sources: string[]
+    products: string[]; confidences: string[]; lossReasons: string[]
+    probability: Record<string, number>
+  }
+}
+
+/** The deal fields a client may write; the rest are server-owned. */
+export type DealFieldKey =
+  'title' | 'phase' | 'owner' | 'leadSource' | 'products' | 'mrr' | 'fees'
+  | 'confidence' | 'anticipatedDate' | 'demoDate' | 'nextStep' | 'notes' | 'lossReason'
+
+export const getCrmSummary = (): Promise<CrmSummary> => maestroGet('crmSummary')
+
+export const getPipeline = (owner?: string): Promise<Pipeline> =>
+  maestroGet('pipeline', owner ? { owner } : {})
+
+export const getLeads = (params: { status?: string; source?: string; owner?: string; category?: string } = {}): Promise<LeadList> =>
+  maestroGet('leads', params as Record<string, string>)
+
+export const getDeals = (params: { companyId?: string; phase?: string; owner?: string; openOnly?: string } = {}): Promise<{ total: number; rows: Deal[] }> =>
+  maestroGet('deals', params as Record<string, string>)
+
+export const createDeal = (companyId: string, fields: Partial<Record<DealFieldKey, string>>): Promise<Deal> =>
+  maestroPost('createDeal', { companyId, fields })
+
+export const updateDeal = (companyId: string, entryId: string, fields: Partial<Record<DealFieldKey, string>>): Promise<Deal> =>
+  maestroPost('updateDeal', { companyId, entryId, fields })
+
+export const deleteDeal = (companyId: string, entryId: string): Promise<{ deleted: string; companyId: string }> =>
+  maestroPost('deleteDeal', { companyId, entryId })
+
+/** `$13,400`. Null reads as an em dash, because "no value" is not "zero". */
+export function formatMoney(value: number | null): string {
+  if (value === null || value === undefined) return '—'
+  return '$' + Math.round(value).toLocaleString('en-US')
+}
+
+/** `$13.4k` — for headline figures where the exact dollar is noise. */
+export function formatCompactMoney(value: number | null): string {
+  if (value === null || value === undefined) return '—'
+  const n = Math.round(value)
+  if (Math.abs(n) >= 1000000) return '$' + (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'm'
+  if (Math.abs(n) >= 1000) return '$' + (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k'
+  return '$' + n.toLocaleString('en-US')
 }
 
 export const COMPANY_CATEGORIES = ['Lead', 'Client', 'Former Client'] as const

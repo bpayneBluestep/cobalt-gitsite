@@ -23,6 +23,8 @@ export interface Section {
   foundation?: string
   /** Working pages worth pointing at from here. */
   live?: { to: string; label: string; note: string }[]
+  /** Built for real — keeps its nav item but gets no placeholder route. */
+  built?: boolean
 }
 
 export const SECTIONS: Section[] = [
@@ -48,18 +50,19 @@ export const SECTIONS: Section[] = [
     key: 'crm',
     path: '/crm',
     label: 'CRM',
+    built: true,
     purpose: 'The sales side: who we are talking to, what stage they are at, and what happens next.',
     planned: [
-      'Deals with a value and a close date',
-      'Contacts against each company, not just the company',
-      'Notes and call logs on a timeline',
-      'Follow-ups that appear on Home when they come due',
+      'A call and note timeline against each company',
+      'Contacts as their own records, not one primary per company',
+      'Conference ROI, once there are conferences to attribute to',
+      'Trends over time — the analysis that needs history to say anything',
     ],
     foundation:
-      'The Company record and its Lead / Client / Former Client stages are the spine of this, and both exist. ' +
-      'Moving a company between stages still needs the Category Editor permission granted.',
+      'Dashboard, Pipeline and Prospecting are live, on the same phases and lead sources beh uses.',
     live: [
-      { to: '/clients', label: 'Clients', note: 'companies in the Client stage' },
+      { to: '/crm/pipeline', label: 'Pipeline', note: 'open deals by phase, with the weighted forecast' },
+      { to: '/crm/prospecting', label: 'Prospecting', note: 'leads with no open deal yet' },
     ],
   },
   {

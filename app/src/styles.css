@@ -1899,3 +1899,349 @@ main { flex: 1; min-height: 0; display: flex; }
 .uc__link:hover { border-bottom-color: currentColor; }
 
 .uc__linknote { font-size: 0.78rem; color: var(--text-mute); }
+
+/* ===========================================================================
+   CRM — sub-nav, KPI strip, funnel, pipeline board, lead table
+   =========================================================================== */
+
+.subnav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem;
+  margin: 0 0 1.25rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.subnav a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.7rem;
+  font-family: var(--font-display);
+  font-size: 0.74rem;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  color: var(--text-mute);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.subnav a:hover { color: var(--text); }
+.subnav a.active { color: var(--text); border-bottom-color: var(--cobalt); }
+
+.subnav__n {
+  padding: 0.02rem 0.34rem;
+  font-size: 0.66rem;
+  color: var(--text-dim);
+  background: var(--bg-sunk);
+  border-radius: 999px;
+}
+.subnav a.active .subnav__n { color: var(--cobalt); }
+
+/* --- KPI strip ------------------------------------------------------------ */
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.kpi {
+  padding: 0.75rem 0.85rem;
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--line-strong);
+  border-radius: var(--r);
+}
+.kpi[data-tone="good"] { border-left-color: #5AA33C; }
+.kpi[data-tone="warn"] { border-left-color: var(--warn); }
+.kpi[data-tone="bad"]  { border-left-color: #ce4a5b; }
+
+.kpi__k {
+  margin: 0 0 0.3rem;
+  font-family: var(--font-display);
+  font-size: 0.64rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+.kpi__v {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+.kpi__n { margin: 0.25rem 0 0; font-size: 0.72rem; color: var(--text-dim); }
+
+/* --- dashboard panels ---------------------------------------------------- */
+
+.crmgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(21rem, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+.panel {
+  min-width: 0;
+  padding: 0.9rem 1rem 1rem;
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+@media (min-width: 1200px) {
+  .panel--wide { grid-column: 1 / -1; }
+}
+
+.panel__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.6rem;
+  margin-bottom: 0.7rem;
+}
+.panel__head h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--text);
+}
+.panel__note { font-size: 0.72rem; color: var(--text-mute); margin-left: auto; }
+.panel__foot { margin: 0.7rem 0 0; font-size: 0.74rem; color: var(--text-mute); }
+
+/* --- the funnel ---------------------------------------------------------- */
+
+.funnel { margin: 0; padding: 0; list-style: none; }
+
+.funnel__row {
+  display: grid;
+  grid-template-columns: 10.5rem 1fr 2rem 5rem;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0;
+  font-size: 0.78rem;
+}
+
+.funnel__label { display: flex; align-items: baseline; gap: 0.35rem; min-width: 0; }
+.funnel__p { font-family: var(--font-display); font-size: 0.64rem; color: var(--text-mute); }
+
+.funnel__bar {
+  height: 8px;
+  background: var(--bg-sunk);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.funnel__fill { display: block; height: 100%; background: var(--cobalt); }
+
+.funnel__n { font-family: var(--font-display); font-size: 0.74rem; text-align: right; color: var(--text-dim); }
+.funnel__v { font-family: var(--font-display); font-size: 0.76rem; text-align: right; }
+
+/* --- loss reasons -------------------------------------------------------- */
+
+.reasons { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.3rem; }
+.reasons li { display: flex; align-items: baseline; gap: 0.6rem; font-size: 0.8rem; }
+.reasons__n {
+  min-width: 1.6rem;
+  padding: 0.02rem 0.35rem;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  text-align: center;
+  color: #ce4a5b;
+  border: 1px solid #ce4a5b;
+  border-radius: 999px;
+}
+
+/* --- pipeline bar + board ------------------------------------------------ */
+
+.pipebar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 0.7rem 0.85rem;
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+
+.pipebar__totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.1rem;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+.pipebar__totals strong { font-family: var(--font-display); font-size: 0.95rem; color: var(--text); }
+.pipebar__totals .muted strong { color: var(--text-dim); }
+
+.pipe {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(15rem, 1fr);
+  gap: 0.75rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+}
+
+.pipe__col {
+  min-width: 0;
+  padding: 0.7rem;
+  background: var(--bg-sunk);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+
+.pipe__head { display: flex; align-items: baseline; gap: 0.4rem; }
+.pipe__head h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+.pipe__p { font-family: var(--font-display); font-size: 0.62rem; color: var(--text-mute); }
+.pipe__n {
+  margin-left: auto;
+  padding: 0.02rem 0.36rem;
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  background: var(--bg-panel);
+  border-radius: 999px;
+}
+.pipe__sum {
+  margin: 0.2rem 0 0.6rem;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  color: var(--text);
+}
+.pipe__empty { margin: 0.4rem 0; font-size: 0.75rem; color: var(--text-mute); }
+
+/* --- a deal card --------------------------------------------------------- */
+
+.dcard {
+  margin-bottom: 0.55rem;
+  padding: 0.6rem 0.65rem;
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.dcard:last-child { margin-bottom: 0; }
+.dcard[data-on] { border-color: var(--cobalt); box-shadow: inset 2px 0 0 var(--cobalt); }
+
+.dcard__title {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  margin: 0 0 0.25rem;
+  font-size: 0.82rem;
+  line-height: 1.3;
+}
+.dcard__co { margin: 0 0 0.35rem; font-size: 0.74rem; }
+.dcard__money { margin: 0 0 0.3rem; font-family: var(--font-display); font-size: 0.8rem; }
+.dcard__next {
+  margin: 0 0 0.35rem;
+  padding-left: 0.5rem;
+  font-size: 0.74rem;
+  color: var(--text-dim);
+  border-left: 2px solid var(--line-strong);
+}
+.dcard__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--text-mute);
+}
+.dcard__prods { display: flex; flex-wrap: wrap; gap: 0.25rem; margin: 0.4rem 0 0; }
+.dcard__move { margin-top: 0.5rem; }
+.dcard__move select {
+  width: 100%;
+  padding: 0.22rem 0.3rem;
+  font-family: inherit;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  background: var(--bg-raise);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.dcard__move select:focus { border-color: var(--cobalt); outline: none; }
+
+/* A confidence dot: the rep's own read, separate from the phase. */
+.dotc {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--line-strong);
+}
+.dotc[data-c="Green"]  { background: #5AA33C; }
+.dotc[data-c="Yellow"] { background: var(--warn); }
+.dotc[data-c="Red"]    { background: #ce4a5b; }
+
+/* --- deal phase pills ---------------------------------------------------- */
+
+.pill[data-phase="OpenLead"]       { color: var(--text-dim); }
+.pill[data-phase="ContactMade"]    { color: #7a6bd8; border-color: #7a6bd8; }
+.pill[data-phase="SchedulingDemo"] { color: var(--cobalt); border-color: var(--cobalt); }
+.pill[data-phase="Negotiating"]    { color: var(--warn); border-color: var(--warn); }
+.pill[data-phase="Agreements"]     { color: #5AA33C; border-color: #5AA33C; }
+.pill[data-phase="Won"]            { color: #5AA33C; border-color: #5AA33C; }
+.pill[data-phase="Lost"]           { color: #ce4a5b; border-color: #ce4a5b; }
+
+/* --- the deal editor ----------------------------------------------------- */
+
+.dealcard { margin-bottom: 1rem; }
+.dealcard__decided { margin: 0 0 0.9rem; font-size: 0.8rem; }
+
+.dealcard__close {
+  margin-top: 0.9rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--line);
+}
+.dealcard__closebtns {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* --- compact tables ------------------------------------------------------ */
+
+.fields.compact th,
+.fields.compact td { padding: 0.35rem 0.5rem; font-size: 0.78rem; }
+
+.num { text-align: right; font-family: var(--font-display); white-space: nowrap; }
+.nowrap { white-space: nowrap; }
+
+/* An overdue row is tinted, not shouted at — the tag already says it. */
+.fields tbody tr[data-overdue] { background: color-mix(in srgb, var(--warn) 10%, transparent); }
+
+.minisel {
+  padding: 0.18rem 0.28rem;
+  font-family: inherit;
+  font-size: 0.74rem;
+  color: var(--text-dim);
+  background: var(--bg-raise);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.minisel:focus { border-color: var(--cobalt); outline: none; }
+
+.leads__act { white-space: nowrap; text-align: right; }
+.leads th[scope="row"] { font-weight: 600; }
+
+.rowlink__a {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+.rowlink__a:hover { color: var(--cobalt); border-bottom-color: var(--cobalt); }

@@ -5,6 +5,9 @@ import CompanyRecord from './routes/CompanyRecord'
 import Tickets from './routes/Tickets'
 import Explorer from './routes/Explorer'
 import UnderConstruction from './routes/UnderConstruction'
+import CrmDashboard from './routes/CrmDashboard'
+import CrmPipeline from './routes/CrmPipeline'
+import CrmProspecting from './routes/CrmProspecting'
 import { SECTIONS } from './sections'
 import ThemeToggle from './components/ThemeToggle'
 import ToolsMenu from './components/ToolsMenu'
@@ -34,9 +37,15 @@ export default function App() {
 
       <main>
         <Routes>
-          {SECTIONS.map(s => (
+          {/* Only the unbuilt sections get a placeholder. A built one keeps its nav
+              item and takes its own routes below. */}
+          {SECTIONS.filter(s => !s.built).map(s => (
             <Route key={s.key} path={s.path} element={<UnderConstruction section={s} />} />
           ))}
+
+          <Route path="/crm" element={<CrmDashboard />} />
+          <Route path="/crm/pipeline" element={<CrmPipeline />} />
+          <Route path="/crm/prospecting" element={<CrmProspecting />} />
 
           {/* Clients is live. It sits under /clients rather than the root now that
               Home has it, and is reached from Home and from CRM. */}
