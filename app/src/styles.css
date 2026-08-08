@@ -1778,3 +1778,124 @@ main { flex: 1; min-height: 0; display: flex; }
 .att:first-child { border-top: none; }
 .att__name { font-size: 0.84rem; color: var(--cobalt); word-break: break-all; }
 .att__meta { flex: 1 1 auto; font-size: 0.72rem; color: var(--text-mute); }
+
+/* ===========================================================================
+   Under construction — the placeholder for a section that is not built yet
+
+   One deliberate flourish: a hazard stripe along the top edge of the panel. It
+   reads as scaffolding at a glance, which is the whole job, and it means the copy
+   underneath can stay plain instead of shouting.
+   =========================================================================== */
+
+.uc {
+  position: relative;
+  max-width: 74ch;
+  padding: 1.15rem 1.25rem 1.25rem;
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+
+.uc::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--cobalt) 0 6px,
+    transparent 6px 12px
+  );
+  opacity: 0.75;
+}
+
+.uc__flag {
+  margin: 0 0 0.35rem;
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--cobalt);
+}
+
+.uc__lede {
+  margin: 0 0 1.1rem;
+  font-size: 0.86rem;
+  color: var(--text-dim);
+}
+
+.uc__cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  gap: 1.1rem 1.75rem;
+}
+
+.uc__h {
+  margin: 0 0 0.5rem;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+
+.uc__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.uc__list li {
+  position: relative;
+  padding: 0.28rem 0 0.28rem 0.95rem;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+/* A hairline tick rather than a bullet — these are intentions, not a checklist,
+   and a checkbox would imply progress that does not exist. */
+.uc__list li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.82em;
+  width: 6px;
+  height: 1px;
+  background: var(--line-strong);
+}
+
+.uc__note {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
+.uc__live { max-width: 74ch; margin-top: 1.25rem; }
+
+.uc__links { margin: 0; padding: 0; list-style: none; }
+
+.uc__links li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding: 0.4rem 0;
+  border-top: 1px solid var(--line);
+}
+.uc__links li:first-child { border-top: none; }
+
+.uc__link {
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  color: var(--cobalt);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+.uc__link:hover { border-bottom-color: currentColor; }
+
+.uc__linknote { font-size: 0.78rem; color: var(--text-mute); }

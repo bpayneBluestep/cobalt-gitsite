@@ -4,6 +4,8 @@ import ClientTickets from './routes/ClientTickets'
 import CompanyRecord from './routes/CompanyRecord'
 import Tickets from './routes/Tickets'
 import Explorer from './routes/Explorer'
+import UnderConstruction from './routes/UnderConstruction'
+import { SECTIONS } from './sections'
 import ThemeToggle from './components/ThemeToggle'
 import ToolsMenu from './components/ToolsMenu'
 
@@ -17,9 +19,11 @@ export default function App() {
           <span className="brand__sub">ERP</span>
         </Link>
 
+        {/* Driven by SECTIONS, so a nav item and its page can never disagree. */}
         <nav className="mainnav" aria-label="Sections">
-          <NavLink to="/" end>Clients</NavLink>
-          <NavLink to="/tickets">Tickets</NavLink>
+          {SECTIONS.map(s => (
+            <NavLink key={s.key} to={s.path} end={s.path === '/'}>{s.label}</NavLink>
+          ))}
         </nav>
 
         <div className="topbar__end">
@@ -30,9 +34,16 @@ export default function App() {
 
       <main>
         <Routes>
-          <Route path="/" element={<Clients />} />
+          {SECTIONS.map(s => (
+            <Route key={s.key} path={s.path} element={<UnderConstruction section={s} />} />
+          ))}
+
+          {/* Clients is live. It sits under /clients rather than the root now that
+              Home has it, and is reached from Home and from CRM. */}
+          <Route path="/clients" element={<Clients />} />
           <Route path="/clients/:id" element={<CompanyRecord />} />
           <Route path="/clients/:id/tickets" element={<ClientTickets />} />
+
           {/* The schema explorer is a tool, not a section — reached from the
               Tools menu. Its deep links live under /schema so they stay
               bookmarkable. */}
@@ -40,7 +51,8 @@ export default function App() {
           <Route path="/schema" element={<Explorer />} />
           <Route path="/schema/type/:typeId" element={<Explorer />} />
           <Route path="/schema/form/:formId" element={<Explorer />} />
-          <Route path="*" element={<Clients />} />
+
+          <Route path="*" element={<UnderConstruction section={SECTIONS[0]} />} />
         </Routes>
       </main>
     </div>

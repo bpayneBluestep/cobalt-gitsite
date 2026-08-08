@@ -57,7 +57,7 @@ export default function ClientTickets() {
   return (
     <section className="page">
       <nav className="crumb" aria-label="Breadcrumb">
-        <Link to="/">Clients</Link>
+        <Link to="/clients">Clients</Link>
         <span aria-hidden="true">/</span>
         <Link to={`/clients/${id}`}>
           {state.phase === 'ready' ? state.list.clientName || state.list.listName : 'Client'}

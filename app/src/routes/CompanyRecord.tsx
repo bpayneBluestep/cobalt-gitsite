@@ -123,7 +123,7 @@ export default function CompanyRecord() {
   return (
     <section className="page">
       <nav className="crumb" aria-label="Breadcrumb">
-        <Link to="/">Clients</Link>
+        <Link to="/clients">Clients</Link>
         <span aria-hidden="true">/</span>
         <span>{company ? company.name || 'Untitled' : id}</span>
       </nav>
@@ -141,7 +141,7 @@ export default function CompanyRecord() {
               ? <a className="btn" href={LOGIN_URL}>Sign in to BlueStep</a>
               : <button type="button" className="btn" onClick={load}>Try again</button>}
             {' '}
-            <Link className="btn btn--ghost" to="/">Back to Clients</Link>
+            <Link className="btn btn--ghost" to="/clients">Back to Clients</Link>
           </p>
         </div>
       )}
