@@ -10,6 +10,7 @@ import CrmPipeline from './routes/CrmPipeline'
 import CrmProspecting from './routes/CrmProspecting'
 import Sprints from './routes/Sprints'
 import Settings from './routes/Settings'
+import TicketPage from './routes/TicketPage'
 import { SECTIONS } from './sections'
 import ThemeToggle from './components/ThemeToggle'
 import ToolsMenu from './components/ToolsMenu'
@@ -56,6 +57,11 @@ export default function App() {
           <Route path="/clients" element={<Clients />} />
           <Route path="/clients/:id" element={<CompanyRecord />} />
           <Route path="/clients/:id/tickets" element={<ClientTickets />} />
+
+          {/* A ticket is a page of its own, addressed by its org-wide number, so the
+              link can be pasted into a chat and opened by whoever gets it. An entry id
+              works in the same slot for a ticket that never got a number. */}
+          <Route path="/tickets/:key" element={<TicketPage />} />
 
           {/* The schema explorer is a tool, not a section — reached from the
               Tools menu. Its deep links live under /schema so they stay

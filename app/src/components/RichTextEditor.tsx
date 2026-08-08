@@ -28,7 +28,7 @@ const TOOLS: { cmd: string; arg?: string; label: string; title: string; classNam
 ]
 
 export default function RichTextEditor({
-  value, docKey, onChange, placeholder, ariaLabel,
+  value, docKey, onChange, placeholder, ariaLabel, tall,
 }: {
   value: string
   /** Changes when a different ticket is loaded — the only time the DOM is reset. */
@@ -36,6 +36,8 @@ export default function RichTextEditor({
   onChange: (html: string) => void
   placeholder?: string
   ariaLabel: string
+  /** Give the body room — the ticket page's description is the main event. */
+  tall?: boolean
 }) {
   const ref = useRef<HTMLDivElement | null>(null)
   const loaded = useRef('')
@@ -84,7 +86,7 @@ export default function RichTextEditor({
       </div>
       <div
         ref={ref}
-        className="rte__body"
+        className={tall ? 'rte__body rte__body--tall' : 'rte__body'}
         contentEditable
         role="textbox"
         aria-multiline="true"

@@ -1,11 +1,15 @@
 import { Fragment, useMemo, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   addTicket, updateTicket, ApiError, formatHours,
   TICKET_STATUSES, TICKET_PRIORITIES, TICKET_TABS, PRIORITY_RANK,
   type List, type Ticket, type TicketFieldKey,
 } from '../api'
 import { htmlToText } from '../lib/html'
-import TicketDetail from './TicketDetail'
+
+/** Where a ticket lives. The number is the shareable form; the entry id is the fallback. */
+export const ticketPath = (t: Ticket): string =>
+  `/tickets/${t.ticketNumber === null ? t.entryId : t.ticketNumber}`
 
 /*
  * The ticket board for one list — the Cobalt port of beh's "Clickup Killer".
@@ -20,9 +24,9 @@ import TicketDetail from './TicketDetail'
  * back in a single `tickets` call, so tabs, counts and filters are all computed
  * here — four round trips become one, and switching tabs is instant.
  *
- * The board owns the table and the create form. Opening a ticket hands it to
- * TicketDetail, which owns everything about a single ticket — the table stays put
- * beside it.
+ * The board owns the table and the create form. A ticket itself is a PAGE, at
+ * /tickets/<number> — so it can be linked to and sent to someone. A row is a real
+ * link, which also means middle-click and "open in new tab" work.
  */
 
 /** Only the fields the create form collects; the rest are set from the drawer. */
@@ -51,6 +55,7 @@ export default function TicketBoard({
   /** Replace one ticket in the caller's copy, from an action's fresh reply. */
   onTicket: (t: Ticket) => void
 }) {
+  const navigate = useNavigate()
   const [tab, setTab] = useState('open')
   const [search, setSearch] = useState('')
   const [fStatus, setFStatus] = useState('')
@@ -58,16 +63,11 @@ export default function TicketBoard({
   const [fAssignee, setFAssignee] = useState('')
   const [showFilters, setShowFilters] = useState(false)
 
-  // Held by id, not by value: a ticket updated in the drawer arrives as a new
-  // object, and holding the old one would show stale values.
-  const [openId, setOpenId] = useState('')
   const [creating, setCreating] = useState(false)
   const [draft, setDraft] = useState<NewDraft>(EMPTY_DRAFT)
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState('')
   const [notice, setNotice] = useState('')
-
-  const open = tickets.find(t => t.entryId === openId) || null
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { open: 0, ready: 0, current: 0, completed: 0 }
@@ -105,14 +105,7 @@ export default function TicketBoard({
 
   function openNew() {
     setCreating(true)
-    setOpenId('')
     setDraft({ ...EMPTY_DRAFT, status: TICKET_TABS.find(t => t.key === tab)?.statuses[0] || 'Open' })
-    setFailure(''); setNotice('')
-  }
-
-  function openTicket(t: Ticket) {
-    setOpenId(t.entryId)
-    setCreating(false)
     setFailure(''); setNotice('')
   }
 
@@ -129,8 +122,10 @@ export default function TicketBoard({
     addTicket(list.id, fields)
       .then(created => {
         setCreating(false)
-        setNotice(created.ticketNumber !== null ? `Added #${created.ticketNumber}.` : 'Ticket added.')
         onChanged()
+        // Straight into the new ticket: the form collects only the essentials, and the
+        // description is the reason you were adding it.
+        navigate(ticketPath(created))
       })
       .catch(err => setFailure(err instanceof ApiError ? err.message : String(err)))
       .finally(() => setBusy(false))
@@ -242,9 +237,9 @@ export default function TicketBoard({
 
       {notice && <p className="board2__notice" role="status">{notice}</p>}
 
-      {/* Create collects only the essentials. Details, time, files and the
-          roadblock all belong to a ticket that exists, so they live in the drawer
-          rather than making the first step longer than it needs to be. */}
+      {/* Create collects only the essentials. Details, time, files and the roadblock all
+          belong to a ticket that exists, so they live on the ticket's own page rather
+          than making the first step longer than it needs to be. */}
       {creating && (
         <div className="editcard newclient">
           <div className="editcard__head">
@@ -291,7 +286,9 @@ export default function TicketBoard({
           </div>
 
           <div className="editcard__foot">
-            <span className="editcard__status">{busy ? 'Adding…' : 'A title is required.'}</span>
+            <span className="editcard__status">
+              {busy ? 'Adding…' : 'It gets the next number, then opens.'}
+            </span>
             <button type="button" className="btn btn--ghost" onClick={() => { setCreating(false); setFailure('') }} disabled={busy}>
               Cancel
             </button>
@@ -302,7 +299,6 @@ export default function TicketBoard({
         </div>
       )}
 
-      <div className="board2__split" data-open={open ? '' : undefined}>
       {visible.length === 0 ? (
         <div className="callout callout--plain">
           <p className="callout__title">
@@ -350,18 +346,19 @@ export default function TicketBoard({
                         key={t.entryId}
                         className="rowlink"
                         data-prio={t.priority}
-                        data-on={t.entryId === openId ? '' : undefined}
                         data-blocked={t.roadblocked ? '' : undefined}
                       >
                         <td className="tickets__num">
                           {t.ticketNumber === null
                             ? <span className="muted">—</span>
-                            : <span className="tnum">#{t.ticketNumber}</span>}
+                            : <Link className="tnum tnum--link" to={ticketPath(t)}>#{t.ticketNumber}</Link>}
                         </td>
                         <th scope="row">
-                          <button type="button" className="rowlink__btn" onClick={() => openTicket(t)}>
+                          {/* A real link: shareable, middle-clickable, and the browser
+                              shows where it goes. */}
+                          <Link className="rowlink__a" to={ticketPath(t)}>
                             {t.title || <span className="muted">(untitled)</span>}
-                          </button>
+                          </Link>
                           <span className="rowmarks">
                             {t.roadblocked && (
                               <span className="mark mark--block" title={t.roadblockReason || 'Roadblocked'}>
@@ -412,15 +409,6 @@ export default function TicketBoard({
         </div>
       )}
 
-      {open && (
-        <TicketDetail
-          ticket={open}
-          onTicket={onTicket}
-          onDeleted={() => { setOpenId(''); setNotice('Ticket deleted.'); onChanged() }}
-          onClose={() => setOpenId('')}
-        />
-      )}
-      </div>
     </section>
   )
 }

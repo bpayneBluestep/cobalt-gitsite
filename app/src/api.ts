@@ -294,6 +294,14 @@ export type TicketFieldKey =
 export const getTickets = (params: { listId?: string; assignee?: string; sprint?: string; status?: string } = {}): Promise<TicketList> =>
   maestroGet('tickets', params as Record<string, string>)
 
+/**
+ * One ticket, by number or entry id, without knowing which list it is on — what a
+ * shared `/tickets/8` link resolves through. Ticket numbers are org-wide, so the
+ * number alone is enough; `listId` skips the endpoint's scan when it is known.
+ */
+export const getTicket = (key: string, listId?: string): Promise<{ ticket: Ticket; list: List; listsScanned: number }> =>
+  maestroGet('ticket', listId ? { key, listId } : { key })
+
 export const getList = (id: string): Promise<List & { tickets: Ticket[] }> => maestroGet('list', { id })
 
 export const getLists = (params: { clientId?: string; kind?: string } = {}): Promise<{ total: number; rows: List[] }> =>
