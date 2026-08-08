@@ -37,14 +37,22 @@ export default function ClientTickets() {
 
   useEffect(load, [load])
 
-  // After a write, re-read just this list's tickets rather than re-resolving the
-  // list itself — nothing about the list changed. The id is passed in so this
-  // doesn't close over a stale state.
+  // After an add or delete, re-read just this list's tickets rather than
+  // re-resolving the list itself — nothing about the list changed. The id is passed
+  // in so this doesn't close over a stale state.
   const reloadTickets = useCallback((listId: string) => {
     getTickets({ listId })
       .then(data => setState(s => (s.phase === 'ready' ? { ...s, tickets: data.rows } : s)))
       .catch(() => load())
   }, [load])
+
+  // Every ticket write returns the whole ticket, re-read server-side — so an edit
+  // swaps that one row in place instead of costing another round trip for the list.
+  const patchTicket = useCallback((updated: Ticket) => {
+    setState(s => (s.phase === 'ready'
+      ? { ...s, tickets: s.tickets.map(t => (t.entryId === updated.entryId ? updated : t)) }
+      : s))
+  }, [])
 
   return (
     <section className="page">
@@ -91,6 +99,7 @@ export default function ClientTickets() {
             list={state.list}
             tickets={state.tickets}
             onChanged={() => reloadTickets(state.list.id)}
+            onTicket={patchTicket}
           />
         </>
       )}

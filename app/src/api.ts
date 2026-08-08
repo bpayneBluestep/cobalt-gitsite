@@ -182,15 +182,56 @@ export const TICKET_TABS = [
 /** Priority order for sorting a group, highest first — beh's PRIORITY_RANK. */
 export const PRIORITY_RANK: Record<string, number> = { Critical: 4, High: 3, Normal: 2, Low: 1 }
 
+/** One row in a ticket's time log. Ids are stable — never address these by index. */
+export interface TimeEntry {
+  id: string
+  date: string
+  minutes: number
+  who: string
+  note: string
+  billable: boolean
+}
+
+/** A file on a ticket. `url` is a same-origin /download/ path. */
+export interface Attachment {
+  id: string
+  name: string
+  url: string
+  mime: string
+  size: number
+  at: string
+  by: string
+}
+
 export interface Ticket {
   entryId: string
+  /** Global running number. Null only for a ticket that predates numbering. */
+  ticketNumber: number | null
   title: string
   status: string
   priority: string
   assignee: string
   dueDate: string
   sprint: string
+  /** Rich text (HTML). Sanitise before rendering — see lib/html.ts. */
   details: string
+
+  estHours: number | null
+  /** Derived server-side from the time log; never written directly. */
+  loggedHours: number | null
+  time: TimeEntry[]
+  timerRunning: boolean
+  timerElapsedMinutes: number
+  timerBy: string
+  timerStartedAt: string
+
+  attachments: Attachment[]
+
+  roadblocked: boolean
+  roadblockReason: string
+  roadblockedAt: string
+  roadblockedBy: string
+
   createdBy: string
   createdAt: string
   completedAt: string
@@ -208,8 +249,16 @@ export interface TicketList {
   rows: Ticket[]
 }
 
-/** The editable ticket fields — the server-stamped audit ones are excluded. */
-export type TicketFieldKey = 'title' | 'status' | 'priority' | 'assignee' | 'dueDate' | 'sprint' | 'details'
+/**
+ * The ticket fields `addTicket` / `updateTicket` accept.
+ *
+ * Everything else a ticket carries is written through its own action, because the
+ * value alone would leave the ticket inconsistent: a roadblock needs its reason and
+ * stamps, and the time log and attachments are append-and-recompute rather than
+ * overwrite. The endpoint enforces this — it is not a convention.
+ */
+export type TicketFieldKey =
+  'title' | 'status' | 'priority' | 'assignee' | 'dueDate' | 'sprint' | 'details' | 'estHours'
 
 export const getTickets = (params: { listId?: string; assignee?: string; sprint?: string; status?: string } = {}): Promise<TicketList> =>
   maestroGet('tickets', params as Record<string, string>)
@@ -231,6 +280,72 @@ export const updateTicket = (listId: string, entryId: string, fields: Partial<Re
 
 export const deleteTicket = (listId: string, entryId: string): Promise<{ deleted: string; listId: string }> =>
   maestroPost('deleteTicket', { listId, entryId })
+
+// ------------------------------------------------------- time, blocks, files
+// Each of these returns the WHOLE ticket, re-read server-side — so a caller
+// replaces its copy rather than patching it and hoping the patch matches.
+
+type On = { listId: string; entryId: string }
+
+/** Log time. Send `minutes` or `hours`, not both. */
+export const logTime = (
+  on: On,
+  entry: { minutes?: number; hours?: number; date?: string; note?: string; billable?: boolean },
+): Promise<Ticket> => maestroPost('logTime', { ...on, ...entry })
+
+export const editTime = (
+  on: On,
+  entry: { timeId: string; minutes: number; date?: string; note?: string; billable?: boolean },
+): Promise<Ticket> => maestroPost('editTime', { ...on, ...entry })
+
+export const deleteTime = (on: On, timeId: string): Promise<Ticket> =>
+  maestroPost('deleteTime', { ...on, timeId })
+
+export const startTimer = (on: On): Promise<Ticket> => maestroPost('startTimer', on)
+
+/** Stop the clock; the elapsed minutes become a log entry. */
+export const stopTimer = (on: On, note?: string): Promise<Ticket & { loggedMinutes: number }> =>
+  maestroPost('stopTimer', { ...on, note: note || '' })
+
+export const setRoadblock = (on: On, active: boolean, reason?: string): Promise<Ticket> =>
+  maestroPost('setRoadblock', { ...on, active, reason: reason || '' })
+
+/** Max upload the endpoint accepts, so the UI can refuse before sending. */
+export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
+
+export const uploadAttachment = (
+  on: On,
+  file: { fileName: string; mimeType: string; dataBase64: string },
+): Promise<Ticket> => maestroPost('uploadAttachment', { ...on, ...file })
+
+export const deleteAttachment = (on: On, attachmentId: string): Promise<Ticket> =>
+  maestroPost('deleteAttachment', { ...on, attachmentId })
+
+// ------------------------------------------------------------------ formatting
+
+/** Minutes as `1h 30m` / `45m` / `2h`. Used everywhere time is shown. */
+export function formatMinutes(minutes: number): string {
+  const m = Math.max(0, Math.round(minutes || 0))
+  if (!m) return '0m'
+  const h = Math.floor(m / 60)
+  const rest = m % 60
+  if (!h) return `${rest}m`
+  if (!rest) return `${h}h`
+  return `${h}h ${rest}m`
+}
+
+/** Hours as `3.5h`, or an em dash when there is no value at all. */
+export function formatHours(hours: number | null): string {
+  if (hours === null || hours === undefined) return '—'
+  return `${Math.round(hours * 100) / 100}h`
+}
+
+export function formatBytes(bytes: number): string {
+  if (!bytes) return ''
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
+  return `${Math.round((bytes / (1024 * 1024)) * 10) / 10} MB`
+}
 
 export const COMPANY_CATEGORIES = ['Lead', 'Client', 'Former Client'] as const
 

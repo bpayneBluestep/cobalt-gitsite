@@ -1,9 +1,11 @@
 import { Fragment, useMemo, useState } from 'react'
 import {
-  addTicket, updateTicket, deleteTicket, ApiError,
+  addTicket, updateTicket, ApiError, formatHours,
   TICKET_STATUSES, TICKET_PRIORITIES, TICKET_TABS, PRIORITY_RANK,
   type List, type Ticket, type TicketFieldKey,
 } from '../api'
+import { htmlToText } from '../lib/html'
+import TicketDetail from './TicketDetail'
 
 /*
  * The ticket board for one list — the Cobalt port of beh's "Clickup Killer".
@@ -17,27 +19,17 @@ import {
  * tab and asks the server for counts separately. A Cobalt list is small and comes
  * back in a single `tickets` call, so tabs, counts and filters are all computed
  * here — four round trips become one, and switching tabs is instant.
+ *
+ * The board owns the table and the create form. Opening a ticket hands it to
+ * TicketDetail, which owns everything about a single ticket — the table stays put
+ * beside it.
  */
 
-type Draft = Record<TicketFieldKey, string>
+/** Only the fields the create form collects; the rest are set from the drawer. */
+type NewDraft = Pick<Record<TicketFieldKey, string>, 'title' | 'status' | 'priority' | 'assignee' | 'dueDate' | 'sprint'>
 
-const EMPTY_DRAFT: Draft = {
-  title: '', status: 'Open', priority: 'Normal', assignee: '', dueDate: '', sprint: '', details: '',
-}
-
-function draftOf(t: Ticket): Draft {
-  return {
-    title: t.title || '', status: t.status || 'Open', priority: t.priority || 'Normal',
-    assignee: t.assignee || '', dueDate: t.dueDate || '', sprint: t.sprint || '', details: t.details || '',
-  }
-}
-
-function changed(draft: Draft, saved: Ticket): Partial<Record<TicketFieldKey, string>> {
-  const out: Partial<Record<TicketFieldKey, string>> = {}
-  for (const k of Object.keys(draft) as TicketFieldKey[]) {
-    if (draft[k] !== ((saved[k] as string) || '')) out[k] = draft[k]
-  }
-  return out
+const EMPTY_DRAFT: NewDraft = {
+  title: '', status: 'Open', priority: 'Normal', assignee: '', dueDate: '', sprint: '',
 }
 
 /** Which tab a status belongs to — beh's `tabOf`, unchanged. */
@@ -51,11 +43,13 @@ function byPriority(a: Ticket, b: Ticket): number {
 }
 
 export default function TicketBoard({
-  list, tickets, onChanged,
+  list, tickets, onChanged, onTicket,
 }: {
   list: List
   tickets: Ticket[]
   onChanged: () => void
+  /** Replace one ticket in the caller's copy, from an action's fresh reply. */
+  onTicket: (t: Ticket) => void
 }) {
   const [tab, setTab] = useState('open')
   const [search, setSearch] = useState('')
@@ -64,13 +58,16 @@ export default function TicketBoard({
   const [fAssignee, setFAssignee] = useState('')
   const [showFilters, setShowFilters] = useState(false)
 
-  // The editor doubles as create and edit — same fields, one code path.
-  const [editing, setEditing] = useState<Ticket | 'new' | null>(null)
-  const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT)
+  // Held by id, not by value: a ticket updated in the drawer arrives as a new
+  // object, and holding the old one would show stale values.
+  const [openId, setOpenId] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [draft, setDraft] = useState<NewDraft>(EMPTY_DRAFT)
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState('')
   const [notice, setNotice] = useState('')
-  const [confirmDelete, setConfirmDelete] = useState(false)
+
+  const open = tickets.find(t => t.entryId === openId) || null
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { open: 0, ready: 0, current: 0, completed: 0 }
@@ -89,7 +86,10 @@ export default function TicketBoard({
       if (fAssignee === '__none' && t.assignee) return false
       if (fAssignee && fAssignee !== '__none' && !t.assignee.toLowerCase().includes(fAssignee.toLowerCase())) return false
       if (!q) return true
-      return [t.title, t.assignee, t.sprint, t.details].some(v => (v || '').toLowerCase().includes(q))
+      // Details is markup — search its text, so a query can't match a tag name.
+      const haystack = [t.title, t.assignee, t.sprint, htmlToText(t.details), t.roadblockReason]
+      if (t.ticketNumber !== null) haystack.push(`#${t.ticketNumber}`)
+      return haystack.some(v => (v || '').toLowerCase().includes(q))
     })
   }, [tickets, tab, search, fStatus, fPriority, fAssignee])
 
@@ -104,59 +104,44 @@ export default function TicketBoard({
   }, [visible])
 
   function openNew() {
-    setEditing('new')
+    setCreating(true)
+    setOpenId('')
     setDraft({ ...EMPTY_DRAFT, status: TICKET_TABS.find(t => t.key === tab)?.statuses[0] || 'Open' })
-    setFailure(''); setNotice(''); setConfirmDelete(false)
+    setFailure(''); setNotice('')
   }
 
   function openTicket(t: Ticket) {
-    setEditing(t)
-    setDraft(draftOf(t))
-    setFailure(''); setNotice(''); setConfirmDelete(false)
+    setOpenId(t.entryId)
+    setCreating(false)
+    setFailure(''); setNotice('')
   }
 
-  function close() {
-    setEditing(null); setFailure(''); setConfirmDelete(false)
-  }
-
-  function save() {
-    if (!editing || busy) return
+  function create() {
+    if (busy) return
     if (!draft.title.trim()) { setFailure('A ticket needs a title.'); return }
     setBusy(true); setFailure('')
 
-    if (editing === 'new') {
-      const fields: Partial<Record<TicketFieldKey, string>> = {}
-      for (const k of Object.keys(draft) as TicketFieldKey[]) if (draft[k].trim()) fields[k] = draft[k].trim()
-      addTicket(list.id, fields)
-        .then(() => { setEditing(null); setNotice('Ticket added.'); onChanged() })
-        .catch(err => setFailure(err instanceof ApiError ? err.message : String(err)))
-        .finally(() => setBusy(false))
-      return
+    // Send only what was filled in, so a blank field never overwrites a default.
+    const fields: Partial<Record<TicketFieldKey, string>> = {}
+    for (const k of Object.keys(draft) as (keyof NewDraft)[]) {
+      if (draft[k].trim()) fields[k] = draft[k].trim()
     }
-
-    const diff = changed(draft, editing)
-    if (!Object.keys(diff).length) { setBusy(false); setNotice('No changes to save.'); return }
-    updateTicket(list.id, editing.entryId, diff)
-      .then(() => { setEditing(null); setNotice('Ticket saved.'); onChanged() })
+    addTicket(list.id, fields)
+      .then(created => {
+        setCreating(false)
+        setNotice(created.ticketNumber !== null ? `Added #${created.ticketNumber}.` : 'Ticket added.')
+        onChanged()
+      })
       .catch(err => setFailure(err instanceof ApiError ? err.message : String(err)))
       .finally(() => setBusy(false))
   }
 
-  function remove() {
-    if (!editing || editing === 'new' || busy) return
-    setBusy(true); setFailure('')
-    deleteTicket(list.id, editing.entryId)
-      .then(() => { setEditing(null); setNotice('Ticket deleted.'); onChanged() })
-      .catch(err => setFailure(err instanceof ApiError ? err.message : String(err)))
-      .finally(() => { setBusy(false); setConfirmDelete(false) })
-  }
-
-  /** Move a ticket's status straight from its row, without opening the editor. */
+  /** Move a ticket's status straight from its row, without opening it. */
   function quickStatus(t: Ticket, status: string) {
     if (busy) return
     setBusy(true); setFailure(''); setNotice('')
     updateTicket(list.id, t.entryId, { status })
-      .then(() => { setNotice(`Moved to ${status}.`); onChanged() })
+      .then(fresh => { onTicket(fresh); setNotice(`Moved to ${status}.`) })
       .catch(err => setFailure(err instanceof ApiError ? err.message : String(err)))
       .finally(() => setBusy(false))
   }
@@ -174,7 +159,7 @@ export default function TicketBoard({
               className="tab"
               data-on={t.key === tab ? '' : undefined}
               aria-current={t.key === tab ? 'true' : undefined}
-              onClick={() => { setTab(t.key); close() }}
+              onClick={() => { setTab(t.key); setCreating(false); setFailure('') }}
             >
               {t.label}
               <span className="tab__n">{counts[t.key] || 0}</span>
@@ -257,17 +242,14 @@ export default function TicketBoard({
 
       {notice && <p className="board2__notice" role="status">{notice}</p>}
 
-      {editing && (
+      {/* Create collects only the essentials. Details, time, files and the
+          roadblock all belong to a ticket that exists, so they live in the drawer
+          rather than making the first step longer than it needs to be. */}
+      {creating && (
         <div className="editcard newclient">
           <div className="editcard__head">
-            <h2>{editing === 'new' ? 'New ticket' : 'Edit ticket'}</h2>
-            {editing !== 'new' && (
-              <p className="note">
-                Added by {editing.createdBy || 'unknown'}
-                {editing.createdAt ? ` on ${editing.createdAt}` : ''}
-                {editing.completedAt ? ` · completed ${editing.completedAt}` : ''}
-              </p>
-            )}
+            <h2>New ticket</h2>
+            <p className="note">It gets the next number automatically. Open it afterwards to add detail.</p>
           </div>
 
           {failure && <p className="editcard__err" role="alert">{failure}</p>}
@@ -276,7 +258,8 @@ export default function TicketBoard({
             <div className="ef ef--wide">
               <label htmlFor="t-title">Title<span className="ef__req" aria-hidden="true">*</span></label>
               <input id="t-title" type="text" value={draft.title} autoFocus autoComplete="off"
-                onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} />
+                onChange={e => setDraft(d => ({ ...d, title: e.target.value }))}
+                onKeyDown={e => { if (e.key === 'Enter' && draft.title.trim()) create() }} />
             </div>
             <div className="ef">
               <label htmlFor="t-status">Status</label>
@@ -305,42 +288,21 @@ export default function TicketBoard({
               <input id="t-sprint" type="text" value={draft.sprint} placeholder="2026-W33" autoComplete="off"
                 onChange={e => setDraft(d => ({ ...d, sprint: e.target.value }))} />
             </div>
-            <div className="ef ef--wide">
-              <label htmlFor="t-details">Details</label>
-              <textarea id="t-details" rows={4} value={draft.details}
-                onChange={e => setDraft(d => ({ ...d, details: e.target.value }))} />
-            </div>
           </div>
 
           <div className="editcard__foot">
-            <span className="editcard__status">
-              {busy ? 'Saving…' : editing === 'new' ? 'A title is required.' : ''}
-            </span>
-            {editing !== 'new' && (
-              confirmDelete ? (
-                <>
-                  <span className="board2__confirm">Delete this ticket?</span>
-                  <button type="button" className="btn btn--ghost" onClick={() => setConfirmDelete(false)} disabled={busy}>Keep</button>
-                  <button type="button" className="btn btn--danger" onClick={remove} disabled={busy}>Delete</button>
-                </>
-              ) : (
-                <button type="button" className="btn btn--ghost" onClick={() => setConfirmDelete(true)} disabled={busy}>
-                  Delete
-                </button>
-              )
-            )}
-            {!confirmDelete && (
-              <>
-                <button type="button" className="btn btn--ghost" onClick={close} disabled={busy}>Cancel</button>
-                <button type="button" className="btn" onClick={save} disabled={busy || !draft.title.trim()}>
-                  {editing === 'new' ? 'Add ticket' : 'Save changes'}
-                </button>
-              </>
-            )}
+            <span className="editcard__status">{busy ? 'Adding…' : 'A title is required.'}</span>
+            <button type="button" className="btn btn--ghost" onClick={() => { setCreating(false); setFailure('') }} disabled={busy}>
+              Cancel
+            </button>
+            <button type="button" className="btn" onClick={create} disabled={busy || !draft.title.trim()}>
+              Add ticket
+            </button>
           </div>
         </div>
       )}
 
+      <div className="board2__split" data-open={open ? '' : undefined}>
       {visible.length === 0 ? (
         <div className="callout callout--plain">
           <p className="callout__title">
@@ -359,11 +321,12 @@ export default function TicketBoard({
           <table className="fields tickets">
             <thead>
               <tr>
+                <th scope="col" className="tickets__num">#</th>
                 <th scope="col">Title</th>
                 <th scope="col">Priority</th>
                 <th scope="col">Assignee</th>
+                <th scope="col">Time</th>
                 <th scope="col">Due</th>
-                <th scope="col">Sprint</th>
                 <th scope="col"><span className="visually-hidden">Move</span></th>
               </tr>
             </thead>
@@ -372,41 +335,92 @@ export default function TicketBoard({
                 <Fragment key={g.status || '_all'}>
                   {g.status && (
                     <tr className="grouprow">
-                      <td colSpan={6}>
+                      <td colSpan={7}>
                         <span className="pill" data-status={g.status.replace(/\s+/g, '')}>{g.status}</span>
                         <span className="grouprow__n">{g.rows.length}</span>
                       </td>
                     </tr>
                   )}
-                  {g.rows.map(t => (
-                    <tr key={t.entryId} className="rowlink" data-prio={t.priority}>
-                      <th scope="row">
-                        <button type="button" className="rowlink__btn" onClick={() => openTicket(t)}>
-                          {t.title || <span className="muted">(untitled)</span>}
-                        </button>
-                      </th>
-                      <td><span className="pill" data-prio={t.priority}>{t.priority || 'Normal'}</span></td>
-                      <td>{t.assignee || dash}</td>
-                      <td>{t.dueDate || dash}</td>
-                      <td>{t.sprint || dash}</td>
-                      <td className="tickets__move">
-                        <select
-                          aria-label={`Move "${t.title}" to another status`}
-                          value={t.status || 'Open'}
-                          disabled={busy}
-                          onChange={e => quickStatus(t, e.target.value)}
-                        >
-                          {TICKET_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
-                      </td>
-                    </tr>
-                  ))}
+                  {g.rows.map(t => {
+                    const est = t.estHours
+                    const logged = t.loggedHours || 0
+                    const over = est !== null && est > 0 && logged > est
+                    return (
+                      <tr
+                        key={t.entryId}
+                        className="rowlink"
+                        data-prio={t.priority}
+                        data-on={t.entryId === openId ? '' : undefined}
+                        data-blocked={t.roadblocked ? '' : undefined}
+                      >
+                        <td className="tickets__num">
+                          {t.ticketNumber === null
+                            ? <span className="muted">—</span>
+                            : <span className="tnum">#{t.ticketNumber}</span>}
+                        </td>
+                        <th scope="row">
+                          <button type="button" className="rowlink__btn" onClick={() => openTicket(t)}>
+                            {t.title || <span className="muted">(untitled)</span>}
+                          </button>
+                          <span className="rowmarks">
+                            {t.roadblocked && (
+                              <span className="mark mark--block" title={t.roadblockReason || 'Roadblocked'}>
+                                blocked
+                              </span>
+                            )}
+                            {t.timerRunning && (
+                              <span className="mark mark--timer" title={`Timer running${t.timerBy ? ` for ${t.timerBy}` : ''}`}>
+                                timing
+                              </span>
+                            )}
+                            {t.attachments.length > 0 && (
+                              <span className="mark" title={`${t.attachments.length} attachment${t.attachments.length === 1 ? '' : 's'}`}>
+                                {t.attachments.length} file{t.attachments.length === 1 ? '' : 's'}
+                              </span>
+                            )}
+                          </span>
+                        </th>
+                        <td><span className="pill" data-prio={t.priority}>{t.priority || 'Normal'}</span></td>
+                        <td>{t.assignee || dash}</td>
+                        <td className="tickets__time">
+                          {logged || est !== null ? (
+                            <span className="tvs" data-over={over ? '' : undefined}>
+                              {logged ? formatHours(logged) : '0h'}
+                              <span className="tvs__sep">/</span>
+                              <span className="tvs__est">{est === null ? '—' : formatHours(est)}</span>
+                            </span>
+                          ) : dash}
+                        </td>
+                        <td>{t.dueDate || dash}</td>
+                        <td className="tickets__move">
+                          <select
+                            aria-label={`Move "${t.title}" to another status`}
+                            value={t.status || 'Open'}
+                            disabled={busy}
+                            onChange={e => quickStatus(t, e.target.value)}
+                          >
+                            {TICKET_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                          </select>
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </Fragment>
               ))}
             </tbody>
           </table>
         </div>
       )}
+
+      {open && (
+        <TicketDetail
+          ticket={open}
+          onTicket={onTicket}
+          onDeleted={() => { setOpenId(''); setNotice('Ticket deleted.'); onChanged() }}
+          onClose={() => setOpenId('')}
+        />
+      )}
+      </div>
     </section>
   )
 }
