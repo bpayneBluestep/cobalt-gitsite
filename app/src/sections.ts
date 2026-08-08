@@ -94,6 +94,21 @@ export const SECTIONS: Section[] = [
       'with the unsprinted backlog underneath.',
   },
   {
+    key: 'settings',
+    path: '/settings',
+    label: 'Settings',
+    built: true,
+    purpose: 'How Cobalt is set up: who works here, and the lists everything else picks from.',
+    planned: [
+      'Option lists — departments, deal phases, ticket statuses — editable rather than in code',
+      'Permissions: who can move a company between stages, who can see money',
+      'Default file folders per company type',
+      'Integrations and API credentials',
+    ],
+    foundation:
+      'Users is live: everyone in the system with their employment details and reporting line.',
+  },
+  {
     key: 'reports',
     path: '/reports',
     label: 'Reports',

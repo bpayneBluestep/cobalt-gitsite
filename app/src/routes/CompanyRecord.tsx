@@ -6,6 +6,7 @@ import {
 } from '../api'
 import ContactsPanel from '../components/ContactsPanel'
 import FilesPanel from '../components/FilesPanel'
+import AccountOwnerCard from '../components/AccountOwnerCard'
 
 /*
  * The company record — reached by clicking a row on the Clients table.
@@ -261,6 +262,10 @@ export default function CompanyRecord() {
 
           {tab === 'files' && (
             <FilesPanel companyId={company.id} />
+          )}
+
+          {tab === 'info' && (
+            <AccountOwnerCard companyId={company.id} onChanged={load} />
           )}
 
           {tab === 'info' && (

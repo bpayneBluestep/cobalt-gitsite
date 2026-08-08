@@ -9,6 +9,7 @@ import CrmDashboard from './routes/CrmDashboard'
 import CrmPipeline from './routes/CrmPipeline'
 import CrmProspecting from './routes/CrmProspecting'
 import Sprints from './routes/Sprints'
+import Settings from './routes/Settings'
 import { SECTIONS } from './sections'
 import ThemeToggle from './components/ThemeToggle'
 import ToolsMenu from './components/ToolsMenu'
@@ -48,6 +49,7 @@ export default function App() {
           <Route path="/crm/pipeline" element={<CrmPipeline />} />
           <Route path="/crm/prospecting" element={<CrmProspecting />} />
           <Route path="/sprints" element={<Sprints />} />
+          <Route path="/settings" element={<Settings />} />
 
           {/* Clients is live. It sits under /clients rather than the root now that
               Home has it, and is reached from Home and from CRM. */}

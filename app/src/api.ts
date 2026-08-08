@@ -798,6 +798,98 @@ export function weekRange(key: string): string {
     : `${mon.getDate()} ${month(mon)} – ${fri.getDate()} ${month(fri)}`
 }
 
+// ------------------------------------------------------------- settings: users
+// A "user" is a Staff record in the All Users query with employment details on the
+// Employee Info form. Supervisor is a text id plus a denormalised name — the standing
+// pattern in this project rather than a relationship field.
+
+export const DEPARTMENTS = [
+  'Engineering', 'Implementation', 'Support', 'Sales', 'Leadership', 'Operations',
+] as const
+export const EMPLOYMENT_TYPES = ['Full-time', 'Part-time', 'Contract', 'Intern'] as const
+
+export interface User {
+  id: string
+  name: string
+  jobTitle: string
+  department: string
+  dateOfHire: string
+  employmentType: string
+  workEmail: string
+  workPhone: string
+  employed: boolean
+  notes: string
+  supervisorId: string
+  supervisorName: string
+  /** False when nothing on Employee Info has been filled in yet. */
+  hasEmployeeInfo: boolean
+  /** The stored supervisor id no longer matches any user. */
+  supervisorMissing: boolean
+  directReports: number
+}
+
+export interface UserList {
+  departments: string[]
+  employmentTypes: string[]
+  total: number
+  withEmployeeInfo: number
+  rows: User[]
+}
+
+export type EmployeeFieldKey =
+  'jobTitle' | 'department' | 'dateOfHire' | 'employmentType'
+  | 'workEmail' | 'workPhone' | 'employed' | 'notes'
+
+export const getUsers = (includeFormer = false): Promise<UserList> =>
+  maestroGet('users', includeFormer ? { includeFormer: 'true' } : {})
+
+export const updateEmployee = (id: string, fields: Partial<Record<EmployeeFieldKey, string>>): Promise<User> =>
+  maestroPost('updateEmployee', { id, fields })
+
+/** An empty supervisorId clears it. Self and a two-person cycle are refused. */
+export const setSupervisor = (id: string, supervisorId: string): Promise<User> =>
+  maestroPost('setSupervisor', { id, supervisorId })
+
+/** Creates the person RECORD only — the API cannot mint a BlueStep login. */
+export const createUser = (
+  fields: Partial<Record<EmployeeFieldKey | 'name', string>>,
+): Promise<User & { loginCreated: boolean; note: string }> => maestroPost('createUser', { fields })
+
+// ------------------------------------------------------------- account owner
+// One open stint (no `to`) is the current owner; the closed ones are the history.
+
+export interface OwnerStint {
+  entryId: string
+  userId: string
+  userName: string
+  from: string
+  to: string
+  handoffNote: string
+  assignedBy: string
+  assignedAt: string
+  current: boolean
+}
+
+export interface AccountOwner {
+  companyId: string
+  companyName: string
+  current: OwnerStint | null
+  /** More than one open stint — only possible by hand-editing the BlueStep form. */
+  conflict: boolean
+  history: OwnerStint[]
+  total: number
+  mirrored: string
+}
+
+export const getAccountOwner = (companyId: string): Promise<AccountOwner> =>
+  maestroGet('accountOwner', { companyId })
+
+/** Hand the client over from `fromDate`. An empty userId leaves it unowned. */
+export const setAccountOwner = (
+  companyId: string, userId: string, fromDate: string, note?: string,
+): Promise<AccountOwner> =>
+  maestroPost('setAccountOwner', { companyId, userId, fromDate, note: note || '' })
+
 export const COMPANY_CATEGORIES = ['Lead', 'Client', 'Former Client'] as const
 
 /** Move a company to exactly one category. */
