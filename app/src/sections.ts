@@ -81,16 +81,17 @@ export const SECTIONS: Section[] = [
     key: 'sprints',
     path: '/sprints',
     label: 'Sprints',
+    built: true,
     purpose: 'The weekly cycle: what was committed to, what shipped, and what rolled over.',
     planned: [
-      'A sprint board across every list, not one client at a time',
-      'Committed versus completed, per person',
-      'Estimated against logged hours for the week',
       'Rollover, so an unfinished ticket is carried rather than lost',
+      'Per-sprint capacity overrides, for the weeks with holidays in them',
+      'A retrospective panel: committed versus completed, per person',
+      'Velocity over time, once there are enough weeks to average',
     ],
     foundation:
-      'Every ticket already has a sprint field and a time log. beh has a Sprint Maestro and Sprint Organizer ' +
-      'to port from rather than design fresh.',
+      'The board is live: a column per engineer measuring committed estimates against capacity, ' +
+      'with the unsprinted backlog underneath.',
   },
   {
     key: 'reports',

@@ -669,6 +669,135 @@ export const renameFolder = (companyId: string, oldPath: string, newPath: string
 export const deleteFolder = (companyId: string, folder: string): Promise<{ deleted: string; entriesRemoved: number; filesRemoved: number }> =>
   maestroPost('deleteFolder', { companyId, folder })
 
+// ------------------------------------------------------------------- sprints
+// beh's model: a sprint is a week, each engineer is a column, and the column measures
+// the estimates assigned to them against their capacity. Cobalt needs almost no new
+// schema for it — a ticket already carries `sprint`, `assignee` and `estHours`.
+
+export const ENGINEER_DISCIPLINES = ['Engineer', 'Implementation', 'Support', 'Design', 'Other'] as const
+
+export interface Engineer {
+  entryId: string
+  name: string
+  email: string
+  role: string
+  capacity: number
+  active: boolean
+}
+
+export interface Team {
+  teamListId: string
+  disciplines: string[]
+  total: number
+  weeklyCapacity: number
+  rows: Engineer[]
+}
+
+export interface SprintColumn {
+  engineer: string
+  entryId: string
+  role: string
+  capacity: number
+  tickets: Ticket[]
+  estHours: number
+  loggedHours: number
+  remaining: number
+  over: boolean
+  /** Percent of capacity committed, or null when they have no capacity set. */
+  utilisation: number | null
+  done: number
+}
+
+export interface SprintBoard {
+  sprint: string
+  listsScanned: number
+  columns: SprintColumn[]
+  /** In this sprint but with nobody's name on it. */
+  unassigned: Ticket[]
+  backlog: Ticket[]
+  backlogTotal: number
+  totals: {
+    engineers: number; tickets: number; capacity: number; estHours: number
+    loggedHours: number; remaining: number; over: boolean
+    utilisation: number | null; done: number; unassigned: number
+  }
+  statuses: string[]
+  priorities: string[]
+}
+
+export type EngineerFieldKey = 'name' | 'email' | 'role' | 'capacity' | 'active'
+
+export const getTeam = (includeInactive = false): Promise<Team> =>
+  maestroGet('team', includeInactive ? { includeInactive: 'true' } : {})
+
+export const addEngineer = (fields: Partial<Record<EngineerFieldKey, string>>): Promise<Team> =>
+  maestroPost('addEngineer', { fields })
+
+export const updateEngineer = (entryId: string, fields: Partial<Record<EngineerFieldKey, string>>): Promise<Team> =>
+  maestroPost('updateEngineer', { entryId, fields })
+
+export const deleteEngineer = (entryId: string): Promise<Team> =>
+  maestroPost('deleteEngineer', { entryId })
+
+export const getSprint = (sprint: string): Promise<SprintBoard> =>
+  maestroGet('sprint', { sprint })
+
+/** Put a ticket into a sprint (and optionally onto someone). An empty sprint pulls it out. */
+export const assignSprint = (
+  listId: string, entryId: string, sprint: string, assignee?: string,
+): Promise<Ticket> => maestroPost('assignSprint', { listId, entryId, sprint, assignee: assignee || '' })
+
+// -- ISO week helpers -------------------------------------------------------
+// The sprint key is an ISO week like 2026-W33. The server treats it as an opaque
+// string, so the browser and the platform never have to agree about when a week
+// starts — only about the characters in the key.
+
+/** The Monday of the week containing `d`. */
+function mondayOf(d: Date): Date {
+  const out = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  const day = out.getDay() === 0 ? 7 : out.getDay()   // Sunday counts as day 7
+  out.setDate(out.getDate() - (day - 1))
+  return out
+}
+
+/** ISO-8601 week key: the week owning the Thursday of that Monday's week. */
+export function weekKey(d: Date): string {
+  const monday = mondayOf(d)
+  const thursday = new Date(monday)
+  thursday.setDate(monday.getDate() + 3)
+  const firstThursday = new Date(thursday.getFullYear(), 0, 4)
+  const firstMonday = mondayOf(firstThursday)
+  const weeks = Math.round((monday.getTime() - firstMonday.getTime()) / (7 * 24 * 3600 * 1000)) + 1
+  return `${thursday.getFullYear()}-W${String(weeks).padStart(2, '0')}`
+}
+
+/** Shift a week key by whole weeks. */
+export function shiftWeek(key: string, weeks: number): string {
+  const monday = mondayFromKey(key)
+  monday.setDate(monday.getDate() + weeks * 7)
+  return weekKey(monday)
+}
+
+/** The Monday a week key refers to. */
+export function mondayFromKey(key: string): Date {
+  const m = /^(\d{4})-W(\d{1,2})$/.exec(key || '')
+  if (!m) return mondayOf(new Date())
+  const firstMonday = mondayOf(new Date(Number(m[1]), 0, 4))
+  firstMonday.setDate(firstMonday.getDate() + (Number(m[2]) - 1) * 7)
+  return firstMonday
+}
+
+/** `11–15 Aug` / `30 Sep – 4 Oct` — the working week, Monday to Friday. */
+export function weekRange(key: string): string {
+  const mon = mondayFromKey(key)
+  const fri = new Date(mon)
+  fri.setDate(mon.getDate() + 4)
+  const month = (d: Date) => d.toLocaleDateString('en-GB', { month: 'short' })
+  return mon.getMonth() === fri.getMonth()
+    ? `${mon.getDate()}–${fri.getDate()} ${month(fri)}`
+    : `${mon.getDate()} ${month(mon)} – ${fri.getDate()} ${month(fri)}`
+}
+
 export const COMPANY_CATEGORIES = ['Lead', 'Client', 'Former Client'] as const
 
 /** Move a company to exactly one category. */
