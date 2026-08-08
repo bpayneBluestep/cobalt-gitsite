@@ -47,6 +47,36 @@ export const SECTIONS: Section[] = [
     ],
   },
   {
+    key: 'clients',
+    path: '/clients',
+    label: 'Clients',
+    built: true,
+    purpose: 'Every company we work with, and everything hanging off its record.',
+    planned: [
+      'A single view of a client across tickets, hours and files',
+      'Contract and renewal dates, so nothing lapses unnoticed',
+      'Health at a glance: last activity, open roadblocks, unpaid time',
+    ],
+    foundation:
+      'The list is live, and each record carries its info, contacts, files, account owner and tickets.',
+  },
+  {
+    key: 'sprints',
+    path: '/sprints',
+    label: 'Sprints',
+    built: true,
+    purpose: 'The weekly cycle: what was committed to, what shipped, and what rolled over.',
+    planned: [
+      'Rollover, so an unfinished ticket is carried rather than lost',
+      'Per-sprint capacity overrides, for the weeks with holidays in them',
+      'A retrospective panel: committed versus completed, per person',
+      'Velocity over time, once there are enough weeks to average',
+    ],
+    foundation:
+      'The board is live: a column per engineer measuring committed estimates against capacity, ' +
+      'with the unsprinted backlog underneath.',
+  },
+  {
     key: 'crm',
     path: '/crm',
     label: 'CRM',
@@ -78,20 +108,19 @@ export const SECTIONS: Section[] = [
     ],
   },
   {
-    key: 'sprints',
-    path: '/sprints',
-    label: 'Sprints',
-    built: true,
-    purpose: 'The weekly cycle: what was committed to, what shipped, and what rolled over.',
+    key: 'reports',
+    path: '/reports',
+    label: 'Reports',
+    purpose: 'The numbers the company runs on, pulled from the records rather than a spreadsheet.',
     planned: [
-      'Rollover, so an unfinished ticket is carried rather than lost',
-      'Per-sprint capacity overrides, for the weeks with holidays in them',
-      'A retrospective panel: committed versus completed, per person',
-      'Velocity over time, once there are enough weeks to average',
+      'Hours by client, by person, by week — billable and not',
+      'Throughput: tickets opened against closed',
+      'Pipeline by stage and value',
+      'Time-to-close, and where tickets actually sit and wait',
     ],
     foundation:
-      'The board is live: a column per engineer measuring committed estimates against capacity, ' +
-      'with the unsprinted backlog underneath.',
+      'Logged hours are stored as a real number on every ticket, not only inside the time log, ' +
+      'so BlueStep reports can total them without any of this being built first.',
   },
   {
     key: 'settings',
@@ -107,20 +136,5 @@ export const SECTIONS: Section[] = [
     ],
     foundation:
       'Users is live: everyone in the system with their employment details and reporting line.',
-  },
-  {
-    key: 'reports',
-    path: '/reports',
-    label: 'Reports',
-    purpose: 'The numbers the company runs on, pulled from the records rather than a spreadsheet.',
-    planned: [
-      'Hours by client, by person, by week — billable and not',
-      'Throughput: tickets opened against closed',
-      'Pipeline by stage and value',
-      'Time-to-close, and where tickets actually sit and wait',
-    ],
-    foundation:
-      'Logged hours are stored as a real number on every ticket, not only inside the time log, ' +
-      'so BlueStep reports can total them without any of this being built first.',
   },
 ]

@@ -284,7 +284,7 @@ main { flex: 1; min-height: 0; display: flex; }
 
 /* ---------------------------------------------------------------- main nav */
 
-.mainnav { display: flex; gap: 0.25rem; }
+.mainnav { display: flex; flex-wrap: wrap; gap: 0.25rem; }
 
 .mainnav a {
   font-family: var(--font-display);
