@@ -1,16 +1,16 @@
 {
   "org": "U142140",
-  "extractedAt": "2026-08-07T17:12:35.057Z",
+  "extractedAt": "2026-08-08T12:58:02.706Z",
   "source": "https://gateway.bluestep.net/mcp (invoke_org_tool)",
   "stats": {
     "recordTypes": 8,
     "baseTypes": 3,
     "categories": 5,
-    "forms": 7,
-    "fields": 42,
-    "unlinkedForms": 1,
+    "forms": 6,
+    "fields": 36,
+    "unlinkedForms": 0,
     "fieldTypeCounts": {
-      "TEXT": 30,
+      "TEXT": 24,
       "MEMO": 2,
       "DATE": 3,
       "PASSWORD": 1,
@@ -122,7 +122,9 @@
       "baseFormId": "1000001___2197371",
       "displayFieldLabel": "Name",
       "requiredForms": [],
-      "optionalForms": [],
+      "optionalForms": [
+        "1000001___2197371"
+      ],
       "attachedForms": [],
       "inList": true,
       "status": "ok",
@@ -284,59 +286,6 @@
           "requirement": "optional"
         }
       ]
-    },
-    {
-      "topId": "1000001___2197271",
-      "displayName": "DELETE ME — orphaned old Company form",
-      "singleEntry": true,
-      "fieldCount": 6,
-      "fields": [
-        {
-          "fieldId": "1000101___3673689",
-          "label": "Name",
-          "columnName": "Name",
-          "dbColumnName": "C1629",
-          "fieldType": "TEXT"
-        },
-        {
-          "fieldId": "1000101___3673690",
-          "label": "Website",
-          "columnName": "Website",
-          "dbColumnName": "C1630",
-          "fieldType": "TEXT"
-        },
-        {
-          "fieldId": "1000101___3673691",
-          "label": "Street",
-          "columnName": "Street",
-          "dbColumnName": "C1631",
-          "fieldType": "TEXT"
-        },
-        {
-          "fieldId": "1000101___3673692",
-          "label": "City",
-          "columnName": "City",
-          "dbColumnName": "C1632",
-          "fieldType": "TEXT"
-        },
-        {
-          "fieldId": "1000101___3673693",
-          "label": "State",
-          "columnName": "State",
-          "dbColumnName": "C1633",
-          "fieldType": "TEXT"
-        },
-        {
-          "fieldId": "1000101___3673694",
-          "label": "Postal Code",
-          "columnName": "Postal Code",
-          "dbColumnName": "C1634",
-          "fieldType": "TEXT"
-        }
-      ],
-      "status": "ok",
-      "error": null,
-      "usedBy": []
     },
     {
       "topId": "1000001__FID_onlineProfile",

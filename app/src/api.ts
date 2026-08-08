@@ -46,9 +46,9 @@ async function handle(res: Response): Promise<any> {
     if (res.status >= 500) {
       throw new ApiError(
         `The Maestro returned HTTP ${res.status} with a non-JSON body. A bare "Error" here ` +
-        `means the endpoint exists on the platform but its code has not been compiled yet — ` +
-        `push it with the b6p CLI, which compiles server-side.`,
-        { code: 'NOT_COMPILED', status: res.status },
+        `means the endpoint exists on the platform but no compiled code is published — the ` +
+        `live snapshot needs scripts/app.js, not just a draft.`,
+        { code: 'NOT_PUBLISHED', status: res.status },
       )
     }
     throw new ApiError(
