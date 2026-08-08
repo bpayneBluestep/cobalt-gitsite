@@ -116,7 +116,11 @@ export default function CrmProspecting() {
         </p>
       </header>
 
-      <CrmNav counts={d ? { Prospecting: d.prospecting, Pipeline: d.inPipeline } : undefined} />
+      {/* Only the Prospecting count: this page knows how many leads are in the
+          pipeline, which is not the same number as how many open DEALS there are —
+          a client can carry an upsell. A badge that means two things is worse than
+          one that is absent. */}
+      <CrmNav counts={d ? { Prospecting: d.prospecting } : undefined} />
 
       {state.phase === 'loading' && <p className="empty">Loading leads…</p>}
 
