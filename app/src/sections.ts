@@ -40,8 +40,9 @@ export const SECTIONS: Section[] = [
       'Clients with no activity in the last fortnight',
     ],
     foundation:
-      'Tickets already carry an assignee, a roadblock flag with its reason, a sprint and a time log, ' +
-      'so this is a matter of arranging what is already recorded.',
+      'Tickets already carry an accountable owner and a responsible engineer, a roadblock flag ' +
+      'with its reason, a sprint, a time log and the components they changed, so this is a matter ' +
+      'of arranging what is already recorded.',
     live: [
       { to: '/clients', label: 'Clients', note: 'the company list, live — open one to reach its tickets' },
     ],

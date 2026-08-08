@@ -1,26 +1,34 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
-  ApiError, getSprint, getTeam, assignSprint, addEngineer, updateEngineer, deleteEngineer,
-  formatHours, weekKey, shiftWeek, weekRange,
-  ENGINEER_DISCIPLINES, type SprintBoard, type Team, type Ticket, type EngineerFieldKey,
+  ApiError, getSprint, getTeam, createSprint, assignSprint,
+  addEngineer, updateEngineer, deleteEngineer,
+  formatHours, shiftSprint, sprintLabel, isSprintKey, nameKey,
+  ENGINEER_DISCIPLINES,
+  type SprintBoard, type Team, type Ticket, type EngineerFieldKey, type User,
 } from '../api'
+import { loadUsers } from '../components/UserPicker'
 
 /*
- * The weekly sprint board — beh's Sprint Organizer, ported.
+ * The sprint board — beh's Sprint Organizer, ported.
  *
- * A column per engineer, each measuring the estimates assigned to them against their
+ * A column per engineer, each measuring the estimates committed to them against their
  * capacity, plus the unsprinted backlog to pull work from. The point of the layout is
- * that over-commitment is visible before the week starts rather than discovered halfway
- * through it.
+ * that over-commitment is visible before the sprint starts rather than discovered
+ * halfway through it.
  *
- * Almost none of this needed new schema: a ticket already carries `sprint`, `assignee`
- * and `estHours`, so planning a week is writing two existing fields. The one addition
- * was the roster — who the engineers are and how many hours each has.
+ * A sprint is a plain NUMBER — 1, 2, 3 — the way the team says it out loud, and the way
+ * beh has always numbered them. It used to be an ISO week (2026-W33): that reads like a
+ * date, sorts nicely, and nobody ever said it in a sentence.
  *
- * The sprint key is an ISO week (2026-W33) computed here; the endpoint treats it as an
- * opaque string, so the browser and the platform never have to agree about when a week
- * begins — only about the characters in the key.
+ * The roster is PER SPRINT. Capacity moves week to week and people take leave, so each
+ * sprint owns its own roster and starting a new one copies the previous forward. Editing
+ * next sprint therefore cannot reach back and rewrite the history of a sprint that has
+ * already happened — which is exactly what a single shared roster did.
+ *
+ * Assignment writes `responsibleId`, a real user id. The roster stores names, so the
+ * two are matched by name here; a roster entry with no matching user cannot be assigned
+ * to, and says so rather than silently failing at the endpoint.
  */
 
 type State =
@@ -32,7 +40,17 @@ const LOGIN_URL = '/shared/login/login.jsp?desturl=' +
   encodeURIComponent(window.location.pathname + window.location.search)
 
 type EngDraft = Record<EngineerFieldKey, string>
-const EMPTY_ENG: EngDraft = { name: '', email: '', role: 'Engineer', capacity: '32', active: 'true' }
+
+const emptyEng = (sprint: string): EngDraft => ({
+  name: '', email: '', role: 'Engineer', capacity: '32', active: 'true', sprint,
+})
+
+/** An engineer on the roster, paired with the user record their name resolves to. */
+interface Assignable {
+  name: string
+  /** The user id to write. Empty when no user has that name. */
+  userId: string
+}
 
 function CapacityBar({ est, capacity, over }: { est: number; capacity: number; over: boolean }) {
   const pct = capacity > 0 ? Math.min(100, (est / capacity) * 100) : 0
@@ -44,18 +62,48 @@ function CapacityBar({ est, capacity, over }: { est: number; capacity: number; o
 }
 
 export default function Sprints() {
-  const thisWeek = useMemo(() => weekKey(new Date()), [])
-  const [sprint, setSprint] = useState(thisWeek)
+  const [params, setParams] = useSearchParams()
+  const urlSprint = params.get('sprint') || ''
+
+  // '' means "not decided yet" — the first load picks the latest sprint that has a
+  // roster, so landing on this page shows the sprint being worked rather than sprint 1.
+  const [sprint, setSprintState] = useState(isSprintKey(urlSprint) ? urlSprint : '')
   const [state, setState] = useState<State>({ phase: 'loading' })
   const [team, setTeam] = useState<Team | null>(null)
+  const [users, setUsers] = useState<User[]>([])
   const [showRoster, setShowRoster] = useState(false)
   const [busy, setBusy] = useState('')
   const [notice, setNotice] = useState('')
   const [failure, setFailure] = useState('')
   const [engEditing, setEngEditing] = useState<string | 'new' | null>(null)
-  const [engDraft, setEngDraft] = useState<EngDraft>(EMPTY_ENG)
+  const [engDraft, setEngDraft] = useState<EngDraft>(emptyEng(''))
+
+  /** Move to a sprint and put it in the URL, so the view can be linked to. */
+  const setSprint = useCallback((key: string) => {
+    setSprintState(key)
+    setParams(key ? { sprint: key } : {}, { replace: true })
+  }, [setParams])
+
+  useEffect(() => { loadUsers().then(setUsers).catch(() => setUsers([])) }, [])
+
+  // Decide which sprint to show, once, before the first board fetch — otherwise the
+  // page loads sprint 1 and then jumps, which reads as a bug.
+  useEffect(() => {
+    if (sprint) return
+    getTeam('', true)
+      .then(t => {
+        setTeam(t)
+        setSprint(t.sprints.length ? t.sprints[t.sprints.length - 1] : '1')
+      })
+      .catch(() => setSprint('1'))
+  }, [sprint, setSprint])
+
+  const loadTeam = useCallback((key: string) => {
+    getTeam(key, true).then(setTeam).catch(() => { /* the roster is secondary */ })
+  }, [])
 
   const load = useCallback((key: string) => {
+    if (!key) return
     setState({ phase: 'loading' })
     getSprint(key)
       .then(board => setState({ phase: 'ready', board }))
@@ -65,8 +113,7 @@ export default function Sprints() {
       }))
   }, [])
 
-  useEffect(() => { load(sprint) }, [load, sprint])
-  useEffect(() => { getTeam(true).then(setTeam).catch(() => setTeam(null)) }, [])
+  useEffect(() => { load(sprint); if (sprint) loadTeam(sprint) }, [load, loadTeam, sprint])
 
   const board = state.phase === 'ready' ? state.board : null
 
@@ -75,18 +122,38 @@ export default function Sprints() {
     work
       .then(() => {
         setNotice(said)
-
         load(sprint)
-        getTeam(true).then(setTeam).catch(() => { /* roster is secondary */ })
+        loadTeam(sprint)
       })
       .catch(err => setFailure(err instanceof ApiError ? err.message : String(err)))
       .finally(() => setBusy(''))
   }
 
+  /**
+   * Who can be assigned this sprint: the roster, resolved to user ids.
+   *
+   * A roster name with no matching user is kept in the list but not selectable — the
+   * fix is to correct the name or add the person, and hiding the row would just make
+   * an engineer quietly disappear from the board with no clue why.
+   */
+  const assignable: Assignable[] = useMemo(() => {
+    const byName = new Map<string, string>()
+    for (const u of users) byName.set(nameKey(u.name), u.id)
+    return (team?.rows || [])
+      .filter(e => e.active)
+      .map(e => ({ name: e.name, userId: byName.get(nameKey(e.name)) || '' }))
+  }, [team, users])
+
+  const unresolved = assignable.filter(a => !a.userId)
+
   /** Pull a backlog ticket into this sprint for someone, or move it between columns. */
-  function plan(t: Ticket, engineer: string) {
-    run('plan', assignSprint(t.listId, t.entryId, sprint, engineer),
-      `${t.ticketNumber !== null ? `#${t.ticketNumber}` : t.title} → ${engineer}.`)
+  function plan(t: Ticket, userId: string, who: string) {
+    if (!userId) {
+      setFailure(`${who} is on the roster but has no matching user record, so work cannot be assigned to them.`)
+      return
+    }
+    run('plan', assignSprint(t.listId, t.entryId, sprint, userId),
+      `${t.ticketNumber !== null ? `#${t.ticketNumber}` : t.title} → ${who}.`)
   }
 
   function unplan(t: Ticket) {
@@ -100,6 +167,7 @@ export default function Sprints() {
     const fields: Partial<Record<EngineerFieldKey, string>> = {
       name: engDraft.name.trim(), email: engDraft.email.trim(),
       role: engDraft.role, capacity: engDraft.capacity, active: engDraft.active,
+      sprint: engDraft.sprint,
     }
     if (engEditing === 'new') {
       run('eng', addEngineer(fields).then(t => { setTeam(t); setEngEditing(null); return t }),
@@ -110,7 +178,39 @@ export default function Sprints() {
       'Roster updated.')
   }
 
-  const engineerNames = (team?.rows || []).filter(e => e.active).map(e => e.name)
+  /** Start this sprint for real, by copying the previous roster forward. */
+  function startSprint() {
+    run('start', createSprint(sprint).then(t => { setTeam(t); return t }),
+      `${sprintLabel(sprint)} started — the previous roster was copied forward.`)
+  }
+
+  const dash = <span className="muted">—</span>
+  const templateRoster = !!board?.rosterIsTemplate
+
+  /** A select of this sprint's engineers, used from three places. */
+  function EngineerSelect({
+    label, value, onPick,
+  }: { label: string; value?: string; onPick: (userId: string, name: string) => void }) {
+    return (
+      <select
+        className="minisel"
+        aria-label={label}
+        value={value ?? ''}
+        disabled={!!busy}
+        onChange={e => {
+          const picked = assignable.find(a => a.name === e.target.value)
+          if (picked) onPick(picked.userId, picked.name)
+        }}
+      >
+        <option value="">Assign to…</option>
+        {assignable.map(a => (
+          <option key={a.name} value={a.name} disabled={!a.userId}>
+            {a.name}{a.userId ? '' : ' (no user record)'}
+          </option>
+        ))}
+      </select>
+    )
+  }
 
   return (
     <section className="page">
@@ -118,29 +218,30 @@ export default function Sprints() {
         <p className="eyebrow">Cobalt</p>
         <h1>Sprints</h1>
         <p className="page__sub-text">
-          One week at a time. Each engineer's committed estimates against their capacity,
-          so an overloaded week shows before it starts.
+          One sprint at a time. Each engineer's committed estimates against their capacity
+          for that sprint, so an overloaded sprint shows before it starts.
         </p>
       </header>
 
       <div className="pipebar sprintbar">
         <div className="weekpick">
           <button type="button" className="btn btn--ghost btn--sm"
-            onClick={() => setSprint(s => shiftWeek(s, -1))} disabled={!!busy}>
+            onClick={() => setSprint(shiftSprint(sprint, -1))}
+            disabled={!!busy || sprint === '1'}>
             ← Previous
           </button>
           <span className="weekpick__now">
-            <strong>{sprint}</strong>
-            <span className="muted"> {weekRange(sprint)}</span>
-            {sprint === thisWeek && <span className="mark mark--timer">this week</span>}
+            <strong>{sprintLabel(sprint)}</strong>
+            {templateRoster && <span className="mark">not started</span>}
           </span>
           <button type="button" className="btn btn--ghost btn--sm"
-            onClick={() => setSprint(s => shiftWeek(s, 1))} disabled={!!busy}>
+            onClick={() => setSprint(shiftSprint(sprint, 1))} disabled={!!busy}>
             Next →
           </button>
-          {sprint !== thisWeek && (
-            <button type="button" className="linkbtn" onClick={() => setSprint(thisWeek)}>
-              Back to this week
+          {board && board.sprints.length > 0 && sprint !== board.sprints[board.sprints.length - 1] && (
+            <button type="button" className="linkbtn"
+              onClick={() => setSprint(board.sprints[board.sprints.length - 1])}>
+              Back to {sprintLabel(board.sprints[board.sprints.length - 1])}
             </button>
           )}
         </div>
@@ -153,6 +254,38 @@ export default function Sprints() {
       {notice && <p className="board2__notice" role="status">{notice}</p>}
       {failure && <p className="editcard__err" role="alert">{failure}</p>}
 
+      {/* A sprint nobody has started yet is showing the DEFAULT roster. Saying so
+          matters: edit a row here and you are changing where every future sprint
+          starts, not just this one. */}
+      {templateRoster && (
+        <div className="callout callout--warn">
+          <p className="callout__title">{sprintLabel(sprint)} has not been started</p>
+          <p>
+            It is showing the default roster as a preview. Start it to copy the previous
+            sprint's roster forward — after that, changing who is on it, or their hours,
+            affects this sprint only.
+          </p>
+          <p className="callout__actions">
+            <button type="button" className="btn" onClick={startSprint} disabled={!!busy}>
+              {busy === 'start' ? 'Starting…' : `Start ${sprintLabel(sprint)}`}
+            </button>
+          </p>
+        </div>
+      )}
+
+      {unresolved.length > 0 && (
+        <div className="callout callout--warn">
+          <p className="callout__title">
+            {unresolved.length} roster name{unresolved.length === 1 ? '' : 's'} with no user record
+          </p>
+          <p>
+            {unresolved.map(a => a.name).join(', ')} cannot be given work: a ticket stores
+            the engineer as a user, and no user has that name. Correct the roster name so it
+            matches, or add the person under Settings.
+          </p>
+        </div>
+      )}
+
       {/* ---- the roster ---- */}
       {showRoster && (
         <section className="tsec">
@@ -162,10 +295,14 @@ export default function Sprints() {
               {team && <span className="tsec__n">{team.rows.length}</span>}
             </h2>
             {team && (
-              <span className="panel__note">{formatHours(team.weeklyCapacity)} a week across the active roster</span>
+              <span className="panel__note">
+                {formatHours(team.weeklyCapacity)} across the active roster
+                {team.isTemplate ? ' · the default roster' : ` · ${sprintLabel(sprint)} only`}
+              </span>
             )}
             <button type="button" className="btn btn--sm"
-              onClick={() => { setEngEditing('new'); setEngDraft(EMPTY_ENG) }} disabled={!!busy}>
+              onClick={() => { setEngEditing('new'); setEngDraft(emptyEng(team?.isTemplate ? '' : sprint)) }}
+              disabled={!!busy}>
               <span aria-hidden="true">+</span> Add engineer
             </button>
           </div>
@@ -175,15 +312,21 @@ export default function Sprints() {
               <div className="editcard__head">
                 <h2>{engEditing === 'new' ? 'New engineer' : 'Edit engineer'}</h2>
                 <p className="note">
-                  The name must match what goes in a ticket's Assignee field — that is how
-                  work finds its column.
+                  The name must match the person's user record — that is how a ticket's
+                  responsible engineer finds their column.
                 </p>
               </div>
               <div className="efgrid">
                 <div className="ef">
                   <label htmlFor="en-name">Name</label>
                   <input id="en-name" type="text" value={engDraft.name} autoFocus autoComplete="off"
+                    list="en-users"
                     onChange={e => setEngDraft(d => ({ ...d, name: e.target.value }))} />
+                  {/* The user list as suggestions rather than a select: the roster can
+                      legitimately name somebody who is not a Cobalt user yet. */}
+                  <datalist id="en-users">
+                    {users.map(u => <option key={u.id} value={u.name} />)}
+                  </datalist>
                 </div>
                 <div className="ef">
                   <label htmlFor="en-email">Email</label>
@@ -198,7 +341,7 @@ export default function Sprints() {
                   </select>
                 </div>
                 <div className="ef">
-                  <label htmlFor="en-cap">Weekly capacity (hours)</label>
+                  <label htmlFor="en-cap">Capacity this sprint (hours)</label>
                   <input id="en-cap" type="number" min="0" max="80" step="1" value={engDraft.capacity}
                     onChange={e => setEngDraft(d => ({ ...d, capacity: e.target.value }))} />
                 </div>
@@ -207,8 +350,16 @@ export default function Sprints() {
                   <label className="checkline">
                     <input id="en-active" type="checkbox" checked={engDraft.active === 'true'}
                       onChange={e => setEngDraft(d => ({ ...d, active: e.target.checked ? 'true' : 'false' }))} />
-                    <span>Include in sprints</span>
+                    <span>Include in this sprint</span>
                   </label>
+                </div>
+                <div className="ef">
+                  <label htmlFor="en-sprint">Applies to</label>
+                  <select id="en-sprint" value={engDraft.sprint}
+                    onChange={e => setEngDraft(d => ({ ...d, sprint: e.target.value }))}>
+                    <option value={sprint}>{sprintLabel(sprint)} only</option>
+                    <option value="">The default roster (every new sprint)</option>
+                  </select>
                 </div>
               </div>
               <div className="editcard__foot">
@@ -242,7 +393,7 @@ export default function Sprints() {
                         {e.name}
                         {e.email && <span className="contacts__title">{e.email}</span>}
                       </th>
-                      <td>{e.role || <span className="muted">—</span>}</td>
+                      <td>{e.role || dash}</td>
                       <td className="num">{formatHours(e.capacity)}</td>
                       <td>{e.active ? 'Yes' : <span className="muted">No</span>}</td>
                       <td className="leads__act">
@@ -252,6 +403,7 @@ export default function Sprints() {
                             setEngDraft({
                               name: e.name, email: e.email, role: e.role || 'Engineer',
                               capacity: String(e.capacity), active: e.active ? 'true' : 'false',
+                              sprint: e.sprint || '',
                             })
                           }}>
                           Edit
@@ -293,7 +445,7 @@ export default function Sprints() {
           <p>
             A sprint is engineers and their capacity, so that comes first.{' '}
             <button type="button" className="linkbtn"
-              onClick={() => { setShowRoster(true); setEngEditing('new'); setEngDraft(EMPTY_ENG) }}>
+              onClick={() => { setShowRoster(true); setEngEditing('new'); setEngDraft(emptyEng('')) }}>
               Add the first one
             </button>.
           </p>
@@ -342,12 +494,10 @@ export default function Sprints() {
                       <span className="cab__name">{t.title}</span>
                       <span className="cab__count">{formatHours(t.estHours)}</span>
                     </span>
-                    <select className="minisel" aria-label={`Assign ${t.title}`} defaultValue=""
-                      disabled={!!busy}
-                      onChange={e => { if (e.target.value) plan(t, e.target.value) }}>
-                      <option value="">Assign to…</option>
-                      {engineerNames.map(nm => <option key={nm} value={nm}>{nm}</option>)}
-                    </select>
+                    <EngineerSelect
+                      label={`Assign ${t.title}`}
+                      onPick={(userId, name) => plan(t, userId, name)}
+                    />
                   </li>
                 ))}
               </ul>
@@ -389,18 +539,18 @@ export default function Sprints() {
                         {t.clientName || t.listName}
                       </Link>
                     </p>
+                    {t.accountableName && (
+                      <p className="dcard__co muted">PM: {t.accountableName}</p>
+                    )}
                     {t.roadblocked && (
                       <p className="dcard__next">Blocked: {t.roadblockReason}</p>
                     )}
                     <div className="dcard__move">
-                      <select
-                        aria-label={`Move ${t.title} to another engineer`}
+                      <EngineerSelect
+                        label={`Move ${t.title} to another engineer`}
                         value={col.engineer}
-                        disabled={!!busy}
-                        onChange={e => plan(t, e.target.value)}
-                      >
-                        {engineerNames.map(nm => <option key={nm} value={nm}>{nm}</option>)}
-                      </select>
+                        onPick={(userId, name) => plan(t, userId, name)}
+                      />
                       <button type="button" className="linkbtn" disabled={!!busy} onClick={() => unplan(t)}>
                         Remove
                       </button>
@@ -438,7 +588,7 @@ export default function Sprints() {
                       <th scope="col">For</th>
                       <th scope="col">Priority</th>
                       <th scope="col">Est</th>
-                      <th scope="col">Plan into {sprint}</th>
+                      <th scope="col">Plan into {sprintLabel(sprint)}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -446,7 +596,7 @@ export default function Sprints() {
                       <tr key={t.entryId} data-prio={t.priority}>
                         <td className="tickets__num">
                           {t.ticketNumber === null
-                            ? <span className="muted">—</span>
+                            ? dash
                             : <span className="tnum">#{t.ticketNumber}</span>}
                         </td>
                         <th scope="row">{t.title}</th>
@@ -458,12 +608,10 @@ export default function Sprints() {
                             : formatHours(t.estHours)}
                         </td>
                         <td>
-                          <select className="minisel" aria-label={`Plan ${t.title}`} defaultValue=""
-                            disabled={!!busy}
-                            onChange={e => { if (e.target.value) plan(t, e.target.value) }}>
-                            <option value="">Assign to…</option>
-                            {engineerNames.map(nm => <option key={nm} value={nm}>{nm}</option>)}
-                          </select>
+                          <EngineerSelect
+                            label={`Plan ${t.title}`}
+                            onPick={(userId, name) => plan(t, userId, name)}
+                          />
                         </td>
                       </tr>
                     ))}
@@ -476,7 +624,7 @@ export default function Sprints() {
           <p className="panel__foot">
             Walked {board.listsScanned} list{board.listsScanned === 1 ? '' : 's'} to build this.
             A ticket with no estimate counts as zero hours, so it plans in without moving
-            the bar — set one on the ticket to make the week honest.
+            the bar — set one on the ticket to make the sprint honest.
           </p>
         </>
       )}

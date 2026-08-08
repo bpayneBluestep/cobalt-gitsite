@@ -23,9 +23,9 @@ import RichTextEditor from './RichTextEditor'
 type Draft = Record<DealFieldKey, string>
 
 const EMPTY: Draft = {
-  title: '', phase: 'Open Lead', owner: '', leadSource: '', products: '',
-  mrr: '', fees: '', confidence: 'Yellow', anticipatedDate: '', demoDate: '',
-  nextStep: '', notes: '', lossReason: '',
+  title: '', phase: 'Open Lead', owner: '', leadSource: '',
+  mrr: '', fees: '', confidence: 'Yellow', firstBillingMonth: '', demoDate: '',
+  notes: '', lossReason: '',
 }
 
 function draftOf(d: Deal): Draft {
@@ -34,13 +34,11 @@ function draftOf(d: Deal): Draft {
     phase: d.phase || 'Open Lead',
     owner: d.owner || '',
     leadSource: d.leadSource || '',
-    products: d.products || '',
     mrr: d.mrr === null || d.mrr === undefined ? '' : String(d.mrr),
     fees: d.fees === null || d.fees === undefined ? '' : String(d.fees),
     confidence: d.confidence || 'Yellow',
-    anticipatedDate: d.anticipatedDate || '',
+    firstBillingMonth: d.firstBillingMonth || '',
     demoDate: d.demoDate || '',
-    nextStep: d.nextStep || '',
     notes: d.notes || '',
     lossReason: d.lossReason || '',
   }
@@ -59,7 +57,7 @@ function changedFields(draft: Draft, saved: Deal): Partial<Record<DealFieldKey, 
 }
 
 export default function DealEditor({
-  companyId, companyName, deal, lossReasons, sources, products,
+  companyId, companyName, deal, lossReasons, sources,
   onSaved, onDeleted, onClose,
 }: {
   companyId: string
@@ -68,7 +66,6 @@ export default function DealEditor({
   deal: Deal | null
   lossReasons: string[]
   sources: string[]
-  products: string[]
   onSaved: (d: Deal) => void
   onDeleted: () => void
   onClose: () => void
@@ -192,9 +189,14 @@ export default function DealEditor({
             onChange={e => edit('fees', e.target.value)} />
         </div>
         <div className="ef">
-          <label htmlFor="d-close">Anticipated close</label>
-          <input id="d-close" type="date" value={draft.anticipatedDate}
-            onChange={e => edit('anticipatedDate', e.target.value)} />
+          <label htmlFor="d-billing">Anticipated first billing month</label>
+          {/*
+            A month, not a date. Nobody knows which DAY of September billing starts on
+            while the deal is still open, and asking for one only invites a made-up
+            answer that the forecast then reports as though it meant something.
+          */}
+          <input id="d-billing" type="month" value={draft.firstBillingMonth}
+            onChange={e => edit('firstBillingMonth', e.target.value)} />
         </div>
         <div className="ef">
           <label htmlFor="d-demo">Demo date</label>
@@ -212,18 +214,6 @@ export default function DealEditor({
             <option value="">—</option>
             {sources.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
-        </div>
-        <div className="ef ef--wide">
-          <label htmlFor="d-products">Products</label>
-          <input id="d-products" type="text" value={draft.products} autoComplete="off"
-            placeholder={products.slice(0, 3).join(', ')}
-            onChange={e => edit('products', e.target.value)} />
-        </div>
-        <div className="ef ef--wide">
-          <label htmlFor="d-next">Next step</label>
-          <input id="d-next" type="text" value={draft.nextStep} autoComplete="off"
-            placeholder="The one thing that moves this forward"
-            onChange={e => edit('nextStep', e.target.value)} />
         </div>
         <div className="ef ef--wide">
           <label htmlFor="d-notes">Notes</label>

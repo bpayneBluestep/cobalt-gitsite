@@ -2578,3 +2578,42 @@ main { flex: 1; min-height: 0; display: flex; }
 
 /* An inactive engineer stays in the roster table but reads as retired. */
 .fields tbody tr[data-off] th, .fields tbody tr[data-off] td { opacity: 0.55; }
+
+/* --- components on a ticket ---------------------------------------------- */
+/* What a ticket changed on the platform. Sits under Attachments and reads as a
+   companion to it: the same card, a table instead of a list, because a component
+   has four facts worth lining up rather than one name and a size. */
+
+.comps { margin-top: 0.7rem; }
+.comps__act { white-space: nowrap; text-align: right; }
+.comps__act .linkbtn + .linkbtn { margin-left: 0.6rem; }
+
+/* New reads as an addition, Edit stays quiet — most rows are edits, and colouring
+   the common case is just noise. */
+.mark[data-change="New"] { color: var(--cobalt); border-color: var(--cobalt); background: transparent; }
+
+/* The inline add/edit form, inset so it reads as part of the section it sits in
+   rather than a second card stacked on top of it. */
+.efgrid--inset {
+  margin-top: 0.8rem;
+  padding: 0.8rem;
+  background: var(--bg-sunk);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.tsec__add { margin: 0.8rem 0 0; }
+.tsec__formfoot {
+  flex-direction: row;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* --- rail: a value you read rather than set ------------------------------ */
+/* Sprint is set from the sprint board, so on the ticket it is a fact, not a field.
+   Matching the height of a real input would be a lie about what it is. */
+.railval { margin: 0; font-size: 0.85rem; }
+
+/* A one-line "why this field is what it is", under the field. Quieter than
+   .ef__warn, which is for a value that will be refused. */
+.ef__hint { margin: 0.1rem 0 0; font-size: 0.7rem; line-height: 1.35; color: var(--text-dim); }

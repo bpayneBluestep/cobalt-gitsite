@@ -207,7 +207,6 @@ export default function CrmProspecting() {
               deal={null}
               lossReasons={[]}
               sources={d.sources}
-              products={['EHR', 'CRM', 'Outcomes', 'BlueIQ', 'ScriptSure']}
               onSaved={deal => {
                 setStartFor(null)
                 setNotice(`${deal.title} opened — it is on the pipeline board now.`)

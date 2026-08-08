@@ -6,6 +6,7 @@ import {
   type List, type Ticket, type TicketFieldKey,
 } from '../api'
 import { htmlToText } from '../lib/html'
+import UserPicker from './UserPicker'
 
 /** Where a ticket lives. The number is the shareable form; the entry id is the fallback. */
 export const ticketPath = (t: Ticket): string =>
@@ -29,11 +30,19 @@ export const ticketPath = (t: Ticket): string =>
  * link, which also means middle-click and "open in new tab" work.
  */
 
-/** Only the fields the create form collects; the rest are set from the drawer. */
-type NewDraft = Pick<Record<TicketFieldKey, string>, 'title' | 'status' | 'priority' | 'assignee' | 'dueDate' | 'sprint'>
+/**
+ * Only the fields the create form collects; the rest are set from the ticket page.
+ *
+ * Sprint is not among them any more. A sprint is planned on the sprint board, against
+ * a roster and a capacity — typing one here was a way to put work into a week without
+ * ever looking at whether the week had room for it.
+ */
+type NewDraft = Pick<Record<TicketFieldKey, string>, 'title' | 'status' | 'priority' | 'dueDate'>
+  & { accountableId: string; responsibleId: string }
 
 const EMPTY_DRAFT: NewDraft = {
-  title: '', status: 'Open', priority: 'Normal', assignee: '', dueDate: '', sprint: '',
+  title: '', status: 'Open', priority: 'Normal', dueDate: '',
+  accountableId: '', responsibleId: '',
 }
 
 /** Which tab a status belongs to — beh's `tabOf`, unchanged. */
@@ -60,7 +69,7 @@ export default function TicketBoard({
   const [search, setSearch] = useState('')
   const [fStatus, setFStatus] = useState('')
   const [fPriority, setFPriority] = useState('')
-  const [fAssignee, setFAssignee] = useState('')
+  const [fResponsible, setFResponsible] = useState('')
   const [showFilters, setShowFilters] = useState(false)
 
   const [creating, setCreating] = useState(false)
@@ -75,7 +84,7 @@ export default function TicketBoard({
     return c
   }, [tickets])
 
-  const activeFilters = [fStatus, fPriority, fAssignee].filter(Boolean).length
+  const activeFilters = [fStatus, fPriority, fResponsible].filter(Boolean).length
 
   const visible = useMemo(() => {
     const q = search.toLowerCase().trim()
@@ -83,15 +92,20 @@ export default function TicketBoard({
       if (tabOf(t.status) !== tab) return false
       if (fStatus && t.status !== fStatus) return false
       if (fPriority && t.priority !== fPriority) return false
-      if (fAssignee === '__none' && t.assignee) return false
-      if (fAssignee && fAssignee !== '__none' && !t.assignee.toLowerCase().includes(fAssignee.toLowerCase())) return false
+      if (fResponsible === '__none' && t.responsibleName) return false
+      if (fResponsible && fResponsible !== '__none' && !t.responsibleName.toLowerCase().includes(fResponsible.toLowerCase())) return false
       if (!q) return true
-      // Details is markup — search its text, so a query can't match a tag name.
-      const haystack = [t.title, t.assignee, t.sprint, htmlToText(t.details), t.roadblockReason]
+      // Details is markup — search its text, so a query can't match a tag name. The
+      // retired free-text assignee stays searchable so an old ticket still turns up
+      // under the name it was originally filed against.
+      const haystack = [
+        t.title, t.responsibleName, t.accountableName, t.assignee,
+        t.sprint && ('sprint ' + t.sprint), htmlToText(t.details), t.roadblockReason,
+      ]
       if (t.ticketNumber !== null) haystack.push(`#${t.ticketNumber}`)
       return haystack.some(v => (v || '').toLowerCase().includes(q))
     })
-  }, [tickets, tab, search, fStatus, fPriority, fAssignee])
+  }, [tickets, tab, search, fStatus, fPriority, fResponsible])
 
   // Group by status only when the tab holds more than one — beh's rule exactly.
   const groups = useMemo(() => {
@@ -114,12 +128,19 @@ export default function TicketBoard({
     if (!draft.title.trim()) { setFailure('A ticket needs a title.'); return }
     setBusy(true); setFailure('')
 
-    // Send only what was filled in, so a blank field never overwrites a default.
+    // Send only what was filled in, so a blank field never overwrites a default. The
+    // two owners travel separately: the endpoint resolves them against the user list
+    // rather than writing what the browser sent straight through.
+    const { accountableId, responsibleId, ...rest } = draft
     const fields: Partial<Record<TicketFieldKey, string>> = {}
-    for (const k of Object.keys(draft) as (keyof NewDraft)[]) {
-      if (draft[k].trim()) fields[k] = draft[k].trim()
+    for (const k of Object.keys(rest) as (keyof typeof rest)[]) {
+      if (rest[k].trim()) fields[k] = rest[k].trim()
     }
-    addTicket(list.id, fields)
+    const people: { accountableId?: string; responsibleId?: string } = {}
+    if (accountableId) people.accountableId = accountableId
+    if (responsibleId) people.responsibleId = responsibleId
+
+    addTicket(list.id, fields, people)
       .then(created => {
         setCreating(false)
         onChanged()
@@ -203,13 +224,13 @@ export default function TicketBoard({
             </select>
           </div>
           <div className="ef">
-            <label htmlFor="f-assignee">Assignee</label>
+            <label htmlFor="f-responsible">Responsible</label>
             <input
-              id="f-assignee"
+              id="f-responsible"
               type="text"
               placeholder="Name contains…"
-              value={fAssignee === '__none' ? '' : fAssignee}
-              onChange={e => setFAssignee(e.target.value)}
+              value={fResponsible === '__none' ? '' : fResponsible}
+              onChange={e => setFResponsible(e.target.value)}
             />
           </div>
           <div className="ef">
@@ -218,16 +239,16 @@ export default function TicketBoard({
               <input
                 id="f-unassigned"
                 type="checkbox"
-                checked={fAssignee === '__none'}
-                onChange={e => setFAssignee(e.target.checked ? '__none' : '')}
+                checked={fResponsible === '__none'}
+                onChange={e => setFResponsible(e.target.checked ? '__none' : '')}
               />
-              <span>Hide tickets that have an assignee</span>
+              <span>Hide tickets that already have an engineer</span>
             </label>
           </div>
           {activeFilters > 0 && (
             <div className="ef">
               <label>&nbsp;</label>
-              <button type="button" className="btn btn--ghost" onClick={() => { setFStatus(''); setFPriority(''); setFAssignee('') }}>
+              <button type="button" className="btn btn--ghost" onClick={() => { setFStatus(''); setFPriority(''); setFResponsible('') }}>
                 Clear filters
               </button>
             </div>
@@ -269,19 +290,27 @@ export default function TicketBoard({
               </select>
             </div>
             <div className="ef">
-              <label htmlFor="t-assignee">Assignee</label>
-              <input id="t-assignee" type="text" value={draft.assignee} autoComplete="off"
-                onChange={e => setDraft(d => ({ ...d, assignee: e.target.value }))} />
+              <label htmlFor="t-responsible">Responsible</label>
+              <UserPicker
+                id="t-responsible"
+                value={draft.responsibleId}
+                placeholder="Nobody yet"
+                onChange={v => setDraft(d => ({ ...d, responsibleId: v }))}
+              />
+            </div>
+            <div className="ef">
+              <label htmlFor="t-accountable">Accountable</label>
+              <UserPicker
+                id="t-accountable"
+                value={draft.accountableId}
+                placeholder="Nobody yet"
+                onChange={v => setDraft(d => ({ ...d, accountableId: v }))}
+              />
             </div>
             <div className="ef">
               <label htmlFor="t-due">Due date</label>
               <input id="t-due" type="date" value={draft.dueDate}
                 onChange={e => setDraft(d => ({ ...d, dueDate: e.target.value }))} />
-            </div>
-            <div className="ef">
-              <label htmlFor="t-sprint">Sprint</label>
-              <input id="t-sprint" type="text" value={draft.sprint} placeholder="2026-W33" autoComplete="off"
-                onChange={e => setDraft(d => ({ ...d, sprint: e.target.value }))} />
             </div>
           </div>
 
@@ -320,7 +349,7 @@ export default function TicketBoard({
                 <th scope="col" className="tickets__num">#</th>
                 <th scope="col">Title</th>
                 <th scope="col">Priority</th>
-                <th scope="col">Assignee</th>
+                <th scope="col">Responsible</th>
                 <th scope="col">Time</th>
                 <th scope="col">Due</th>
                 <th scope="col"><span className="visually-hidden">Move</span></th>
@@ -378,7 +407,7 @@ export default function TicketBoard({
                           </span>
                         </th>
                         <td><span className="pill" data-prio={t.priority}>{t.priority || 'Normal'}</span></td>
-                        <td>{t.assignee || dash}</td>
+                        <td>{t.responsibleName || t.assignee || dash}</td>
                         <td className="tickets__time">
                           {logged || est !== null ? (
                             <span className="tvs" data-over={over ? '' : undefined}>

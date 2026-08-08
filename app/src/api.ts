@@ -238,6 +238,25 @@ export interface Attachment {
   by: string
 }
 
+/** A BlueStep thing a ticket changed — the engineer's own record of the blast radius. */
+export interface ComponentRef {
+  id: string
+  name: string
+  kind: string
+  /** 'New' or 'Edit'. */
+  change: string
+  url: string
+  at: string
+  by: string
+}
+
+export const COMPONENT_KINDS = [
+  'Endpoint', 'Merge Report', 'Formula', 'Scheduled Script', 'Post-Save Script',
+  'Form', 'Field', 'Option List', 'Query', 'View', 'Record Type', 'Site Page', 'Other',
+] as const
+
+export const COMPONENT_CHANGES = ['New', 'Edit'] as const
+
 export interface Ticket {
   entryId: string
   /** Global running number. Null only for a ticket that predates numbering. */
@@ -245,11 +264,20 @@ export interface Ticket {
   title: string
   status: string
   priority: string
-  assignee: string
   dueDate: string
+  /** A plain sprint number as a string ('3'), or '' for unplanned. Set from the board. */
   sprint: string
   /** Rich text (HTML). Sanitise before rendering — see lib/html.ts. */
   details: string
+
+  /** The PM answerable to the client. Written only through `setTicketPeople`. */
+  accountableId: string
+  accountableName: string
+  /** The engineer doing the work — what the sprint board groups by. */
+  responsibleId: string
+  responsibleName: string
+  /** Retired free-text owner. Read-only, kept so old tickets still read sensibly. */
+  assignee: string
 
   estHours: number | null
   /** Derived server-side from the time log; never written directly. */
@@ -261,6 +289,7 @@ export interface Ticket {
   timerStartedAt: string
 
   attachments: Attachment[]
+  components: ComponentRef[]
 
   roadblocked: boolean
   roadblockReason: string
@@ -289,13 +318,15 @@ export interface TicketList {
  *
  * Everything else a ticket carries is written through its own action, because the
  * value alone would leave the ticket inconsistent: a roadblock needs its reason and
- * stamps, and the time log and attachments are append-and-recompute rather than
- * overwrite. The endpoint enforces this — it is not a convention.
+ * stamps, the time log, attachments and components are append-and-recompute rather
+ * than overwrite, and the two owners need their names resolved from the user record.
+ * `sprint` is missing on purpose — it is set from the sprint board, not typed on the
+ * ticket page. The endpoint enforces all of this; it is not a convention.
  */
 export type TicketFieldKey =
-  'title' | 'status' | 'priority' | 'assignee' | 'dueDate' | 'sprint' | 'details' | 'estHours'
+  'title' | 'status' | 'priority' | 'dueDate' | 'details' | 'estHours'
 
-export const getTickets = (params: { listId?: string; assignee?: string; sprint?: string; status?: string } = {}): Promise<TicketList> =>
+export const getTickets = (params: { listId?: string; responsible?: string; sprint?: string; status?: string } = {}): Promise<TicketList> =>
   maestroGet('tickets', params as Record<string, string>)
 
 /**
@@ -315,8 +346,17 @@ export const getLists = (params: { clientId?: string; kind?: string } = {}): Pro
 export const getClientList = (clientId: string): Promise<List & { created: boolean; tickets: Ticket[] }> =>
   maestroPost('clientList', { clientId })
 
-export const addTicket = (listId: string, fields: Partial<Record<TicketFieldKey, string>>): Promise<Ticket> =>
-  maestroPost('addTicket', { listId, fields })
+/**
+ * Create a ticket. The two owners ride alongside `fields` rather than inside it,
+ * because the endpoint resolves them against the user list instead of writing them
+ * straight through — the same reason they are absent from `TicketFieldKey`.
+ */
+export const addTicket = (
+  listId: string,
+  fields: Partial<Record<TicketFieldKey, string>>,
+  people: { accountableId?: string; responsibleId?: string } = {},
+): Promise<Ticket> =>
+  maestroPost('addTicket', { listId, fields: { ...fields, ...people } })
 
 export const updateTicket = (listId: string, entryId: string, fields: Partial<Record<TicketFieldKey, string>>): Promise<Ticket> =>
   maestroPost('updateTicket', { listId, entryId, fields })
@@ -363,6 +403,28 @@ export const uploadAttachment = (
 
 export const deleteAttachment = (on: On, attachmentId: string): Promise<Ticket> =>
   maestroPost('deleteAttachment', { ...on, attachmentId })
+
+/**
+ * Set either owner. An omitted key leaves that role alone; an empty string clears it —
+ * which is why this takes a partial rather than two strings.
+ */
+export const setTicketPeople = (
+  on: On,
+  people: { accountableId?: string; responsibleId?: string },
+): Promise<Ticket> => maestroPost('setTicketPeople', { ...on, ...people })
+
+export const addComponent = (
+  on: On,
+  component: { name: string; kind: string; change: string; url?: string },
+): Promise<Ticket> => maestroPost('addComponent', { ...on, ...component })
+
+export const updateComponent = (
+  on: On,
+  component: { componentId: string; name?: string; kind?: string; change?: string; url?: string },
+): Promise<Ticket> => maestroPost('updateComponent', { ...on, ...component })
+
+export const deleteComponent = (on: On, componentId: string): Promise<Ticket> =>
+  maestroPost('deleteComponent', { ...on, componentId })
 
 // ------------------------------------------------------------------ formatting
 
@@ -413,14 +475,16 @@ export interface Deal {
   phase: string
   owner: string
   leadSource: string
-  products: string
-  productList: string[]
   mrr: number | null
   fees: number | null
   confidence: string
-  anticipatedDate: string
+  /**
+   * `YYYY-MM` — when billing is expected to start. Month precision on purpose: this
+   * replaced a day-precise close date nobody could answer honestly while the deal was
+   * still open, and the forecast now buckets by it.
+   */
+  firstBillingMonth: string
   demoDate: string
-  nextStep: string
   notes: string
   lossReason: string
   createdBy: string
@@ -486,7 +550,6 @@ export interface Pipeline {
   openPhases: string[]
   confidences: string[]
   sources: string[]
-  products: string[]
   lossReasons: string[]
   owner: string | null
   companiesScanned: number
@@ -503,7 +566,8 @@ export interface CrmSummary {
   }
   value: {
     openMrr: number; weightedMrr: number; openAnnualValue: number; wonMrr: number
-    closingThisMonthCount: number; closingThisMonthMrr: number; averageOpenMrr: number
+    /** Open deals whose billing is expected to START this month — not deals closing. */
+    billingThisMonthCount: number; billingThisMonthMrr: number; averageOpenMrr: number
   }
   winRate: number | null
   byPhase: { phase: string; count: number; mrr: number; probability: number }[]
@@ -519,15 +583,22 @@ export interface CrmSummary {
   overdueFollowUps: number
   vocabularies: {
     phases: string[]; openPhases: string[]; statuses: string[]; sources: string[]
-    products: string[]; confidences: string[]; lossReasons: string[]
+    confidences: string[]; lossReasons: string[]
     probability: Record<string, number>
   }
 }
 
-/** The deal fields a client may write; the rest are server-owned. */
+/**
+ * The deal fields a client may write; the rest are server-owned.
+ *
+ * `products` and `nextStep` are gone — neither was being answered honestly, so both
+ * were noise dressed as data. `anticipatedDate` is replaced by `firstBillingMonth`.
+ * All three still exist on the platform form, relabelled "(retired)", because a
+ * BlueStep field can never be deleted.
+ */
 export type DealFieldKey =
-  'title' | 'phase' | 'owner' | 'leadSource' | 'products' | 'mrr' | 'fees'
-  | 'confidence' | 'anticipatedDate' | 'demoDate' | 'nextStep' | 'notes' | 'lossReason'
+  'title' | 'phase' | 'owner' | 'leadSource' | 'mrr' | 'fees'
+  | 'confidence' | 'firstBillingMonth' | 'demoDate' | 'notes' | 'lossReason'
 
 export const getCrmSummary = (): Promise<CrmSummary> => maestroGet('crmSummary')
 
@@ -550,6 +621,16 @@ export const deleteDeal = (companyId: string, entryId: string): Promise<{ delete
   maestroPost('deleteDeal', { companyId, entryId })
 
 /** `$13,400`. Null reads as an em dash, because "no value" is not "zero". */
+/** `2026-09` as `Sep 2026`. An empty or malformed month renders as an em dash. */
+export function formatMonth(month: string): string {
+  const m = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(String(month || ''))
+  if (!m) return '—'
+  // Built from parts rather than parsed as a date: `new Date('2026-09')` is UTC
+  // midnight, which in a western timezone renders as August.
+  const names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  return `${names[Number(m[2]) - 1]} ${m[1]}`
+}
+
 export function formatMoney(value: number | null): string {
   if (value === null || value === undefined) return '—'
   return '$' + Math.round(value).toLocaleString('en-US')
@@ -681,11 +762,24 @@ export const deleteFolder = (companyId: string, folder: string): Promise<{ delet
   maestroPost('deleteFolder', { companyId, folder })
 
 // ------------------------------------------------------------------- sprints
-// beh's model: a sprint is a week, each engineer is a column, and the column measures
-// the estimates assigned to them against their capacity. Cobalt needs almost no new
-// schema for it — a ticket already carries `sprint`, `assignee` and `estHours`.
+// beh's model: each engineer is a column, and the column measures the estimates
+// assigned to them against their capacity. Cobalt needs almost no new schema for it —
+// a ticket already carries `sprint`, `responsible` and `estHours`.
+//
+// A sprint is a plain counting number — 1, 2, 3 — the way the team says it out loud.
+// It used to be an ISO week (2026-W33), which reads like a date but is not one, and
+// nobody ever said it. The server treats the key as an opaque string; the format is
+// the only thing the two sides have to agree on, so it is validated at both ends.
+//
+// The roster is PER SPRINT. Capacity moves week to week, and an engineer who is out
+// comes off that sprint only — never off a sprint that already happened.
 
 export const ENGINEER_DISCIPLINES = ['Engineer', 'Implementation', 'Support', 'Design', 'Other'] as const
+
+/** Digits only, no leading zero — mirrors the endpoint's own check. */
+export const SPRINT_PATTERN = /^[1-9]\d{0,3}$/
+
+export const isSprintKey = (key: string): boolean => SPRINT_PATTERN.test(String(key || ''))
 
 export interface Engineer {
   entryId: string
@@ -694,11 +788,23 @@ export interface Engineer {
   role: string
   capacity: number
   active: boolean
+  /** The sprint this roster row is for. Empty means it is a template row. */
+  sprint: string
 }
 
 export interface Team {
   teamListId: string
   disciplines: string[]
+  /** The sprint asked for, or null when the default roster was asked for. */
+  sprint: string | null
+  /**
+   * True when this sprint has no roster of its own and the default is standing in.
+   * Editing a template row changes the starting point of every future sprint, so the
+   * UI has to say which one you are looking at.
+   */
+  isTemplate: boolean
+  /** Every sprint that has a roster, oldest first. */
+  sprints: string[]
   total: number
   weeklyCapacity: number
   rows: Engineer[]
@@ -721,6 +827,10 @@ export interface SprintColumn {
 
 export interface SprintBoard {
   sprint: string
+  /** True when the default roster is standing in because this sprint has none yet. */
+  rosterIsTemplate: boolean
+  /** Every sprint that has a roster, oldest first — what the picker offers. */
+  sprints: string[]
   listsScanned: number
   columns: SprintColumn[]
   /** In this sprint but with nobody's name on it. */
@@ -736,10 +846,21 @@ export interface SprintBoard {
   priorities: string[]
 }
 
-export type EngineerFieldKey = 'name' | 'email' | 'role' | 'capacity' | 'active'
+export type EngineerFieldKey = 'name' | 'email' | 'role' | 'capacity' | 'active' | 'sprint'
 
-export const getTeam = (includeInactive = false): Promise<Team> =>
-  maestroGet('team', includeInactive ? { includeInactive: 'true' } : {})
+/** The roster for one sprint. No sprint asks for the default roster. */
+export const getTeam = (sprint = '', includeInactive = false): Promise<Team> =>
+  maestroGet('team', {
+    ...(sprint ? { sprint } : {}),
+    ...(includeInactive ? { includeInactive: 'true' } : {}),
+  })
+
+/**
+ * Start a sprint by copying the previous roster forward. Idempotent — a sprint that
+ * already has a roster comes back untouched, so a double-click cannot double a column.
+ */
+export const createSprint = (sprint: string, from?: string): Promise<Team & { created: number; copiedFrom: string | null; note?: string }> =>
+  maestroPost('createSprint', { sprint, from: from || '' })
 
 export const addEngineer = (fields: Partial<Record<EngineerFieldKey, string>>): Promise<Team> =>
   maestroPost('addEngineer', { fields })
@@ -753,60 +874,46 @@ export const deleteEngineer = (entryId: string): Promise<Team> =>
 export const getSprint = (sprint: string): Promise<SprintBoard> =>
   maestroGet('sprint', { sprint })
 
-/** Put a ticket into a sprint (and optionally onto someone). An empty sprint pulls it out. */
+/**
+ * Put a ticket into a sprint (and optionally onto an engineer). An empty sprint pulls
+ * it out. The engineer is the RESPONSIBLE one — moving a ticket between sprints never
+ * changes who is accountable to the client for it.
+ */
 export const assignSprint = (
-  listId: string, entryId: string, sprint: string, assignee?: string,
-): Promise<Ticket> => maestroPost('assignSprint', { listId, entryId, sprint, assignee: assignee || '' })
+  listId: string, entryId: string, sprint: string, responsibleId?: string,
+): Promise<Ticket> =>
+  maestroPost('assignSprint', { listId, entryId, sprint, responsibleId: responsibleId || '' })
 
-// -- ISO week helpers -------------------------------------------------------
-// The sprint key is an ISO week like 2026-W33. The server treats it as an opaque
-// string, so the browser and the platform never have to agree about when a week
-// starts — only about the characters in the key.
+// -- sprint number helpers --------------------------------------------------
 
-/** The Monday of the week containing `d`. */
-function mondayOf(d: Date): Date {
-  const out = new Date(d.getFullYear(), d.getMonth(), d.getDate())
-  const day = out.getDay() === 0 ? 7 : out.getDay()   // Sunday counts as day 7
-  out.setDate(out.getDate() - (day - 1))
-  return out
+/** Step a sprint number, never below 1. */
+export function shiftSprint(key: string, by: number): string {
+  const n = Number(key)
+  if (!isFinite(n) || n < 1) return '1'
+  return String(Math.max(1, Math.round(n) + by))
 }
 
-/** ISO-8601 week key: the week owning the Thursday of that Monday's week. */
-export function weekKey(d: Date): string {
-  const monday = mondayOf(d)
-  const thursday = new Date(monday)
-  thursday.setDate(monday.getDate() + 3)
-  const firstThursday = new Date(thursday.getFullYear(), 0, 4)
-  const firstMonday = mondayOf(firstThursday)
-  const weeks = Math.round((monday.getTime() - firstMonday.getTime()) / (7 * 24 * 3600 * 1000)) + 1
-  return `${thursday.getFullYear()}-W${String(weeks).padStart(2, '0')}`
+/**
+ * A name reduced to something two spellings of the same person agree on.
+ *
+ * A BlueStep person record reads "Payne, Brandon"; every hand-entered name — a roster
+ * row, an old assignee — reads "Brandon Payne". Lower-case, drop punctuation, sort the
+ * words, and both become "brandon payne". Mirrors `nameKey` in the endpoint, because
+ * the two have to agree about which column a ticket belongs in.
+ */
+export function nameKey(name: string): string {
+  return String(name || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .sort()
+    .join(' ')
 }
 
-/** Shift a week key by whole weeks. */
-export function shiftWeek(key: string, weeks: number): string {
-  const monday = mondayFromKey(key)
-  monday.setDate(monday.getDate() + weeks * 7)
-  return weekKey(monday)
-}
-
-/** The Monday a week key refers to. */
-export function mondayFromKey(key: string): Date {
-  const m = /^(\d{4})-W(\d{1,2})$/.exec(key || '')
-  if (!m) return mondayOf(new Date())
-  const firstMonday = mondayOf(new Date(Number(m[1]), 0, 4))
-  firstMonday.setDate(firstMonday.getDate() + (Number(m[2]) - 1) * 7)
-  return firstMonday
-}
-
-/** `11–15 Aug` / `30 Sep – 4 Oct` — the working week, Monday to Friday. */
-export function weekRange(key: string): string {
-  const mon = mondayFromKey(key)
-  const fri = new Date(mon)
-  fri.setDate(mon.getDate() + 4)
-  const month = (d: Date) => d.toLocaleDateString('en-GB', { month: 'short' })
-  return mon.getMonth() === fri.getMonth()
-    ? `${mon.getDate()}–${fri.getDate()} ${month(fri)}`
-    : `${mon.getDate()} ${month(mon)} – ${fri.getDate()} ${month(fri)}`
+/** `Sprint 3` — the one label the whole app uses for a sprint. */
+export function sprintLabel(key: string): string {
+  return key ? `Sprint ${key}` : 'No sprint'
 }
 
 // ------------------------------------------------------------- settings: users

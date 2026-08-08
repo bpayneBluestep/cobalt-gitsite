@@ -4,13 +4,16 @@ import {
   ApiError, getTicket, updateTicket, deleteTicket,
   logTime, editTime, deleteTime, startTimer, stopTimer,
   setRoadblock, uploadAttachment, deleteAttachment,
+  setTicketPeople, addComponent, updateComponent, deleteComponent,
   formatHours, formatMinutes, formatBytes, MAX_ATTACHMENT_BYTES,
-  TICKET_STATUSES, TICKET_PRIORITIES,
-  type Ticket, type TicketFieldKey, type TimeEntry,
+  TICKET_STATUSES, TICKET_PRIORITIES, COMPONENT_KINDS, COMPONENT_CHANGES,
+  sprintLabel,
+  type Ticket, type TicketFieldKey, type TimeEntry, type ComponentRef,
 } from '../api'
 import { sanitizeHtml } from '../lib/html'
 import { parseDuration, elapsedSince, todayISO } from '../lib/time'
 import RichTextEditor from '../components/RichTextEditor'
+import UserPicker from '../components/UserPicker'
 
 /*
  * One ticket, as a page of its own at /tickets/<number>.
@@ -27,11 +30,15 @@ import RichTextEditor from '../components/RichTextEditor'
  * things you set. The rail is where a drawer used to put everything in one column.
  *
  * Two kinds of write, and the difference is deliberate:
- *   * the FIELD form (title, status, priority, assignee, due, sprint, estimate,
- *     description) is a draft with an explicit Save, sending only what changed
- *   * time, the roadblock and attachments write IMMEDIATELY through their own actions,
- *     because each is a discrete act with a real-world moment attached — you stop a
- *     timer when you stop working, not when you get round to saving
+ *   * the FIELD form (title, status, priority, due, estimate, description) is a draft
+ *     with an explicit Save, sending only what changed
+ *   * the two owners, time, the roadblock, attachments and components write IMMEDIATELY
+ *     through their own actions, because each is a discrete act with a real-world moment
+ *     attached — you stop a timer when you stop working, not when you get round to saving
+ *
+ * Sprint is READ-ONLY here. It is planned on the sprint board, where the roster and the
+ * week's capacity are in front of you; typing it on the ticket was a way to fill a week
+ * without ever seeing whether it had room.
  *
  * Every action returns the whole ticket, re-read server-side, so the reply replaces
  * what is on screen rather than patching it.
@@ -53,13 +60,16 @@ function draftOf(t: Ticket): Draft {
     title: t.title || '',
     status: t.status || 'Open',
     priority: t.priority || 'Normal',
-    assignee: t.assignee || '',
     dueDate: t.dueDate || '',
-    sprint: t.sprint || '',
     details: t.details || '',
     estHours: t.estHours === null || t.estHours === undefined ? '' : String(t.estHours),
   }
 }
+
+/** A blank row for the "add a component" form. */
+const EMPTY_COMPONENT = { name: '', kind: 'Endpoint', change: 'Edit', url: '' }
+
+const dash = <span className="muted">—</span>
 
 function savedValue(t: Ticket, key: TicketFieldKey): string {
   if (key === 'estHours') return t.estHours === null || t.estHours === undefined ? '' : String(t.estHours)
@@ -112,6 +122,11 @@ export default function TicketPage() {
   // Roadblock form
   const [blockReason, setBlockReason] = useState('')
   const [showBlockForm, setShowBlockForm] = useState(false)
+
+  // Components form. `editingComponent` doubles as the mode: '' is adding.
+  const [comp, setComp] = useState({ ...EMPTY_COMPONENT })
+  const [editingComponent, setEditingComponent] = useState('')
+  const [showCompForm, setShowCompForm] = useState(false)
 
   const load = useCallback(() => {
     setState({ phase: 'loading' })
@@ -481,6 +496,133 @@ export default function TicketPage() {
             )}
           </section>
 
+          {/* Components: what this ticket actually changed on the platform.
+              Separate from the description on purpose — the description says what
+              happened, this says what to look at if it breaks, or what to repeat when
+              the same change has to go into another org. */}
+          <section className="tcard">
+            <div className="tcard__head">
+              <h2>
+                Components
+                {ticket.components.length > 0 && <span className="tsec__n">{ticket.components.length}</span>}
+              </h2>
+              <p className="note">The BlueStep components this ticket created or changed.</p>
+            </div>
+
+            {ticket.components.length === 0 ? (
+              <p className="muted tsec__empty">Nothing recorded yet.</p>
+            ) : (
+              <div className="tablewrap">
+                <table className="fields comps">
+                  <thead>
+                    <tr>
+                      <th scope="col">Component</th>
+                      <th scope="col">Kind</th>
+                      <th scope="col">Change</th>
+                      <th scope="col">Added</th>
+                      <th scope="col"><span className="visually-hidden">Actions</span></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ticket.components.map((c: ComponentRef) => (
+                      <tr key={c.id}>
+                        <th scope="row">
+                          {c.url
+                            ? <a className="inlink" href={c.url} target="_blank" rel="noopener noreferrer">{c.name}</a>
+                            : c.name}
+                        </th>
+                        <td>{c.kind || dash}</td>
+                        <td><span className="mark" data-change={c.change}>{c.change || 'Edit'}</span></td>
+                        <td className="muted nowrap">{c.at || dash}{c.by ? ` · ${c.by}` : ''}</td>
+                        <td className="comps__act">
+                          <button type="button" className="linkbtn" disabled={!!busy}
+                            onClick={() => {
+                              setEditingComponent(c.id)
+                              setComp({ name: c.name, kind: c.kind || 'Other', change: c.change || 'Edit', url: c.url })
+                              setShowCompForm(true)
+                              setFailure(''); setNotice('')
+                            }}>
+                            Edit
+                          </button>
+                          <button type="button" className="linkbtn linkbtn--danger" disabled={!!busy}
+                            onClick={() => run('comp', deleteComponent(on, c.id),
+                              () => setNotice(`Removed ${c.name}.`))}>
+                            Remove
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {!showCompForm ? (
+              <p className="tsec__add">
+                <button type="button" className="btn btn--ghost btn--sm" disabled={!!busy}
+                  onClick={() => {
+                    setEditingComponent(''); setComp({ ...EMPTY_COMPONENT })
+                    setShowCompForm(true); setFailure(''); setNotice('')
+                  }}>
+                  Add a component
+                </button>
+              </p>
+            ) : (
+              <div className="efgrid efgrid--inset">
+                <div className="ef ef--wide">
+                  <label htmlFor="c-name">Name<span className="ef__req" aria-hidden="true">*</span></label>
+                  <input id="c-name" type="text" value={comp.name} autoComplete="off" autoFocus
+                    placeholder="Cobalt Maestro"
+                    onChange={e => setComp(c => ({ ...c, name: e.target.value }))} />
+                </div>
+                <div className="ef">
+                  <label htmlFor="c-kind">Kind</label>
+                  <select id="c-kind" value={comp.kind}
+                    onChange={e => setComp(c => ({ ...c, kind: e.target.value }))}>
+                    {COMPONENT_KINDS.map(k => <option key={k} value={k}>{k}</option>)}
+                  </select>
+                </div>
+                <div className="ef">
+                  <label htmlFor="c-change">Change</label>
+                  <select id="c-change" value={comp.change}
+                    onChange={e => setComp(c => ({ ...c, change: e.target.value }))}>
+                    {COMPONENT_CHANGES.map(k => <option key={k} value={k}>{k}</option>)}
+                  </select>
+                </div>
+                <div className="ef ef--wide">
+                  <label htmlFor="c-url">Link</label>
+                  <input id="c-url" type="url" value={comp.url} autoComplete="off"
+                    placeholder="https://cobaltorg.bluestep.net/…"
+                    onChange={e => setComp(c => ({ ...c, url: e.target.value }))} />
+                </div>
+                <div className="ef ef--wide tsec__formfoot">
+                  <button type="button" className="btn btn--ghost btn--sm" disabled={!!busy}
+                    onClick={() => { setShowCompForm(false); setEditingComponent(''); setFailure('') }}>
+                    Cancel
+                  </button>
+                  <button type="button" className="btn btn--sm"
+                    disabled={!!busy || !comp.name.trim()}
+                    onClick={() => {
+                      const payload = {
+                        name: comp.name.trim(), kind: comp.kind,
+                        change: comp.change, url: comp.url.trim(),
+                      }
+                      const work = editingComponent
+                        ? updateComponent(on, { componentId: editingComponent, ...payload })
+                        : addComponent(on, payload)
+                      run('comp', work, () => {
+                        setShowCompForm(false); setEditingComponent('')
+                        setComp({ ...EMPTY_COMPONENT })
+                        setNotice(editingComponent ? 'Component updated.' : `Recorded ${payload.name}.`)
+                      })
+                    }}>
+                    {editingComponent ? 'Save component' : 'Add component'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </section>
+
         </div>
 
         {/* The properties rail: everything you SET, in one narrow column, so the
@@ -501,19 +643,52 @@ export default function TicketPage() {
                 {TICKET_PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
             </div>
+            {/* The two owners save on change rather than with the rest of the form:
+                the endpoint resolves each id to a name against the user record, so
+                there is nothing here for a draft to hold on to. */}
             <div className="ef">
-              <label htmlFor="tp-assignee">Assignee</label>
-              <input id="tp-assignee" type="text" value={draft.assignee} autoComplete="off"
-                placeholder="Nobody yet" onChange={e => edit('assignee', e.target.value)} />
+              <label htmlFor="tp-responsible">Responsible</label>
+              <UserPicker
+                id="tp-responsible"
+                value={ticket.responsibleId}
+                placeholder="Nobody yet"
+                disabled={!!busy}
+                onChange={v => run('people', setTicketPeople(on, { responsibleId: v }),
+                  () => setNotice('Responsible engineer updated.'))}
+              />
+              <p className="ef__hint">The engineer doing the work. The sprint board groups by this.</p>
             </div>
+            <div className="ef">
+              <label htmlFor="tp-accountable">Accountable</label>
+              <UserPicker
+                id="tp-accountable"
+                value={ticket.accountableId}
+                placeholder="Nobody yet"
+                disabled={!!busy}
+                onChange={v => run('people', setTicketPeople(on, { accountableId: v }),
+                  () => setNotice('Accountable owner updated.'))}
+              />
+              <p className="ef__hint">The PM answerable to the client for it happening.</p>
+            </div>
+            {/* Only shown when it has something to say — an old ticket that predates
+                the split still names whoever it was filed against. */}
+            {ticket.assignee && !ticket.responsibleId && (
+              <p className="ef__hint">
+                Previously assigned to <strong>{ticket.assignee}</strong>.
+              </p>
+            )}
             <div className="ef">
               <label htmlFor="tp-due">Due date</label>
               <input id="tp-due" type="date" value={draft.dueDate} onChange={e => edit('dueDate', e.target.value)} />
             </div>
             <div className="ef">
-              <label htmlFor="tp-sprint">Sprint</label>
-              <input id="tp-sprint" type="text" value={draft.sprint} placeholder="2026-W33" autoComplete="off"
-                onChange={e => edit('sprint', e.target.value)} />
+              <label>Sprint</label>
+              <p className="railval">
+                {ticket.sprint
+                  ? <Link className="inlink" to={`/sprints?sprint=${ticket.sprint}`}>{sprintLabel(ticket.sprint)}</Link>
+                  : <span className="muted">Not planned</span>}
+              </p>
+              <p className="ef__hint">Set from the sprint board, against that sprint's capacity.</p>
             </div>
             <div className="ef">
               <label htmlFor="tp-est">Estimate (hours)</label>

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  ApiError, getCrmSummary, formatMoney, formatCompactMoney,
+  ApiError, getCrmSummary, formatMoney, formatCompactMoney, formatMonth,
   type CrmSummary,
 } from '../api'
 import CrmNav from '../components/CrmNav'
@@ -105,10 +105,10 @@ export default function CrmDashboard() {
               note="MRR × phase probability"
             />
             <Kpi
-              label="Closing this month"
-              value={formatCompactMoney(d.value.closingThisMonthMrr)}
-              note={`${d.value.closingThisMonthCount} deal${d.value.closingThisMonthCount === 1 ? '' : 's'} by anticipated date`}
-              tone={d.value.closingThisMonthCount ? 'good' : undefined}
+              label="Billing starts this month"
+              value={formatCompactMoney(d.value.billingThisMonthMrr)}
+              note={`${d.value.billingThisMonthCount} open deal${d.value.billingThisMonthCount === 1 ? '' : 's'} expected to start billing`}
+              tone={d.value.billingThisMonthCount ? 'good' : undefined}
             />
             <Kpi
               label="Win rate"
@@ -224,7 +224,7 @@ export default function CrmDashboard() {
                         <th scope="col">Phase</th>
                         <th scope="col">MRR</th>
                         <th scope="col">Weighted</th>
-                        <th scope="col">Close</th>
+                        <th scope="col">Billing</th>
                         <th scope="col">Owner</th>
                       </tr>
                     </thead>
@@ -239,7 +239,7 @@ export default function CrmDashboard() {
                           <td><span className="pill" data-phase={deal.phase.replace(/\s+/g, '')}>{deal.phase}</span></td>
                           <td className="num">{formatMoney(deal.mrr)}</td>
                           <td className="num muted">{formatMoney(deal.weightedMrr)}</td>
-                          <td className="nowrap">{deal.anticipatedDate || <span className="muted">—</span>}</td>
+                          <td className="nowrap">{formatMonth(deal.firstBillingMonth)}</td>
                           <td>{deal.owner || <span className="muted">—</span>}</td>
                         </tr>
                       ))}

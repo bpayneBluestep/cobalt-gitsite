@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  ApiError, getPipeline, updateDeal, formatMoney, formatCompactMoney,
+  ApiError, getPipeline, updateDeal, formatMoney, formatCompactMoney, formatMonth,
   OPEN_PHASES, type Deal, type Pipeline,
 } from '../api'
 import CrmNav from '../components/CrmNav'
@@ -149,7 +149,6 @@ export default function CrmPipeline() {
               deal={selected}
               lossReasons={d.lossReasons}
               sources={d.sources}
-              products={d.products}
               onSaved={() => load(owner)}
               onDeleted={() => { setOpenDeal(null); setNotice('Deal deleted.'); load(owner) }}
               onClose={() => setOpenDeal(null)}
@@ -206,19 +205,13 @@ export default function CrmPipeline() {
                         <span className="muted"> /mo</span>
                         {deal.fees ? <span className="muted"> + {formatMoney(deal.fees)} once</span> : null}
                       </p>
-                      {deal.nextStep && <p className="dcard__next">{deal.nextStep}</p>}
                       <p className="dcard__meta">
-                        {deal.anticipatedDate
-                          ? <span>close {deal.anticipatedDate}</span>
-                          : <span className="muted">no close date</span>}
+                        {deal.firstBillingMonth
+                          ? <span>bills {formatMonth(deal.firstBillingMonth)}</span>
+                          : <span className="muted">no billing month</span>}
                         {deal.owner && <span className="dot" aria-hidden="true">·</span>}
                         {deal.owner && <span>{deal.owner}</span>}
                       </p>
-                      {deal.productList.length > 0 && (
-                        <p className="dcard__prods">
-                          {deal.productList.map(p => <span className="mark" key={p}>{p}</span>)}
-                        </p>
-                      )}
                       <div className="dcard__move">
                         <select
                           aria-label={`Move "${deal.title}" to another phase`}
