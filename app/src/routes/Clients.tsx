@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { getClients, ApiError, type Company } from '../api'
 
 type State =
@@ -31,6 +32,7 @@ export default function Clients() {
         <h1>Clients</h1>
         <p className="page__sub-text">
           Every Company record in the <code>Client</code> category, served by the Maestro.
+          Open a name to view and edit its record.
         </p>
       </header>
 
@@ -78,8 +80,14 @@ export default function Clients() {
               </thead>
               <tbody>
                 {state.rows.map(row => (
-                  <tr key={row.id}>
-                    <th scope="row">{row.name || <span className="muted">(unnamed)</span>}</th>
+                  <tr key={row.id} className="rowlink">
+                    <th scope="row">
+                      {/* A real link, so the row is keyboard-reachable and opens in a
+                          new tab on middle-click — not a div with an onClick. */}
+                      <Link className="rowlink__a" to={`/clients/${row.id}`}>
+                        {row.name || <span className="muted">(unnamed)</span>}
+                      </Link>
+                    </th>
                     <td>
                       {row.website
                         ? <a className="inlink" href={row.website} target="_blank" rel="noopener noreferrer">{row.website}</a>

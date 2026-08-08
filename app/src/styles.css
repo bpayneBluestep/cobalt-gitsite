@@ -1068,3 +1068,123 @@ main { flex: 1; min-height: 0; display: flex; }
 }
 
 .callout--demo .callout__title { color: var(--cobalt); }
+
+/* ---------------------------------------------------------------- record page
+
+   The company record: breadcrumb, a read-only header card with the pipeline
+   stage control, then one editable card per backing BlueStep form. Reuses
+   `.facts` for the header rows and `.filter` for the stage buttons so the
+   record page reads as the same product as the schema explorer.
+   -------------------------------------------------------------------------- */
+
+.rowlink__a {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+.rowlink__a:hover { color: var(--cobalt); border-bottom-color: var(--cobalt); }
+.rowlink:hover th { color: var(--cobalt); }
+
+.crumb {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.9rem;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+.crumb a { color: var(--text-dim); text-decoration: none; }
+.crumb a:hover { color: var(--cobalt); }
+.crumb span[aria-hidden] { color: var(--line-strong); }
+
+.reccard {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+  padding: var(--pane-pad);
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.reccard .facts { margin: 0; min-width: 0; flex: 1 1 22rem; }
+
+.stage { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+.stage .filter:disabled { cursor: default; }
+.stage .filter[data-on]:disabled { opacity: 1; }
+.stage .filter:disabled:not([data-on]) { opacity: 0.55; cursor: progress; }
+
+.editcard {
+  padding: var(--pane-pad);
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.editcard__head { margin-bottom: 1rem; }
+.editcard__head h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.editcard__head .note { margin: 0.3rem 0 0; }
+
+.editcard__err {
+  margin: 0 0 0.9rem;
+  padding: 0.6rem 0.7rem;
+  font-size: 0.78rem;
+  color: var(--text);
+  background: color-mix(in srgb, #ce4a5b 12%, transparent);
+  border-left: 2px solid #ce4a5b;
+  border-radius: var(--r);
+}
+
+.efgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0.85rem;
+}
+.ef { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
+.ef label {
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+.ef__req { margin-left: 0.2rem; color: var(--warn); }
+.ef input {
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  font-family: inherit;
+  font-size: 0.82rem;
+  color: var(--text);
+  background: var(--bg-raise);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.ef input::placeholder { color: var(--text-mute); }
+.ef input:focus { border-color: var(--cobalt); outline: none; }
+
+.editcard__foot {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1.1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--line);
+}
+.editcard__status {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+.btn:disabled, .btn--ghost:disabled { opacity: 0.45; cursor: not-allowed; filter: none; }

@@ -118,3 +118,27 @@ export const getClients = (): Promise<CompanyList> => maestroGet('clients')
 
 export const getCompanies = (category?: string): Promise<CompanyList> =>
   maestroGet('companies', category ? { category } : {})
+
+export const getCompany = (id: string): Promise<Company> => maestroGet('company', { id })
+
+/** The fields a company record exposes for editing, in display order. */
+export const COMPANY_FIELDS = [
+  { key: 'name', label: 'Name', required: true },
+  { key: 'website', label: 'Website', placeholder: 'https://example.com' },
+  { key: 'street', label: 'Street' },
+  { key: 'city', label: 'City' },
+  { key: 'state', label: 'State' },
+  { key: 'postalCode', label: 'Postal code' },
+] as const
+
+export type CompanyFieldKey = (typeof COMPANY_FIELDS)[number]['key']
+
+/** Save only the keys that changed. The reply is the record as re-read server-side. */
+export const updateCompany = (id: string, fields: Partial<Record<CompanyFieldKey, string>>): Promise<Company> =>
+  maestroPost('updateCompany', { id, fields })
+
+export const COMPANY_CATEGORIES = ['Lead', 'Client', 'Former Client'] as const
+
+/** Move a company to exactly one category. */
+export const setCategory = (id: string, category: string): Promise<Company> =>
+  maestroPost('setCategory', { id, category })
