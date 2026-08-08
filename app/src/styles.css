@@ -1789,7 +1789,7 @@ main { flex: 1; min-height: 0; display: flex; }
 
 .uc {
   position: relative;
-  max-width: 74ch;
+  max-width: 88ch;
   padding: 1.15rem 1.25rem 1.25rem;
   background: var(--bg-panel);
   border: 1px solid var(--line);
@@ -1828,8 +1828,8 @@ main { flex: 1; min-height: 0; display: flex; }
 
 .uc__cols {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
-  gap: 1.1rem 1.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 1.1rem 2rem;
 }
 
 .uc__h {
@@ -1875,7 +1875,7 @@ main { flex: 1; min-height: 0; display: flex; }
   color: var(--text-dim);
 }
 
-.uc__live { max-width: 74ch; margin-top: 1.25rem; }
+.uc__live { max-width: 88ch; margin-top: 1.25rem; }
 
 .uc__links { margin: 0; padding: 0; list-style: none; }
 
