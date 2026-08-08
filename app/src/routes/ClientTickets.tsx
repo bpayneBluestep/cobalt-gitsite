@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ApiError, getClientList, getTickets, type List, type Ticket } from '../api'
 import TicketBoard from '../components/TicketBoard'
+import RecordTabs from '../components/RecordTabs'
 
 /*
  * A client's tickets, at /clients/<id>/tickets.
@@ -94,6 +95,10 @@ export default function ClientTickets() {
               {state.created && ' This list was created just now.'}
             </p>
           </header>
+
+          {/* The same strip as the record itself, so the other three sections are one
+              click away rather than a trip back through the breadcrumb. */}
+          <RecordTabs companyId={id} active="tickets" />
 
           <TicketBoard
             list={state.list}

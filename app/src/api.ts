@@ -637,9 +637,8 @@ export interface FileEntry {
 export interface FileCabinet {
   companyId: string
   companyName: string
-  defaultFolders: string[]
   maxBytes: number
-  /** Every folder that exists, ancestors included, sorted. */
+  /** Every folder in use, ancestors included, sorted. A new cabinet has none. */
   folders: string[]
   total: number
   totalBytes: number

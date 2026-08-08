@@ -4,6 +4,8 @@ import {
   DEPARTMENTS, EMPLOYMENT_TYPES,
   type User, type UserList, type EmployeeFieldKey,
 } from '../api'
+import PhoneInput from '../components/PhoneInput'
+import { isPhoneOk } from '../lib/phone'
 
 /*
  * Settings → Users.
@@ -155,7 +157,7 @@ export default function Settings() {
                 <p className="note">
                   {editing === 'new'
                     ? 'This creates the person record only. A BlueStep login has to be issued from the platform’s account tooling — the scripting API cannot mint credentials.'
-                    : 'Phone numbers must look like (555) 234-0101.'}
+                    : 'Type a phone number as digits — it formats itself.'}
                 </p>
               </div>
               <div className="efgrid">
@@ -200,9 +202,8 @@ export default function Settings() {
                 </div>
                 <div className="ef">
                   <label htmlFor="u-phone">Work phone</label>
-                  <input id="u-phone" type="text" value={draft.workPhone} autoComplete="off"
-                    placeholder="(555) 234-0101"
-                    onChange={e => setDraft(x => ({ ...x, workPhone: e.target.value }))} />
+                  <PhoneInput id="u-phone" value={draft.workPhone}
+                    onChange={v => setDraft(x => ({ ...x, workPhone: v }))} />
                 </div>
                 <div className="ef">
                   <label htmlFor="u-employed">Employment</label>
@@ -218,7 +219,8 @@ export default function Settings() {
                 <button type="button" className="btn btn--ghost" onClick={() => setEditing(null)} disabled={!!busy}>
                   Cancel
                 </button>
-                <button type="button" className="btn" onClick={save} disabled={!!busy}>
+                <button type="button" className="btn" onClick={save}
+                  disabled={!!busy || !isPhoneOk(draft.workPhone)}>
                   {editing === 'new' ? 'Add person' : 'Save details'}
                 </button>
               </div>

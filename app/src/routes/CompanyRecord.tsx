@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useLocation, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import {
   ApiError, getCompany, updateCompany, setCategory,
   COMPANY_FIELDS, COMPANY_CATEGORIES, type Company, type CompanyFieldKey,
@@ -7,6 +7,7 @@ import {
 import ContactsPanel from '../components/ContactsPanel'
 import FilesPanel from '../components/FilesPanel'
 import AccountOwnerCard from '../components/AccountOwnerCard'
+import RecordTabs from '../components/RecordTabs'
 
 /*
  * The company record — reached by clicking a row on the Clients table.
@@ -56,9 +57,15 @@ export default function CompanyRecord() {
   // client exists, so this is a warning about what's missing, not an error.
   const arrivalWarning = (useLocation().state as { warning?: string } | null)?.warning || ''
   const [state, setState] = useState<State>({ phase: 'loading' })
-  // Info / Contacts / Files. Tabs rather than three pages: they are all one record,
-  // and a route change would lose the header that says which company you are in.
-  const [tab, setTab] = useState<'info' | 'contacts' | 'files'>('info')
+  // Which panel is open lives in the URL, so the strip works the same here as it does
+  // on the ticket board and a tab can be linked to. Same route either way, so switching
+  // tabs costs nothing — the record is not re-fetched.
+  const [params, setParams] = useSearchParams()
+  const asked = params.get('tab')
+  const tab: 'info' | 'contacts' | 'files' =
+    asked === 'contacts' || asked === 'files' ? asked : 'info'
+  const setTab = (next: 'info' | 'contacts' | 'files') =>
+    setParams(next === 'info' ? {} : { tab: next }, { replace: true })
   const [draft, setDraft] = useState<Draft | null>(null)
   const [saving, setSaving] = useState(false)
   const [moving, setMoving] = useState('')
@@ -155,13 +162,8 @@ export default function CompanyRecord() {
       {company && draft && (
         <>
           <header className="page__head">
-            <div className="page__headrow">
-              <div>
-                <p className="eyebrow">Company</p>
-                <h1>{company.name || <span className="muted">Untitled</span>}</h1>
-              </div>
-              <Link className="btn" to={`/clients/${company.id}/tickets`}>Tickets →</Link>
-            </div>
+            <p className="eyebrow">Company</p>
+            <h1>{company.name || <span className="muted">Untitled</span>}</h1>
           </header>
 
           {arrivalWarning && (
@@ -237,24 +239,7 @@ export default function CompanyRecord() {
             </div>
           </div>
 
-          <nav className="subnav" aria-label="Record sections">
-            {([
-              { key: 'info', label: 'Info' },
-              { key: 'contacts', label: 'Contacts' },
-              { key: 'files', label: 'Files' },
-            ] as const).map(t => (
-              <button
-                key={t.key}
-                type="button"
-                className="subnav__btn"
-                data-on={tab === t.key ? '' : undefined}
-                aria-current={tab === t.key ? 'true' : undefined}
-                onClick={() => setTab(t.key)}
-              >
-                {t.label}
-              </button>
-            ))}
-          </nav>
+          <RecordTabs companyId={company.id} active={tab} />
 
           {tab === 'contacts' && (
             <ContactsPanel companyId={company.id} onMirror={load} />

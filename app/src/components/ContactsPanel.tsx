@@ -3,6 +3,8 @@ import {
   ApiError, getContacts, addContact, updateContact, setPrimaryContact, deleteContact,
   CONTACT_ROLES, type Contact, type ContactList, type ContactFieldKey,
 } from '../api'
+import PhoneInput from './PhoneInput'
+import { isPhoneOk } from '../lib/phone'
 
 /*
  * The people at one company.
@@ -144,7 +146,7 @@ export default function ContactsPanel({ companyId, onMirror }: {
             <p className="note">
               {editing === 'new' && data && data.total === 0
                 ? 'The first contact at a company becomes the primary automatically.'
-                : 'Phone numbers must look like (555) 234-0101.'}
+                : 'Type phone numbers as digits — they format themselves.'}
             </p>
           </div>
           <div className="efgrid">
@@ -178,15 +180,13 @@ export default function ContactsPanel({ companyId, onMirror }: {
             </div>
             <div className="ef">
               <label htmlFor="ct-phone">Phone</label>
-              <input id="ct-phone" type="text" value={draft.phone} autoComplete="off"
-                placeholder="(555) 234-0101"
-                onChange={e => setDraft(d => ({ ...d, phone: e.target.value }))} />
+              <PhoneInput id="ct-phone" value={draft.phone}
+                onChange={v => setDraft(d => ({ ...d, phone: v }))} />
             </div>
             <div className="ef">
               <label htmlFor="ct-mobile">Mobile</label>
-              <input id="ct-mobile" type="text" value={draft.mobile} autoComplete="off"
-                placeholder="(555) 234-0102"
-                onChange={e => setDraft(d => ({ ...d, mobile: e.target.value }))} />
+              <PhoneInput id="ct-mobile" value={draft.mobile}
+                onChange={v => setDraft(d => ({ ...d, mobile: v }))} />
             </div>
             {editing === 'new' && data && data.total > 0 && (
               <div className="ef">
@@ -209,7 +209,10 @@ export default function ContactsPanel({ companyId, onMirror }: {
             <button type="button" className="btn btn--ghost" onClick={() => setEditing(null)} disabled={!!busy}>
               Cancel
             </button>
-            <button type="button" className="btn" onClick={save} disabled={!!busy}>
+            {/* An incomplete phone number would be refused by the platform on write,
+                so it is caught here instead of after a round trip. */}
+            <button type="button" className="btn" onClick={save}
+              disabled={!!busy || !isPhoneOk(draft.phone) || !isPhoneOk(draft.mobile)}>
               {editing === 'new' ? 'Add contact' : 'Save changes'}
             </button>
           </div>
