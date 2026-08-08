@@ -2248,3 +2248,202 @@ main { flex: 1; min-height: 0; display: flex; }
   border-bottom: 1px solid transparent;
 }
 .rowlink__a:hover { color: var(--cobalt); border-bottom-color: var(--cobalt); }
+
+/* ===========================================================================
+   Contacts and the filing cabinet
+   =========================================================================== */
+
+/* The record page's tab strip reuses .subnav, but with buttons rather than links —
+   the tab is component state, not a route. */
+.subnav__btn {
+  padding: 0.4rem 0.7rem;
+  font-family: var(--font-display);
+  font-size: 0.74rem;
+  letter-spacing: 0.04em;
+  color: var(--text-mute);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+}
+.subnav__btn:hover { color: var(--text); }
+.subnav__btn[data-on] { color: var(--text); border-bottom-color: var(--cobalt); }
+
+/* --- contacts ------------------------------------------------------------ */
+
+.contacts th[scope="row"] { font-weight: 600; }
+.contacts tbody tr[data-on] { background: color-mix(in srgb, var(--cobalt) 7%, transparent); }
+
+.contacts__title {
+  display: block;
+  font-weight: 400;
+  font-size: 0.74rem;
+  color: var(--text-mute);
+}
+
+.mark--primary {
+  margin-left: 0.4rem;
+  color: var(--cobalt);
+  border-color: var(--cobalt);
+  background: transparent;
+}
+
+/* --- the cabinet --------------------------------------------------------- */
+
+.cab__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.8rem;
+}
+
+.cab__crumb { margin: 0; font-size: 0.8rem; }
+.cab__crumb .linkbtn { margin-left: 0; }
+
+.cab__actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+
+/* The file input is hidden inside its own label, so the label IS the button. */
+.cab__upload { position: relative; overflow: hidden; cursor: pointer; }
+
+.cab__inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
+  padding: 0.65rem 0.75rem;
+  background: var(--bg-raise);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.cab__inline .ef { flex: 1 1 14rem; }
+.cab__inline--tight {
+  flex: 1 1 100%;
+  margin: 0;
+  padding: 0.3rem 0.4rem;
+  align-items: center;
+}
+.cab__inline--tight input[type="text"] {
+  flex: 1 1 10rem;
+  padding: 0.3rem 0.45rem;
+  font-family: inherit;
+  font-size: 0.8rem;
+  color: var(--text);
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+
+/* --- folders ------------------------------------------------------------- */
+
+.cab__folders {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 0.45rem;
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.cab__folder {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.55rem;
+  background: var(--bg-raise);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.cab__folder:hover { border-color: var(--line-strong); }
+
+.cab__open {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+  font: inherit;
+  font-size: 0.84rem;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.cab__open:hover .cab__name { color: var(--cobalt); }
+
+/* A folder mark drawn in CSS: a tab over a body, which reads as a folder without
+   shipping an icon font for five glyphs. */
+.cab__icon {
+  position: relative;
+  flex: 0 0 auto;
+  width: 14px;
+  height: 11px;
+  background: var(--cobalt);
+  border-radius: 1px 2px 2px 2px;
+  opacity: 0.85;
+}
+.cab__icon::before {
+  content: "";
+  position: absolute;
+  top: -3px;
+  left: 0;
+  width: 6px;
+  height: 3px;
+  background: var(--cobalt);
+  border-radius: 1px 1px 0 0;
+}
+
+.cab__name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cab__count { margin-left: auto; font-size: 0.7rem; color: var(--text-mute); white-space: nowrap; }
+.cab__folderact { display: flex; gap: 0.1rem; white-space: nowrap; }
+
+/* --- files --------------------------------------------------------------- */
+
+.cab__files { font-size: 0.82rem; }
+
+.cab__filerow { display: flex; align-items: flex-start; gap: 0.55rem; }
+
+.cab__fileicon {
+  flex: 0 0 auto;
+  width: 11px;
+  height: 14px;
+  margin-top: 2px;
+  background: var(--bg-sunk);
+  border: 1px solid var(--line-strong);
+  border-radius: 1px;
+  /* A dog-eared corner, so a file reads differently from a folder at a glance. */
+  clip-path: polygon(0 0, 70% 0, 100% 22%, 100% 100%, 0 100%);
+}
+
+.cab__thumb {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+}
+
+.cab__realname {
+  display: block;
+  font-weight: 400;
+  font-size: 0.7rem;
+  color: var(--text-mute);
+}
+
+.cab__move { display: inline-flex; align-items: center; gap: 0.4rem; }
+.cab__move select {
+  padding: 0.18rem 0.28rem;
+  font-family: inherit;
+  font-size: 0.74rem;
+  color: var(--text-dim);
+  background: var(--bg-raise);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.cab__move select:focus { border-color: var(--cobalt); outline: none; }

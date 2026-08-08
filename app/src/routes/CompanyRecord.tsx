@@ -4,6 +4,8 @@ import {
   ApiError, getCompany, updateCompany, setCategory,
   COMPANY_FIELDS, COMPANY_CATEGORIES, type Company, type CompanyFieldKey,
 } from '../api'
+import ContactsPanel from '../components/ContactsPanel'
+import FilesPanel from '../components/FilesPanel'
 
 /*
  * The company record — reached by clicking a row on the Clients table.
@@ -53,6 +55,9 @@ export default function CompanyRecord() {
   // client exists, so this is a warning about what's missing, not an error.
   const arrivalWarning = (useLocation().state as { warning?: string } | null)?.warning || ''
   const [state, setState] = useState<State>({ phase: 'loading' })
+  // Info / Contacts / Files. Tabs rather than three pages: they are all one record,
+  // and a route change would lose the header that says which company you are in.
+  const [tab, setTab] = useState<'info' | 'contacts' | 'files'>('info')
   const [draft, setDraft] = useState<Draft | null>(null)
   const [saving, setSaving] = useState(false)
   const [moving, setMoving] = useState('')
@@ -172,6 +177,24 @@ export default function CompanyRecord() {
           <div className="reccard">
             <dl className="facts">
               <div>
+                <dt>Primary contact</dt>
+                <dd>
+                  {company.contactName ? (
+                    <>
+                      {company.contactName}
+                      {company.contactTitle && <span className="muted"> · {company.contactTitle}</span>}
+                      {company.contactEmail && (
+                        <><br /><a className="inlink" href={`mailto:${company.contactEmail}`}>{company.contactEmail}</a></>
+                      )}
+                    </>
+                  ) : (
+                    <button type="button" className="linkbtn" onClick={() => setTab('contacts')}>
+                      Add a contact
+                    </button>
+                  )}
+                </dd>
+              </div>
+              <div>
                 <dt>Website</dt>
                 <dd>
                   {company.website
@@ -213,6 +236,34 @@ export default function CompanyRecord() {
             </div>
           </div>
 
+          <nav className="subnav" aria-label="Record sections">
+            {([
+              { key: 'info', label: 'Info' },
+              { key: 'contacts', label: 'Contacts' },
+              { key: 'files', label: 'Files' },
+            ] as const).map(t => (
+              <button
+                key={t.key}
+                type="button"
+                className="subnav__btn"
+                data-on={tab === t.key ? '' : undefined}
+                aria-current={tab === t.key ? 'true' : undefined}
+                onClick={() => setTab(t.key)}
+              >
+                {t.label}
+              </button>
+            ))}
+          </nav>
+
+          {tab === 'contacts' && (
+            <ContactsPanel companyId={company.id} onMirror={load} />
+          )}
+
+          {tab === 'files' && (
+            <FilesPanel companyId={company.id} />
+          )}
+
+          {tab === 'info' && (
           <div className="editcard">
             <div className="editcard__head">
               <h2>Company Info</h2>
@@ -258,6 +309,7 @@ export default function CompanyRecord() {
               </button>
             </div>
           </div>
+          )}
         </>
       )}
     </section>

@@ -97,6 +97,12 @@ export async function maestroPost(action: string, payload: Record<string, unknow
 
 // ---------------------------------------------------------------- typed actions
 
+/**
+ * A company as `companyRow` returns it — the whole Company Info catalog, including
+ * the CRM half. The four `contact*` fields are a MIRROR of the primary contact, kept
+ * in step by the endpoint, so every screen that shows a company gets the contact's
+ * name without walking the Contacts form.
+ */
 export interface Company {
   id: string
   name: string
@@ -106,6 +112,18 @@ export interface Company {
   state: string
   postalCode: string
   categories: string[]
+
+  contactName: string
+  contactTitle: string
+  contactEmail: string
+  contactPhone: string
+  owner: string
+  leadSource: string
+  leadStatus: string
+  beds: number | null
+  lastTouch: string
+  nextFollowUp: string
+  crmNotes: string
 }
 
 export interface CompanyList {
@@ -414,18 +432,6 @@ export interface Deal {
 
 /** A company as the CRM sees it: Company Info plus its deal roll-up. */
 export interface Lead extends Company {
-  contactName: string
-  contactTitle: string
-  contactEmail: string
-  contactPhone: string
-  owner: string
-  leadSource: string
-  leadStatus: string
-  beds: number | null
-  lastTouch: string
-  nextFollowUp: string
-  crmNotes: string
-
   dealCount: number
   openDealCount: number
   wonDealCount: number
@@ -545,6 +551,123 @@ export function formatCompactMoney(value: number | null): string {
   if (Math.abs(n) >= 1000) return '$' + (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k'
   return '$' + n.toLocaleString('en-US')
 }
+
+// ------------------------------------------------------------------ contacts
+// The individuals at a company. Exactly one is primary; the endpoint enforces that
+// by clearing every other entry whenever one is set, so it cannot go plural.
+
+export const CONTACT_ROLES = [
+  'Decision Maker', 'Champion', 'Influencer', 'Blocker', 'Clinical', 'Billing', 'IT', 'Other',
+] as const
+
+export interface Contact {
+  entryId: string
+  firstName: string
+  lastName: string
+  fullName: string
+  title: string
+  role: string
+  email: string
+  phone: string
+  mobile: string
+  notes: string
+  primary: boolean
+}
+
+export interface ContactList {
+  companyId: string
+  companyName: string
+  roles: string[]
+  total: number
+  primaryEntryId: string | null
+  /** True if more than one entry carries the flag — only possible via the platform UI. */
+  primaryConflict: boolean
+  /** The primary's details as copied onto Company Info. */
+  mirrored: { contactName: string; contactTitle: string; contactEmail: string; contactPhone: string }
+  rows: Contact[]
+}
+
+export type ContactFieldKey =
+  'firstName' | 'lastName' | 'title' | 'role' | 'email' | 'phone' | 'mobile' | 'notes'
+
+export const getContacts = (companyId: string): Promise<ContactList> =>
+  maestroGet('contacts', { companyId })
+
+export const addContact = (
+  companyId: string,
+  fields: Partial<Record<ContactFieldKey, string>>,
+  primary = false,
+): Promise<ContactList> => maestroPost('addContact', { companyId, fields, primary })
+
+export const updateContact = (companyId: string, entryId: string, fields: Partial<Record<ContactFieldKey, string>>): Promise<ContactList> =>
+  maestroPost('updateContact', { companyId, entryId, fields })
+
+export const setPrimaryContact = (companyId: string, entryId: string): Promise<ContactList> =>
+  maestroPost('setPrimaryContact', { companyId, entryId })
+
+export const deleteContact = (companyId: string, entryId: string): Promise<ContactList> =>
+  maestroPost('deleteContact', { companyId, entryId })
+
+// --------------------------------------------------------------------- files
+// A filing cabinet per company, using eccrm's design: one entry per file, and
+// FOLDERS ARE NOT OBJECTS — the folder is a "/"-separated path on the entry and the
+// tree is derived from every path in use. An entry with a folder and no file is a
+// marker, which is the only thing that makes an empty folder persist.
+
+export interface FileDoc {
+  hasFile: boolean
+  filename: string
+  url: string
+  contentType: string
+  size: number
+  thumbUrl: string
+}
+
+export interface FileEntry {
+  entryId: string
+  name: string
+  folder: string
+  timestamp: string
+  uploadedBy: string
+  file: FileDoc
+  /** A folder placeholder rather than a file. */
+  isMarker: boolean
+}
+
+export interface FileCabinet {
+  companyId: string
+  companyName: string
+  defaultFolders: string[]
+  maxBytes: number
+  /** Every folder that exists, ancestors included, sorted. */
+  folders: string[]
+  total: number
+  totalBytes: number
+  rows: FileEntry[]
+}
+
+export const getFiles = (companyId: string): Promise<FileCabinet> =>
+  maestroGet('files', { companyId })
+
+export const addFile = (companyId: string, file: {
+  filename: string; dataBase64: string; name?: string; folder?: string; contentType?: string
+}): Promise<FileEntry> => maestroPost('addFile', { companyId, ...file })
+
+/** Rename and move are the same write: `name` and/or `folder`. */
+export const updateFile = (companyId: string, entryId: string, fields: { name?: string; folder?: string }): Promise<FileEntry> =>
+  maestroPost('updateFile', { companyId, entryId, fields })
+
+export const deleteFile = (companyId: string, entryId: string): Promise<{ deleted: string }> =>
+  maestroPost('deleteFile', { companyId, entryId })
+
+export const createFolder = (companyId: string, folder: string): Promise<{ created: boolean; folder: string; reason?: string }> =>
+  maestroPost('createFolder', { companyId, folder })
+
+export const renameFolder = (companyId: string, oldPath: string, newPath: string): Promise<{ renamed: number; from: string; to: string }> =>
+  maestroPost('renameFolder', { companyId, oldPath, newPath })
+
+export const deleteFolder = (companyId: string, folder: string): Promise<{ deleted: string; entriesRemoved: number; filesRemoved: number }> =>
+  maestroPost('deleteFolder', { companyId, folder })
 
 export const COMPANY_CATEGORIES = ['Lead', 'Client', 'Former Client'] as const
 
