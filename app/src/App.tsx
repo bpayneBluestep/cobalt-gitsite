@@ -1,5 +1,6 @@
 import { Link, NavLink, Route, Routes } from 'react-router-dom'
 import Clients from './routes/Clients'
+import Tickets from './routes/Tickets'
 import Explorer from './routes/Explorer'
 import ThemeToggle from './components/ThemeToggle'
 import ToolsMenu from './components/ToolsMenu'
@@ -16,6 +17,7 @@ export default function App() {
 
         <nav className="mainnav" aria-label="Sections">
           <NavLink to="/" end>Clients</NavLink>
+          <NavLink to="/tickets">Tickets</NavLink>
         </nav>
 
         <div className="topbar__end">
@@ -30,6 +32,7 @@ export default function App() {
           {/* The schema explorer is a tool, not a section — reached from the
               Tools menu. Its deep links live under /schema so they stay
               bookmarkable. */}
+          <Route path="/tickets" element={<Tickets />} />
           <Route path="/schema" element={<Explorer />} />
           <Route path="/schema/type/:typeId" element={<Explorer />} />
           <Route path="/schema/form/:formId" element={<Explorer />} />
