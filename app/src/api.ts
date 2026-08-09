@@ -337,10 +337,34 @@ export interface Ticket {
   subtaskEstHours: number
   subtaskLoggedHours: number
 
+  // ---- activity ---------------------------------------------------------------
+  /** Events and comments in one ordered list, oldest first. Empty on a board row. */
+  activity: ActivityItem[]
+  /** How many items the log holds — present on board rows, where `activity` is not. */
+  activityCount: number
+  commentCount: number
+
   /** The children in full. Present only on a single-ticket read; null on a board row. */
   subtasks: Ticket[] | null
   /** A crumb back to the parent. Present only on a single-ticket read of a subtask. */
   parent: TicketParent | null
+}
+
+/**
+ * One line of a ticket's history.
+ *
+ * `event` is written by the endpoint when a write actually changed something — derived
+ * from the diff, so re-saving an unchanged form adds nothing. `comment` is a person's,
+ * and is the only kind that can be removed: an event is the record's own account of
+ * what happened, and letting people rewrite that turns a history into a story.
+ */
+export interface ActivityItem {
+  id: string
+  type: 'event' | 'comment'
+  who: string
+  /** ISO instant. */
+  at: string
+  text: string
 }
 
 /** Just enough of a parent to link back to it from a subtask. */
@@ -449,6 +473,17 @@ export const addSubtask = (
  */
 export const setParent = (on: On, parentId: string): Promise<Ticket> =>
   maestroPost('setParent', { ...on, parentId })
+
+// ------------------------------------------------------------------- activity
+// The ticket's history. Events write themselves from every other action; these two
+// are the only way a person puts something in it directly.
+
+export const addComment = (on: On, text: string): Promise<Ticket> =>
+  maestroPost('addComment', { ...on, text })
+
+/** Comments only — the endpoint refuses an event with NOT_A_COMMENT. */
+export const deleteComment = (on: On, commentId: string): Promise<Ticket> =>
+  maestroPost('deleteComment', { ...on, commentId })
 
 // ------------------------------------------------------- time, blocks, files
 // Each of these returns the WHOLE ticket, re-read server-side — so a caller

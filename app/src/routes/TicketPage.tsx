@@ -5,14 +5,14 @@ import {
   logTime, editTime, deleteTime, startTimer, stopTimer,
   setRoadblock, uploadAttachment, deleteAttachment,
   setTicketPeople, addComponent, updateComponent, deleteComponent,
-  addSubtask, setParent,
+  addSubtask, setParent, addComment, deleteComment,
   formatHours, formatMinutes, formatBytes, MAX_ATTACHMENT_BYTES, ceilingFor,
   TICKET_STATUSES, TICKET_PRIORITIES, COMPONENT_KINDS, COMPONENT_CHANGES,
   sprintLabel,
-  type Ticket, type TicketFieldKey, type TimeEntry, type ComponentRef,
+  type Ticket, type TicketFieldKey, type TimeEntry, type ComponentRef, type ActivityItem,
 } from '../api'
 import { sanitizeHtml } from '../lib/html'
-import { parseDuration, elapsedSince, todayISO } from '../lib/time'
+import { parseDuration, elapsedSince, todayISO, whenLabel, whenExact } from '../lib/time'
 import RichTextEditor from '../components/RichTextEditor'
 import UserPicker from '../components/UserPicker'
 
@@ -134,6 +134,10 @@ export default function TicketPage() {
   const [sub, setSub] = useState({ title: '', responsibleId: '', estHours: '' })
   const [showSubForm, setShowSubForm] = useState(false)
 
+  // Comment box, and whether the automated events are shown alongside them.
+  const [comment, setComment] = useState('')
+  const [showEvents, setShowEvents] = useState(true)
+
   const load = useCallback(() => {
     setState({ phase: 'loading' })
     setFailure(''); setNotice('')
@@ -231,6 +235,13 @@ export default function TicketPage() {
       })
       .catch(err => setFailure(err instanceof ApiError ? err.message : String(err)))
       .finally(() => setBusy(''))
+  }
+
+  function submitComment() {
+    if (!ticket || !comment.trim() || busy) return
+    const text = comment.trim()
+    // Cleared on success only — a failed post must not eat what someone just wrote.
+    run('comment', addComment(on, text), () => { setComment(''); setNotice('Comment added.') })
   }
 
   function submitSubtask() {
@@ -857,6 +868,96 @@ export default function TicketPage() {
                 </div>
               </div>
             )}
+          </section>
+
+
+          {/* Activity — the ticket's history, oldest first, with the comment box at the
+              bottom where the newest line is. Events and comments interleave because the
+              question people ask is "what happened to this", and splitting them into two
+              lists makes that question take two reads to answer. */}
+          <section className="tcard">
+            <div className="tcard__head">
+              <h2>
+                Activity
+                {ticket.activityCount > 0 && <span className="tsec__n">{ticket.activityCount}</span>}
+              </h2>
+              <p className="note">
+                Everything that happened to this ticket. Events write themselves; comments are yours.
+              </p>
+            </div>
+
+            {ticket.activityCount > ticket.commentCount && (
+              <p className="act__filter">
+                <button type="button" className="linkbtn" onClick={() => setShowEvents(v => !v)}>
+                  {showEvents
+                    ? `Hide the ${ticket.activityCount - ticket.commentCount} automatic entries`
+                    : `Show all ${ticket.activityCount} entries`}
+                </button>
+              </p>
+            )}
+
+            {(() => {
+              const shown = showEvents
+                ? ticket.activity
+                : ticket.activity.filter((a: ActivityItem) => a.type === 'comment')
+              if (!shown.length) {
+                return (
+                  <p className="muted tsec__empty">
+                    {ticket.activityCount ? 'No comments yet.' : 'Nothing has happened yet.'}
+                  </p>
+                )
+              }
+              return (
+                <ol className="acts">
+                  {shown.map((a: ActivityItem) => (
+                    <li key={a.id} className={`act act--${a.type}`}>
+                      <span className="act__dot" aria-hidden="true" />
+                      <div className="act__body">
+                        <p className="act__line">
+                          <span className="act__who">{a.who || 'Someone'}</span>
+                          {a.type === 'event'
+                            ? <span className="act__text"> {a.text}</span>
+                            : <span className="act__said">{a.text}</span>}
+                        </p>
+                        <p className="act__meta">
+                          <time dateTime={a.at} title={whenExact(a.at)}>{whenLabel(a.at)}</time>
+                          {a.type === 'comment' && (
+                            <button type="button" className="linkbtn linkbtn--danger" disabled={!!busy}
+                              onClick={() => run('comment', deleteComment(on, a.id),
+                                () => setNotice('Comment removed.'))}>
+                              Remove
+                            </button>
+                          )}
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              )
+            })()}
+
+            <div className="act__compose">
+              <textarea
+                value={comment}
+                rows={2}
+                placeholder="Add a comment — what you found, what you are waiting on, what you decided."
+                aria-label="Add a comment"
+                onChange={e => setComment(e.target.value)}
+                onKeyDown={e => {
+                  // Ctrl/Cmd+Enter posts. Plain Enter stays a newline: a comment is prose,
+                  // and losing a half-written paragraph to a stray keystroke is worse than
+                  // reaching for a second key.
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); submitComment() }
+                }}
+              />
+              <div className="act__composefoot">
+                <span className="muted">⌘/Ctrl + Enter</span>
+                <button type="button" className="btn btn--sm"
+                  disabled={!!busy || !comment.trim()} onClick={submitComment}>
+                  {busy === 'comment' ? 'Posting…' : 'Comment'}
+                </button>
+              </div>
+            </div>
           </section>
 
         </div>

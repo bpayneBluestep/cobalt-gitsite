@@ -56,3 +56,38 @@ export function todayISO(): string {
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
+
+/**
+ * "just now" / "14 min ago" / "3 hours ago" / "9 Aug, 14:32" — how an activity line
+ * is stamped.
+ *
+ * Relative for the recent past because that is how people talk about a ticket they are
+ * working on today, and absolute past a day because "37 days ago" is arithmetic nobody
+ * asked for. The full instant is always available as a title attribute.
+ */
+export function whenLabel(iso: string): string {
+  if (!iso) return ''
+  const then = Date.parse(iso)
+  if (!isFinite(then)) return iso
+
+  const mins = Math.floor((Date.now() - then) / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins} min ago`
+
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return hours === 1 ? 'an hour ago' : `${hours} hours ago`
+
+  const d = new Date(then)
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const sameYear = d.getFullYear() === new Date().getFullYear()
+  const day = `${d.getDate()} ${months[d.getMonth()]}${sameYear ? '' : ' ' + d.getFullYear()}`
+  return `${day}, ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+/** The full instant, for a tooltip on a relative label. */
+export function whenExact(iso: string): string {
+  if (!iso) return ''
+  const t = Date.parse(iso)
+  return isFinite(t) ? new Date(t).toLocaleString() : iso
+}

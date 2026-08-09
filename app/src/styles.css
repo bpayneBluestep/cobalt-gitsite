@@ -3039,3 +3039,82 @@ a.subcrumb:hover { color: var(--cobalt); }
   background: var(--cobalt);
   transition: width 0.25s linear;
 }
+
+/* ---------------------------------------------------------------- activity
+ *
+ * A timeline, because the log's whole value is order: what happened, then what
+ * happened next. A rail down the left with a dot per entry makes that readable at a
+ * glance; a flat list of sentences does not.
+ *
+ * Events are quiet and comments are loud, deliberately. An event is context you skim;
+ * a comment is a person saying something, and it should stop your eye.
+ */
+
+.act__filter { margin: 0 0 0.6rem; }
+
+.acts {
+  margin: 0;
+  padding: 0 0 0 1rem;
+  list-style: none;
+  position: relative;
+}
+/* The rail itself, behind the dots. */
+.acts::before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 0.4rem;
+  bottom: 0.4rem;
+  width: 1px;
+  background: var(--line);
+}
+
+.act { position: relative; padding: 0.4rem 0 0.4rem 0.35rem; }
+.act__dot {
+  position: absolute;
+  left: -1rem;
+  top: 0.75rem;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--line-strong);
+}
+.act--comment .act__dot { background: var(--cobalt); }
+
+.act__line { margin: 0; font-size: 0.85rem; line-height: 1.5; }
+.act__who { font-weight: 600; }
+.act--event .act__text { color: var(--text-dim); }
+/* A comment gets its own block: it is prose, not a sentence fragment about a field. */
+.act__said {
+  display: block;
+  margin-top: 0.2rem;
+  padding: 0.4rem 0.6rem;
+  white-space: pre-wrap;
+  background: var(--bg-raise);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+
+.act__meta {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  margin: 0.15rem 0 0;
+  font-size: 0.72rem;
+  color: var(--text-mute);
+}
+
+.act__compose {
+  margin-top: 0.9rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--line);
+}
+.act__compose textarea { width: 100%; resize: vertical; }
+.act__composefoot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 0.4rem;
+  font-size: 0.72rem;
+}
