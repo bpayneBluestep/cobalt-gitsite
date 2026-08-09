@@ -1,7 +1,7 @@
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
-  addTicket, updateTicket, ApiError, formatHours,
+  addTicket, updateTicket, ApiError, formatHours, blueIqStatus,
   TICKET_STATUSES, TICKET_PRIORITIES, TICKET_TABS, PRIORITY_RANK,
   type List, type Ticket, type TicketFieldKey,
 } from '../api'
@@ -71,6 +71,17 @@ export default function TicketBoard({
   const [fPriority, setFPriority] = useState('')
   const [fResponsible, setFResponsible] = useState('')
   const [showFilters, setShowFilters] = useState(false)
+
+  // Asked once per mount rather than assumed: an org with no integration key should
+  // not be shown a door that opens onto an error.
+  const [blueIqAvailable, setBlueIqAvailable] = useState(false)
+  useEffect(() => {
+    let live = true
+    blueIqStatus()
+      .then(s => { if (live) setBlueIqAvailable(!!s.available) })
+      .catch(() => { if (live) setBlueIqAvailable(false) })
+    return () => { live = false }
+  }, [])
 
   const [creating, setCreating] = useState(false)
   const [draft, setDraft] = useState<NewDraft>(EMPTY_DRAFT)
@@ -182,7 +193,19 @@ export default function TicketBoard({
             </button>
           ))}
         </nav>
-        <button type="button" className="btn" onClick={openNew}>
+        {/* Two doors, and the guided one is deliberately the prominent one. Someone who
+            knows exactly what they want types it; someone who would have written "the
+            report is broken" gets interviewed into a request an engineer can act on.
+            Hidden when BlueIQ has no key, so it never offers something that will fail. */}
+        {blueIqAvailable && (
+          <Link
+            className="btn btn--iq"
+            to={list.clientId ? `/clients/${list.clientId}/request` : `/request?listId=${list.id}`}
+          >
+            <span aria-hidden="true">✦</span> Guided request
+          </Link>
+        )}
+        <button type="button" className={blueIqAvailable ? 'btn btn--ghost' : 'btn'} onClick={openNew}>
           <span aria-hidden="true">+</span> New ticket
         </button>
       </div>

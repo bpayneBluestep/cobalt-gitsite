@@ -14,6 +14,7 @@ import CrmProspecting from './routes/CrmProspecting'
 import Sprints from './routes/Sprints'
 import Settings from './routes/Settings'
 import TicketPage from './routes/TicketPage'
+import Intake from './routes/Intake'
 import { SECTIONS } from './sections'
 import ThemeToggle from './components/ThemeToggle'
 import ToolsMenu from './components/ToolsMenu'
@@ -73,6 +74,12 @@ export default function App() {
               link can be pasted into a chat and opened by whoever gets it. An entry id
               works in the same slot for a ticket that never got a number. */}
           <Route path="/tickets/:key" element={<TicketPage />} />
+
+          {/* BlueIQ guided intake. Addressed by the client it is for, so the entry
+              point on a client's board is a plain link and the page can be sent to
+              someone who needs to raise a request. */}
+          <Route path="/clients/:clientId/request" element={<Intake />} />
+          <Route path="/request" element={<Intake />} />
 
           {/* The schema explorer is a tool, not a section — reached from the
               Tools menu. Its deep links live under /schema so they stay

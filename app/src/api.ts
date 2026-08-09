@@ -257,6 +257,12 @@ export const COMPONENT_KINDS = [
 
 export const COMPONENT_CHANGES = ['New', 'Edit'] as const
 
+/** The BlueIQ interview a ticket came from, kept so the request can be audited. */
+export interface TicketConversation {
+  turns: { role: 'user' | 'assistant'; text: string; at?: string }[]
+  narration: { text: string; at?: string }[]
+}
+
 export interface Ticket {
   entryId: string
   /** Global running number. Null only for a ticket that predates numbering. */
@@ -290,6 +296,10 @@ export interface Ticket {
 
   attachments: Attachment[]
   components: ComponentRef[]
+  /** Present only on a ticket that came from BlueIQ, and only on a single-ticket read. */
+  conversation: TicketConversation | null
+  /** True when this ticket was raised through the guided intake. */
+  fromIntake: boolean
 
   roadblocked: boolean
   roadblockReason: string
@@ -425,6 +435,94 @@ export const updateComponent = (
 
 export const deleteComponent = (on: On, componentId: string): Promise<Ticket> =>
   maestroPost('deleteComponent', { ...on, componentId })
+
+// ------------------------------------------------------------------- BlueIQ
+// Guided intake: a conversation that interviews the person, coaches them into
+// recording their screen, and hands back a title and a structured description an
+// engineer can act on. Ported from beh's Ticket Maestro.
+//
+// Two things about this seam are load-bearing:
+//   * BlueIQ NEVER writes to the platform. It returns a proposal; the user edits it
+//     and `addTicket` creates the ticket through the same validation as any other.
+//   * The model provider is reached only from the endpoint. The key is server-side,
+//     which matters here specifically because this repo is public.
+//
+// Nothing user-visible ever says "AI". It is BlueIQ.
+
+export interface IqMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+/** What BlueIQ hands back once it is satisfied it has enough. */
+export interface IqProposal {
+  title: string
+  description: string
+  summary: string
+}
+
+export interface IqTurn {
+  assistantMessage: string
+  proposal?: IqProposal
+  done?: boolean
+}
+
+/** A file or link gathered during the interview, before any ticket exists. */
+export interface IqAttachment {
+  kind: 'video' | 'image' | 'url'
+  fileName?: string
+  /** Empty until uploaded — a link has one from the start, a file gets one at submit. */
+  url: string
+  mime?: string
+  size?: number
+  at?: string
+  by?: string
+  /** Kept client-side only: the blob and its object URL for local preview. */
+  blob?: Blob
+  localUrl?: string
+}
+
+/** A stored artifact, as `blueIqUpload` returns it. */
+export interface IqRef {
+  fileName: string
+  url: string
+  mime: string
+  size: number
+  at: string
+  by: string
+}
+
+export const blueIqStatus = (): Promise<{ available: boolean }> => maestroGet('blueIqStatus')
+
+/**
+ * One turn. Send the WHOLE conversation every time — the endpoint holds no session,
+ * which is what makes a reload or a second tab harmless.
+ */
+export const blueIqChat = (
+  messages: IqMessage[],
+  context: { hasRecording?: boolean; listName?: string; clientName?: string } = {},
+): Promise<IqTurn> => maestroPost('blueIqChat', { messages, ...context })
+
+/** Mic audio only. The screen video is never sent anywhere. */
+export const blueIqTranscribe = (
+  audioBase64: string, mimeType: string,
+): Promise<{ transcript: string }> => maestroPost('blueIqTranscribe', { audioBase64, mimeType })
+
+export const blueIqUpload = (
+  listId: string, file: { fileName: string; dataBase64: string; mimeType: string },
+): Promise<{ ref: IqRef }> => maestroPost('blueIqUpload', { listId, ...file })
+
+/**
+ * Create the ticket the interview produced.
+ *
+ * Separate from `addTicket` only in what it carries: the same action underneath, so
+ * an intake ticket is an ordinary ticket that happens to remember where it came from.
+ */
+export const addIntakeTicket = (
+  listId: string,
+  fields: { title: string; details: string },
+  intake: { attachments: Partial<IqRef & { kind: string }>[]; conversation: TicketConversation },
+): Promise<Ticket> => maestroPost('addTicket', { listId, fields: { ...fields, ...intake } })
 
 // ------------------------------------------------------------------ formatting
 

@@ -496,6 +496,35 @@ export default function TicketPage() {
             )}
           </section>
 
+          {/* The interview this request came from.
+              Collapsed by default: an engineer wants the synthesized description, and
+              only reaches for the raw conversation when they suspect something was lost
+              in the writing of it — which is exactly when having it kept matters. */}
+          {ticket.conversation && ticket.conversation.turns.length > 0 && (
+            <section className="tcard">
+              <details className="biq-history">
+                <summary>
+                  <span className="biq-history-h">BlueIQ conversation</span>
+                  <span className="tsec__n">{ticket.conversation.turns.length}</span>
+                  <span className="note">
+                    How this request was arrived at
+                    {ticket.conversation.narration.length > 0 && ', including spoken narration'}
+                  </span>
+                </summary>
+                <ol className="biq-history-list">
+                  {ticket.conversation.turns.map((t, i) => (
+                    <li key={i} className={`biq-history-turn biq-history-turn--${t.role}`}>
+                      <span className="biq-history-who">
+                        {t.role === 'assistant' ? 'BlueIQ' : ticket.createdBy || 'They'}
+                      </span>
+                      <span className="biq-history-text">{t.text}</span>
+                    </li>
+                  ))}
+                </ol>
+              </details>
+            </section>
+          )}
+
           {/* Components: what this ticket actually changed on the platform.
               Separate from the description on purpose — the description says what
               happened, this says what to look at if it breaks, or what to repeat when
