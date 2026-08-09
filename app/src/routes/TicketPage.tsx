@@ -5,6 +5,7 @@ import {
   logTime, editTime, deleteTime, startTimer, stopTimer,
   setRoadblock, uploadAttachment, deleteAttachment,
   setTicketPeople, addComponent, updateComponent, deleteComponent,
+  addSubtask, setParent,
   formatHours, formatMinutes, formatBytes, MAX_ATTACHMENT_BYTES,
   TICKET_STATUSES, TICKET_PRIORITIES, COMPONENT_KINDS, COMPONENT_CHANGES,
   sprintLabel,
@@ -128,6 +129,11 @@ export default function TicketPage() {
   const [editingComponent, setEditingComponent] = useState('')
   const [showCompForm, setShowCompForm] = useState(false)
 
+  // Subtask form. Deliberately three fields: breaking work up is something you do in
+  // one sitting, and a form that asks for six things per chunk stops you at chunk two.
+  const [sub, setSub] = useState({ title: '', responsibleId: '', estHours: '' })
+  const [showSubForm, setShowSubForm] = useState(false)
+
   const load = useCallback(() => {
     setState({ phase: 'loading' })
     setFailure(''); setNotice('')
@@ -195,11 +201,52 @@ export default function TicketPage() {
 
   function remove() {
     if (!ticket || busy) return
+    // Cascade only because the confirmation names the subtasks it is about to take —
+    // the endpoint refuses a silent one, and this is the screen that earns the right.
+    const cascade = ticket.subtaskCount > 0
     setBusy('delete'); setFailure('')
-    deleteTicket(ticket.listId, ticket.entryId)
+    deleteTicket(ticket.listId, ticket.entryId, cascade)
       .then(() => setState({ phase: 'gone' }))
       .catch(err => setFailure(err instanceof ApiError ? err.message : String(err)))
       .finally(() => { setBusy(''); setConfirmDelete(false) })
+  }
+
+  // -- subtasks -------------------------------------------------------------
+  //
+  // A subtask action changes a DIFFERENT ticket, so the reply is that ticket, not this
+  // one — `run` would swap the page out from under you. These re-read the ticket being
+  // looked at instead, by entry id so the endpoint skips its cross-list scan.
+
+  function runOnFamily(label: string, work: Promise<unknown>, message: string, after?: () => void) {
+    if (!ticket) return
+    const { listId, entryId } = ticket
+    setBusy(label); setFailure(''); setNotice('')
+    work
+      .then(() => getTicket(entryId, listId))
+      .then(({ ticket: fresh }) => {
+        setState({ phase: 'ready', ticket: fresh })
+        setDraft(d => (d ? { ...d, status: fresh.status || d.status } : draftOf(fresh)))
+        setNotice(message)
+        if (after) after()
+      })
+      .catch(err => setFailure(err instanceof ApiError ? err.message : String(err)))
+      .finally(() => setBusy(''))
+  }
+
+  function submitSubtask() {
+    if (!ticket || !sub.title.trim() || busy) return
+    const title = sub.title.trim()
+    const fields: Partial<Record<TicketFieldKey, string>> = { title }
+    if (sub.estHours.trim()) fields.estHours = sub.estHours.trim()
+    // The form is cleared on SUCCESS only. Clearing it on submit would look quicker and
+    // would eat the typing every time the endpoint said no.
+    runOnFamily(
+      'sub',
+      addSubtask(ticket.listId, ticket.entryId, fields,
+        sub.responsibleId ? { responsibleId: sub.responsibleId } : {}),
+      `Added "${title}".`,
+      () => setSub({ title: '', responsibleId: '', estHours: '' }),
+    )
   }
 
   function copyLink() {
@@ -393,13 +440,21 @@ export default function TicketPage() {
 
         {confirmDelete && (
           <div className="tpage__ask tpage__ask--danger">
-            <span className="tpage__askq">Delete this ticket for good? Its time log goes with it.</span>
+            {/* Deleting a parent takes its subtasks with it, so the question says how
+                many and the button says the number out loud. */}
+            <span className="tpage__askq">
+              {ticket.subtaskCount > 0
+                ? `Delete this ticket and its ${ticket.subtaskCount} subtask${ticket.subtaskCount === 1 ? '' : 's'} for good? Every time log goes with them.`
+                : 'Delete this ticket for good? Its time log goes with it.'}
+            </span>
             <button type="button" className="btn btn--ghost btn--sm" disabled={!!busy}
               onClick={() => setConfirmDelete(false)}>
               Keep it
             </button>
             <button type="button" className="btn btn--danger btn--sm" onClick={remove} disabled={!!busy}>
-              {busy === 'delete' ? 'Deleting…' : 'Delete ticket'}
+              {busy === 'delete'
+                ? 'Deleting…'
+                : ticket.subtaskCount > 0 ? `Delete all ${ticket.subtaskCount + 1}` : 'Delete ticket'}
             </button>
           </div>
         )}
@@ -416,6 +471,35 @@ export default function TicketPage() {
           autoComplete="off"
           onChange={e => edit('title', e.target.value)}
         />
+
+        {/* A subtask says what it is part of, right under its own title, and offers the
+            one structural move that belongs to it: getting out. */}
+        {ticket.parent && (
+          <p className="tpage__parent">
+            <span className="tpage__parentlab">Subtask of</span>
+            <Link className="inlink" to={`/tickets/${ticket.parent.ticketNumber ?? ticket.parent.entryId}`}>
+              {ticket.parent.ticketNumber !== null && <span className="tnum">#{ticket.parent.ticketNumber}</span>}
+              {' '}{ticket.parent.title || 'Untitled ticket'}
+            </Link>
+            <span className="muted">
+              {ticket.parent.subtaskDone}/{ticket.parent.subtaskCount} done
+            </span>
+            <button type="button" className="linkbtn" disabled={!!busy}
+              onClick={() => runOnFamily('parent', setParent(on, ''), 'Promoted to a top-level ticket.')}>
+              {busy === 'parent' ? 'Promoting…' : 'Promote to top-level'}
+            </button>
+          </p>
+        )}
+
+        {ticket.orphaned && (
+          <p className="tpage__parent tpage__parent--orphan">
+            <span className="tpage__parentlab">Was a subtask</span>
+            <span className="muted">
+              Its parent {ticket.parentNumber ? `(#${ticket.parentNumber}) ` : ''}
+              was deleted, so this is a top-level ticket now.
+            </span>
+          </p>
+        )}
 
         <p className="tpage__sub">
           on <Link className="inlink" to={boardPath}>{ticket.listName || 'this list'}</Link>
@@ -459,6 +543,126 @@ export default function TicketPage() {
               onChange={html => edit('details', html)}
             />
           </section>
+
+          {/* Subtasks.
+              Only on a top-level ticket — one level deep is the rule, and a page that
+              offered to nest further would be promising something the endpoint refuses.
+
+              Each row is a real ticket with its own page; what is inline here is the one
+              thing you do from the parent, which is move a chunk along. Everything else
+              — time, attachments, the description — is a click away on its own page. */}
+          {!ticket.isSubtask && (
+            <section className="tcard">
+              <div className="tcard__head">
+                <h2>
+                  Subtasks
+                  {ticket.subtaskCount > 0 && (
+                    <span className="tsec__n">{ticket.subtaskDone}/{ticket.subtaskCount}</span>
+                  )}
+                </h2>
+                <p className="note">Break a big job into pieces that can be given out and planned separately.</p>
+              </div>
+
+              {ticket.subtaskCount > 0 && (
+                <div className="subprog" role="img"
+                  aria-label={`${ticket.subtaskDone} of ${ticket.subtaskCount} subtasks complete`}>
+                  <span className="subprog__fill"
+                    style={{ width: `${Math.round((ticket.subtaskDone / ticket.subtaskCount) * 100)}%` }} />
+                </div>
+              )}
+
+              {!ticket.subtasks || ticket.subtasks.length === 0 ? (
+                <p className="muted tsec__empty">No subtasks. This ticket stands on its own.</p>
+              ) : (
+                <ul className="subs">
+                  {ticket.subtasks.map(s => (
+                    <li key={s.entryId} className="sub" data-done={s.status === 'Complete' ? 'yes' : 'no'}>
+                      <Link className="sub__name" to={`/tickets/${s.ticketNumber ?? s.entryId}`}>
+                        {s.ticketNumber !== null && <span className="tnum">#{s.ticketNumber}</span>}
+                        <span className="sub__title">{s.title || 'Untitled'}</span>
+                      </Link>
+
+                      <select className="sub__status" value={s.status || 'Open'}
+                        aria-label={`Status of ${s.title || 'subtask'}`}
+                        disabled={!!busy}
+                        onChange={e => runOnFamily('sub',
+                          updateTicket(s.listId, s.entryId, { status: e.target.value }),
+                          `${s.title || 'Subtask'} → ${e.target.value}.`)}>
+                        {TICKET_STATUSES.map(v => <option key={v} value={v}>{v}</option>)}
+                      </select>
+
+                      <span className="sub__who">{s.responsibleName || dash}</span>
+                      <span className="sub__hrs muted">
+                        {s.estHours !== null ? formatHours(s.estHours) : dash}
+                        {s.loggedHours ? ` · ${formatHours(s.loggedHours)} logged` : ''}
+                      </span>
+                      {s.sprint && <span className="pill pill--sprint">{sprintLabel(s.sprint)}</span>}
+                      {s.roadblocked && <span className="pill pill--block">Blocked</span>}
+
+                      <button type="button" className="linkbtn" disabled={!!busy}
+                        onClick={() => runOnFamily('sub',
+                          setParent({ listId: s.listId, entryId: s.entryId }, ''),
+                          `${s.title || 'Subtask'} is a top-level ticket now.`)}>
+                        Detach
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {ticket.subtaskCount > 0 && (
+                <p className="subs__roll muted">
+                  {formatHours(ticket.subtaskEstHours)} estimated across the subtasks
+                  {ticket.subtaskLoggedHours > 0 && `, ${formatHours(ticket.subtaskLoggedHours)} logged`}
+                  {' — '}separate from this ticket&rsquo;s own {formatHours(est || 0)}.
+                </p>
+              )}
+
+              {!showSubForm ? (
+                <p className="tsec__add">
+                  <button type="button" className="btn btn--ghost btn--sm" disabled={!!busy}
+                    onClick={() => { setShowSubForm(true); setFailure(''); setNotice('') }}>
+                    Add a subtask
+                  </button>
+                </p>
+              ) : (
+                <div className="efgrid efgrid--inset">
+                  <div className="ef ef--wide">
+                    <label htmlFor="s-title">What is the chunk?<span className="ef__req" aria-hidden="true">*</span></label>
+                    <input id="s-title" type="text" value={sub.title} autoComplete="off" autoFocus
+                      placeholder="Map the RTC fields onto the foster model"
+                      onChange={e => setSub(s => ({ ...s, title: e.target.value }))}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') { e.preventDefault(); submitSubtask() }
+                        if (e.key === 'Escape') setShowSubForm(false)
+                      }} />
+                    <p className="ef__hint">Enter adds it and keeps the form open for the next one.</p>
+                  </div>
+                  <div className="ef">
+                    <label htmlFor="s-who">Who does it</label>
+                    <UserPicker id="s-who" value={sub.responsibleId} placeholder="Nobody yet"
+                      onChange={id => setSub(s => ({ ...s, responsibleId: id }))} />
+                  </div>
+                  <div className="ef">
+                    <label htmlFor="s-est">Estimate (hours)</label>
+                    <input id="s-est" type="number" min="0" step="0.25" value={sub.estHours}
+                      autoComplete="off" placeholder="4"
+                      onChange={e => setSub(s => ({ ...s, estHours: e.target.value }))} />
+                  </div>
+                  <div className="ef ef--wide tsec__formfoot">
+                    <button type="button" className="btn btn--ghost btn--sm" disabled={!!busy}
+                      onClick={() => { setShowSubForm(false); setFailure('') }}>
+                      Done adding
+                    </button>
+                    <button type="button" className="btn btn--sm"
+                      disabled={!!busy || !sub.title.trim()} onClick={submitSubtask}>
+                      {busy === 'sub' ? 'Adding…' : 'Add subtask'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
 
           <section className="tcard">
             <div className="tcard__head">

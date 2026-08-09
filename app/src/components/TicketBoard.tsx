@@ -118,15 +118,51 @@ export default function TicketBoard({
     })
   }, [tickets, tab, search, fStatus, fPriority, fResponsible])
 
+  // -- subtasks on the board ------------------------------------------------
+  //
+  // The board is a list of jobs, not a list of steps. A ticket broken into eight chunks
+  // would otherwise push everything else off the screen and count itself nine times, so
+  // children fold into their parent and the parent carries a 3/5 chip you can open.
+  //
+  // Folded only when the PARENT is also visible in this tab and filter. A subtask whose
+  // parent is filtered away stands on its own with a crumb back — the alternative is
+  // work vanishing from a board because of where its parent happens to sit, which is
+  // exactly the bug this is meant to avoid.
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+
+  // Sourced from every ticket on the list, not from `visible`: expanding #42 should show
+  // all five of its subtasks, including the two that are done and the one in another tab.
+  const childrenOf = useMemo(() => {
+    const map: Record<string, Ticket[]> = {}
+    for (const t of tickets) {
+      if (!t.isSubtask || !t.parentId) continue
+      if (!map[t.parentId]) map[t.parentId] = []
+      map[t.parentId].push(t)
+    }
+    for (const key of Object.keys(map)) map[key].sort(byPriority)
+    return map
+  }, [tickets])
+
+  const visibleIds = useMemo(() => {
+    const ids: Record<string, true> = {}
+    for (const t of visible) ids[t.entryId] = true
+    return ids
+  }, [visible])
+
+  const rows = useMemo(
+    () => visible.filter(t => !(t.isSubtask && visibleIds[t.parentId])),
+    [visible, visibleIds],
+  )
+
   // Group by status only when the tab holds more than one — beh's rule exactly.
   const groups = useMemo(() => {
-    const present = TICKET_STATUSES.filter(s => visible.some(t => (t.status || 'Open') === s))
-    if (present.length <= 1) return [{ status: '', rows: visible.slice().sort(byPriority) }]
+    const present = TICKET_STATUSES.filter(s => rows.some(t => (t.status || 'Open') === s))
+    if (present.length <= 1) return [{ status: '', rows: rows.slice().sort(byPriority) }]
     return present.map(status => ({
       status,
-      rows: visible.filter(t => (t.status || 'Open') === status).sort(byPriority),
+      rows: rows.filter(t => (t.status || 'Open') === status).sort(byPriority),
     }))
-  }, [visible])
+  }, [rows])
 
   function openNew() {
     setCreating(true)
@@ -174,6 +210,104 @@ export default function TicketBoard({
   }
 
   const dash = <span className="muted">—</span>
+
+  /**
+   * One row of the table — a top-level ticket, or one of its subtasks indented under it.
+   *
+   * The same renderer for both so a subtask is visibly the same KIND of thing as its
+   * parent: same columns, same status control, its own link. That is the whole claim
+   * being made about subtasks here, and a cut-down child row would quietly deny it.
+   */
+  function renderRow(t: Ticket, child: boolean, kids: Ticket[], open: boolean) {
+    const est = t.estHours
+    const logged = t.loggedHours || 0
+    const over = est !== null && est > 0 && logged > est
+    // A subtask rendered on its own — parent filtered out of this view — says whose it
+    // is, so it never reads as an unrelated ticket that happens to be small.
+    const strayFrom = !child && t.isSubtask && t.parentNumber !== null ? t.parentNumber : null
+
+    return (
+      <tr
+        key={t.entryId}
+        className={child ? 'rowlink rowlink--sub' : 'rowlink'}
+        data-prio={t.priority}
+        data-blocked={t.roadblocked ? '' : undefined}
+      >
+        <td className="tickets__num">
+          {t.ticketNumber === null
+            ? <span className="muted">—</span>
+            : <Link className="tnum tnum--link" to={ticketPath(t)}>#{t.ticketNumber}</Link>}
+        </td>
+        <th scope="row">
+          {child && <span className="subtee" aria-hidden="true">└</span>}
+          {strayFrom !== null && (
+            <Link className="subcrumb" to={`/tickets/${strayFrom}`} title="Its parent ticket">
+              #{strayFrom} ›
+            </Link>
+          )}
+          {/* A real link: shareable, middle-clickable, and the browser
+              shows where it goes. */}
+          <Link className="rowlink__a" to={ticketPath(t)}>
+            {t.title || <span className="muted">(untitled)</span>}
+          </Link>
+
+          {kids.length > 0 && (
+            <button
+              type="button"
+              className="subtoggle"
+              aria-expanded={open}
+              title={open ? 'Hide subtasks' : 'Show subtasks'}
+              onClick={() => setExpanded(e => ({ ...e, [t.entryId]: !e[t.entryId] }))}
+            >
+              <span className="subtoggle__caret" aria-hidden="true">{open ? '▾' : '▸'}</span>
+              {t.subtaskDone}/{t.subtaskCount}
+              <span className="visually-hidden"> subtasks complete</span>
+            </button>
+          )}
+
+          <span className="rowmarks">
+            {t.roadblocked && (
+              <span className="mark mark--block" title={t.roadblockReason || 'Roadblocked'}>
+                blocked
+              </span>
+            )}
+            {t.timerRunning && (
+              <span className="mark mark--timer" title={`Timer running${t.timerBy ? ` for ${t.timerBy}` : ''}`}>
+                timing
+              </span>
+            )}
+            {t.attachments.length > 0 && (
+              <span className="mark" title={`${t.attachments.length} attachment${t.attachments.length === 1 ? '' : 's'}`}>
+                {t.attachments.length} file{t.attachments.length === 1 ? '' : 's'}
+              </span>
+            )}
+          </span>
+        </th>
+        <td><span className="pill" data-prio={t.priority}>{t.priority || 'Normal'}</span></td>
+        <td>{t.responsibleName || t.assignee || dash}</td>
+        <td className="tickets__time">
+          {logged || est !== null ? (
+            <span className="tvs" data-over={over ? '' : undefined}>
+              {logged ? formatHours(logged) : '0h'}
+              <span className="tvs__sep">/</span>
+              <span className="tvs__est">{est === null ? '—' : formatHours(est)}</span>
+            </span>
+          ) : dash}
+        </td>
+        <td>{t.dueDate || dash}</td>
+        <td className="tickets__move">
+          <select
+            aria-label={`Move "${t.title}" to another status`}
+            value={t.status || 'Open'}
+            disabled={busy}
+            onChange={e => quickStatus(t, e.target.value)}
+          >
+            {TICKET_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </td>
+      </tr>
+    )
+  }
 
   return (
     <section className="board2">
@@ -390,68 +524,13 @@ export default function TicketBoard({
                     </tr>
                   )}
                   {g.rows.map(t => {
-                    const est = t.estHours
-                    const logged = t.loggedHours || 0
-                    const over = est !== null && est > 0 && logged > est
+                    const kids = childrenOf[t.entryId] || []
+                    const open = !!expanded[t.entryId]
                     return (
-                      <tr
-                        key={t.entryId}
-                        className="rowlink"
-                        data-prio={t.priority}
-                        data-blocked={t.roadblocked ? '' : undefined}
-                      >
-                        <td className="tickets__num">
-                          {t.ticketNumber === null
-                            ? <span className="muted">—</span>
-                            : <Link className="tnum tnum--link" to={ticketPath(t)}>#{t.ticketNumber}</Link>}
-                        </td>
-                        <th scope="row">
-                          {/* A real link: shareable, middle-clickable, and the browser
-                              shows where it goes. */}
-                          <Link className="rowlink__a" to={ticketPath(t)}>
-                            {t.title || <span className="muted">(untitled)</span>}
-                          </Link>
-                          <span className="rowmarks">
-                            {t.roadblocked && (
-                              <span className="mark mark--block" title={t.roadblockReason || 'Roadblocked'}>
-                                blocked
-                              </span>
-                            )}
-                            {t.timerRunning && (
-                              <span className="mark mark--timer" title={`Timer running${t.timerBy ? ` for ${t.timerBy}` : ''}`}>
-                                timing
-                              </span>
-                            )}
-                            {t.attachments.length > 0 && (
-                              <span className="mark" title={`${t.attachments.length} attachment${t.attachments.length === 1 ? '' : 's'}`}>
-                                {t.attachments.length} file{t.attachments.length === 1 ? '' : 's'}
-                              </span>
-                            )}
-                          </span>
-                        </th>
-                        <td><span className="pill" data-prio={t.priority}>{t.priority || 'Normal'}</span></td>
-                        <td>{t.responsibleName || t.assignee || dash}</td>
-                        <td className="tickets__time">
-                          {logged || est !== null ? (
-                            <span className="tvs" data-over={over ? '' : undefined}>
-                              {logged ? formatHours(logged) : '0h'}
-                              <span className="tvs__sep">/</span>
-                              <span className="tvs__est">{est === null ? '—' : formatHours(est)}</span>
-                            </span>
-                          ) : dash}
-                        </td>
-                        <td>{t.dueDate || dash}</td>
-                        <td className="tickets__move">
-                          <select
-                            aria-label={`Move "${t.title}" to another status`}
-                            value={t.status || 'Open'}
-                            disabled={busy}
-                            onChange={e => quickStatus(t, e.target.value)}
-                          >
-                            {TICKET_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                          </select>
-                        </td>
-                      </tr>
+                      <Fragment key={t.entryId}>
+                        {renderRow(t, false, kids, open)}
+                        {open && kids.map(k => renderRow(k, true, [], false))}
+                      </Fragment>
                     )
                   })}
                 </Fragment>

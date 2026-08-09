@@ -313,6 +313,44 @@ export interface Ticket {
   listName: string
   clientId: string
   clientName: string
+
+  // ---- subtasks -------------------------------------------------------------
+  // A subtask is a whole ticket that names a parent, so everything above applies to one
+  // as well. The fields below say where it sits. Only `parentId` and `parentNumber` are
+  // stored; the rest is derived server-side from a single read of the list, which is why
+  // a renamed parent never leaves a stale title behind.
+
+  /** Entry id of the parent, or '' for a top-level ticket. Always on the same list. */
+  parentId: string
+  parentNumber: number | null
+  /** Resolved server-side; '' unless this is a subtask whose parent still exists. */
+  parentTitle: string
+  /** True when this row belongs underneath its parent rather than on its own. */
+  isSubtask: boolean
+  /** Its parent is gone. Reported as top-level so an orphan cannot vanish from the board. */
+  orphaned: boolean
+
+  /** How many subtasks this ticket has, and how many are done. Both 0 when it has none. */
+  subtaskCount: number
+  subtaskDone: number
+  /** The children's hours, summed — kept apart from the parent's own so nothing double-counts. */
+  subtaskEstHours: number
+  subtaskLoggedHours: number
+
+  /** The children in full. Present only on a single-ticket read; null on a board row. */
+  subtasks: Ticket[] | null
+  /** A crumb back to the parent. Present only on a single-ticket read of a subtask. */
+  parent: TicketParent | null
+}
+
+/** Just enough of a parent to link back to it from a subtask. */
+export interface TicketParent {
+  entryId: string
+  ticketNumber: number | null
+  title: string
+  status: string
+  subtaskCount: number
+  subtaskDone: number
 }
 
 export interface TicketList {
@@ -371,8 +409,46 @@ export const addTicket = (
 export const updateTicket = (listId: string, entryId: string, fields: Partial<Record<TicketFieldKey, string>>): Promise<Ticket> =>
   maestroPost('updateTicket', { listId, entryId, fields })
 
-export const deleteTicket = (listId: string, entryId: string): Promise<{ deleted: string; listId: string }> =>
-  maestroPost('deleteTicket', { listId, entryId })
+/**
+ * Delete a ticket. A parent with subtasks is refused (409 HAS_SUBTASKS) unless
+ * `cascade` is passed — the caller has to have seen the children named before the
+ * delete takes them too.
+ */
+export const deleteTicket = (
+  listId: string,
+  entryId: string,
+  cascade = false,
+): Promise<{ deleted: string; subtasksDeleted: string[]; listId: string }> =>
+  maestroPost('deleteTicket', cascade ? { listId, entryId, cascade: 'true' } : { listId, entryId })
+
+// ------------------------------------------------------------------- subtasks
+// Breaking a big ticket into bite-sized chunks. A subtask is a full ticket with a
+// parent — its own number, status, owner, estimate and timer — because the pieces of
+// a large job are precisely the things that go to different people in different
+// sprints, which a checklist row could never express.
+//
+// Two rules the endpoint enforces, worth knowing before calling these: parent and
+// child live on the SAME list, and subtasks are ONE level deep. A subtask cannot have
+// subtasks of its own, and a ticket that already has children cannot become one.
+
+/** Create a subtask under `parentId`. Same shape as `addTicket` otherwise. */
+export const addSubtask = (
+  listId: string,
+  parentId: string,
+  fields: Partial<Record<TicketFieldKey, string>>,
+  people: { accountableId?: string; responsibleId?: string } = {},
+): Promise<Ticket> =>
+  maestroPost('addSubtask', { listId, parentId, fields: { ...fields, ...people } })
+
+/**
+ * Attach an existing ticket to a parent, move it to a different one, or promote it
+ * back to top-level with an empty `parentId`.
+ *
+ * This is the common path, not `addSubtask`: work is usually broken up after somebody
+ * has written it down and realised it is three jobs.
+ */
+export const setParent = (on: On, parentId: string): Promise<Ticket> =>
+  maestroPost('setParent', { ...on, parentId })
 
 // ------------------------------------------------------- time, blocks, files
 // Each of these returns the WHOLE ticket, re-read server-side — so a caller

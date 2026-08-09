@@ -2859,3 +2859,127 @@ main { flex: 1; min-height: 0; display: flex; }
 @media (max-width: 640px) {
   .biq-history-turn { grid-template-columns: 1fr; gap: 0.15rem; }
 }
+
+/* --------------------------------------------------------------- subtasks
+ *
+ * A subtask is a whole ticket, so it wears the same clothes as one — same pills,
+ * same numbers, same links. What the styling adds is only PLACE: an indent on the
+ * board that says "underneath", and a crumb when a subtask is seen away from its
+ * parent. Nothing here makes a child look like a lesser kind of row, because it
+ * is not one.
+ */
+
+/* --- on the board: a folded parent, and its children when opened --- */
+
+.subtoggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: 0.5rem;
+  padding: 0.05rem 0.35rem;
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  color: var(--text-mute);
+  background: var(--bg-sunk);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  cursor: pointer;
+}
+.subtoggle:hover { color: var(--cobalt); border-color: var(--cobalt); }
+.subtoggle__caret { font-size: 0.6rem; line-height: 1; }
+
+.rowlink--sub > th,
+.rowlink--sub > td { background: var(--bg-raise); }
+/* The indent is on the title cell only: shifting the number column too would break
+   the one vertical line that makes a long table scannable. */
+.rowlink--sub > th[scope="row"] { padding-left: 1.6rem; position: relative; }
+.subtee {
+  position: absolute;
+  left: 0.6rem;
+  color: var(--line-strong);
+  font-size: 0.8rem;
+}
+
+.subcrumb {
+  margin-right: 0.35rem;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  color: var(--text-mute);
+  text-decoration: none;
+  white-space: nowrap;
+}
+a.subcrumb:hover { color: var(--cobalt); }
+
+/* --- on the ticket page: the parent crumb --- */
+
+.tpage__parent {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+}
+.tpage__parentlab {
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+.tpage__parent--orphan .tpage__parentlab { color: var(--warn); }
+
+/* --- on the ticket page: the subtask list --- */
+
+.subprog {
+  height: 4px;
+  margin: 0 0 0.85rem;
+  background: var(--bg-sunk);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.subprog__fill {
+  display: block;
+  height: 100%;
+  background: #5AA33C;
+  transition: width 0.2s ease;
+}
+
+.subs { margin: 0; padding: 0; list-style: none; }
+.sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--line);
+}
+.sub:first-child { border-top: 0; }
+.sub__name {
+  flex: 1 1 14rem;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  text-decoration: none;
+  color: var(--text);
+}
+.sub__name:hover .sub__title { color: var(--cobalt); }
+.sub__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Done reads as done at a glance — the count above is a number, this is the texture. */
+.sub[data-done="yes"] .sub__title { color: var(--text-mute); text-decoration: line-through; }
+.sub__status { flex: 0 0 auto; font-size: 0.8rem; padding: 0.15rem 0.3rem; }
+.sub__who { flex: 0 0 auto; font-size: 0.82rem; color: var(--text-dim); }
+.sub__hrs { flex: 0 0 auto; font-size: 0.78rem; white-space: nowrap; }
+
+.subs__roll { margin: 0.75rem 0 0; font-size: 0.78rem; }
+
+.pill--sprint { color: var(--text-dim); }
+
+.dcard__parent { margin: 0.1rem 0 0; font-size: 0.72rem; }
+
+@media (max-width: 640px) {
+  .sub__name { flex-basis: 100%; }
+  .sub__hrs { margin-left: auto; }
+}

@@ -529,6 +529,16 @@ export default function Sprints() {
                       {t.ticketNumber !== null && <span className="tnum">#{t.ticketNumber}</span>}
                       <span>{t.title}</span>
                     </p>
+                    {/* A subtask in a sprint is a chunk of something bigger, and a card
+                        reading "Backfill existing records" with no context is unplannable
+                        on its own. The parent is what makes it mean anything. */}
+                    {t.isSubtask && t.parentNumber !== null && (
+                      <p className="dcard__parent muted">
+                        part of{' '}
+                        <Link className="inlink" to={`/tickets/${t.parentNumber}`}>#{t.parentNumber}</Link>
+                        {t.parentTitle ? ` ${t.parentTitle}` : ''}
+                      </p>
+                    )}
                     <p className="dcard__meta">
                       <span className="pill" data-status={(t.status || 'Open').replace(/\s+/g, '')}>{t.status}</span>
                       <span>{formatHours(t.estHours)} est</span>
@@ -599,7 +609,12 @@ export default function Sprints() {
                             ? dash
                             : <span className="tnum">#{t.ticketNumber}</span>}
                         </td>
-                        <th scope="row">{t.title}</th>
+                        <th scope="row">
+                          {t.isSubtask && t.parentNumber !== null && (
+                            <span className="subcrumb">#{t.parentNumber} ›</span>
+                          )}
+                          {t.title}
+                        </th>
                         <td>{t.clientName || t.listName}</td>
                         <td><span className="pill" data-prio={t.priority}>{t.priority}</span></td>
                         <td className="num">
