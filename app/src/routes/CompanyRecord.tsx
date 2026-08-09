@@ -103,7 +103,18 @@ export default function CompanyRecord() {
         <>
           <header className="page__head">
             <p className="eyebrow">Company</p>
-            <h1>{company.name || <span className="muted">Untitled</span>}</h1>
+            <div className="page__headrow">
+              <h1>{company.name || <span className="muted">Untitled</span>}</h1>
+              {/* Only rendered when there is somewhere to go — a dead button that
+                  explains itself on click is worse than no button. */}
+              {company.ehrLink && (
+                <a className="btn btn--ghost" href={company.ehrLink}
+                  target="_blank" rel="noopener noreferrer"
+                  title="Open this client's BlueStep org in a new tab">
+                  Go to Org ↗
+                </a>
+              )}
+            </div>
           </header>
 
           {arrivalWarning && (

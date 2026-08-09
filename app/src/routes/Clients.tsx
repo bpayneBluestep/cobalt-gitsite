@@ -185,6 +185,7 @@ export default function Clients() {
                   <th scope="col">City</th>
                   <th scope="col">State</th>
                   <th scope="col">Postal</th>
+                  <th scope="col"><span className="visually-hidden">Their org</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -205,6 +206,20 @@ export default function Clients() {
                     <td>{row.city || <span className="muted">—</span>}</td>
                     <td>{row.state || <span className="muted">—</span>}</td>
                     <td>{row.postalCode || <span className="muted">—</span>}</td>
+                    {/* Straight into the client's own BlueStep org. A new tab, always:
+                        this leaves Cobalt for a different system entirely, and coming
+                        "back" would mean losing whatever you had open here. */}
+                    <td className="clients__org">
+                      {row.ehrLink
+                        ? (
+                          <a className="btn btn--ghost btn--sm" href={row.ehrLink}
+                            target="_blank" rel="noopener noreferrer"
+                            title={`Open ${row.name || 'this client'} in a new tab`}>
+                            Go to Org ↗
+                          </a>
+                        )
+                        : <span className="muted">—</span>}
+                    </td>
                   </tr>
                 ))}
               </tbody>

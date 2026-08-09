@@ -3118,3 +3118,14 @@ a.subcrumb:hover { color: var(--cobalt); }
   margin-top: 0.4rem;
   font-size: 0.72rem;
 }
+
+/* "Go to Org" — the header keeps the title and the button on one line, and the
+   table's column stays hugged to the right so the button never floats mid-row. */
+.page__headrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.clients__org { width: 1%; white-space: nowrap; text-align: right; }

@@ -107,6 +107,8 @@ export interface Company {
   id: string
   name: string
   website: string
+  /** The client's own BlueStep org, imported from beh. Empty for a company without one. */
+  ehrLink: string
   street: string
   city: string
   state: string
