@@ -17,8 +17,30 @@
  * is wanted while the user is still in the conversation.
  */
 
-export const REC_MAX_MS = 25 * 60 * 1000    // ~25 minutes; keeps the file storable
-export const REC_VIDEO_BITS = 1_500_000     // ~1.5 Mbps
+/*
+ * Capture settings, and why they are what they are.
+ *
+ * These were ported from beh at 1.5 Mbps and full resolution, against a 10 MB upload
+ * ceiling — which the recorder crossed at 53 SECONDS. A one-minute walkthrough could
+ * not be submitted, and nothing said so until the end of the interview. The two numbers
+ * had simply never been checked against each other.
+ *
+ * The fix is mostly not the ceiling, it is the capture. A screen is overwhelmingly
+ * static pixels: dropping to 1280-wide at 10 fps costs almost nothing for showing a
+ * workflow — text stays sharp, fast scrolling softens slightly — and cuts the bitrate
+ * needed by roughly two thirds. At these settings 64 MB holds about 18 minutes.
+ */
+export const REC_MAX_MS = 20 * 60 * 1000    // 20 minutes, and the byte budget usually bites first
+export const REC_VIDEO_BITS = 500_000       // ~500 kbps, tuned for 1280w @ 10fps screen content
+export const REC_AUDIO_BITS = 64_000        // speech, not music
+export const REC_MAX_WIDTH = 1280
+export const REC_FPS = 10
+
+/** Fallback ceiling, used only until `wesleyStatus` reports the server's real one. */
+export const REC_DEFAULT_BUDGET = 64 * 1024 * 1024
+
+/** How often the recorders hand us a chunk. Also the resolution of the byte counter. */
+const CHUNK_MS = 2000
 
 export interface RecResult {
   videoBlob: Blob
@@ -27,12 +49,21 @@ export interface RecResult {
   audioBlob: Blob | null
   /** Why there is no audio, for the log — never shown raw to the user. */
   audioNote: string
+  /** True when recording was stopped because it reached the size budget, not by the user. */
+  stoppedForSize: boolean
 }
 
 export interface Recording {
   /** Stop early. The promise passed to `start` resolves once both recorders flush. */
   stop: () => void
   startedAt: number
+}
+
+/** What the ticking callback reports: how long, and how much of the budget is gone. */
+export interface RecProgress {
+  elapsedMs: number
+  bytes: number
+  budget: number
 }
 
 export function recordingSupported(): boolean {
@@ -70,9 +101,17 @@ const audioMime = () => pickMime(
  */
 export async function startRecording(
   onDone: (result: RecResult) => void,
-  onTick: (elapsedMs: number) => void,
+  onTick: (progress: RecProgress) => void,
+  budget: number = REC_DEFAULT_BUDGET,
 ): Promise<Recording> {
-  const display = await navigator.mediaDevices.getDisplayMedia({ video: true })
+  // Constraints, not just bitrate. Asking the browser for fewer, smaller frames is what
+  // makes a low bitrate look fine — throttling bits alone just produces a mushy 1080p.
+  const display = await navigator.mediaDevices.getDisplayMedia({
+    video: {
+      width: { max: REC_MAX_WIDTH },
+      frameRate: { ideal: REC_FPS, max: REC_FPS + 5 },
+    },
+  })
 
   // A missing mic is not fatal — the video is still worth keeping, and the user is
   // told afterwards that no narration was picked up.
@@ -90,7 +129,9 @@ export async function startRecording(
   display.getVideoTracks().forEach(t => combined.addTrack(t))
   micTracks.forEach(t => combined.addTrack(t))
   const videoRec = new MediaRecorder(combined, {
-    mimeType: vMime, videoBitsPerSecond: REC_VIDEO_BITS,
+    mimeType: vMime,
+    videoBitsPerSecond: REC_VIDEO_BITS,
+    audioBitsPerSecond: REC_AUDIO_BITS,
   })
 
   // The separate capture. See the header — cloning the track above does not work.
@@ -105,14 +146,31 @@ export async function startRecording(
 
   const videoChunks: Blob[] = []
   const audioChunks: Blob[] = []
-  videoRec.ondataavailable = e => { if (e.data?.size) videoChunks.push(e.data) }
+  let videoBytes = 0
+  let hitBudget = false
+
+  // The video recorder runs with a timeslice so the bytes can be counted AS THEY ARRIVE.
+  // Without one it emits a single blob at the very end, and the only moment you could
+  // discover the file is too big is the moment it is too late to do anything about it.
+  videoRec.ondataavailable = e => {
+    if (!e.data?.size) return
+    videoChunks.push(e.data)
+    videoBytes += e.data.size
+    if (videoBytes >= budget && !hitBudget) {
+      hitBudget = true
+      stop()   // hard stop: what has been recorded so far is kept and is under the limit
+    }
+  }
   if (audioRec) audioRec.ondataavailable = e => { if (e.data?.size) audioChunks.push(e.data) }
 
   const startedAt = Date.now()
   let finished = false
   let stopping = false
 
-  const tick = window.setInterval(() => onTick(Date.now() - startedAt), 250)
+  const tick = window.setInterval(
+    () => onTick({ elapsedMs: Date.now() - startedAt, bytes: videoBytes, budget }),
+    250,
+  )
 
   const finish = () => {
     if (finished) return
@@ -138,6 +196,7 @@ export async function startRecording(
       audioNote: audioBlob
         ? ''
         : (audioRec ? 'the microphone recorder produced no audio' : 'no microphone was available'),
+      stoppedForSize: hitBudget,
     })
   }
 
@@ -156,9 +215,10 @@ export async function startRecording(
 
   const cap = window.setTimeout(stop, REC_MAX_MS)
 
-  videoRec.start()
-  // A timeslice on the audio recorder: without one, a short recording can end before
-  // the recorder has emitted anything at all.
+  // Both recorders take a timeslice. On the audio side it stops a short recording from
+  // ending before anything is emitted at all; on the video side it is what makes the
+  // running byte count — and therefore the hard stop above — possible.
+  videoRec.start(CHUNK_MS)
   if (audioRec) audioRec.start(1000)
 
   return { stop, startedAt }

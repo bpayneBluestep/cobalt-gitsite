@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
-  ApiError, wesleyChat, wesleyTranscribe, wesleyUpload, addIntakeTicket,
-  getClientList, getList,
+  ApiError, wesleyChat, wesleyTranscribe, wesleyUpload, wesleyStatus, addIntakeTicket,
+  getClientList, getList, formatBytes,
   type IqAttachment, type IqMessage, type IqProposal, type List,
 } from '../api'
 import {
   blobToBase64, formatClock, recordingSupported, startRecording,
-  REC_MAX_MS, type Recording, type RecResult,
+  REC_MAX_MS, REC_DEFAULT_BUDGET, type Recording, type RecResult,
 } from '../lib/recorder'
 import { sanitizeHtml } from '../lib/html'
 import RichTextEditor from '../components/RichTextEditor'
@@ -79,11 +79,24 @@ export default function Intake() {
   const [sending, setSending] = useState('')
   const [created, setCreated] = useState<{ number: number | null; entryId: string } | null>(null)
 
-  // Recording
+  // Recording. `recBytes` is what the chip counts down against — time was the wrong
+  // meter: the limit is a file size, and a busy screen fills it faster than a still one.
   const [recording, setRecording] = useState<Recording | null>(null)
   const [elapsed, setElapsed] = useState(0)
+  const [recBytes, setRecBytes] = useState(0)
+  const [recBudget, setRecBudget] = useState(REC_DEFAULT_BUDGET)
   const [recBusy, setRecBusy] = useState('')
   const [recWarn, setRecWarn] = useState('')
+
+  // The server owns the ceiling; this asks rather than keeping a second copy of it.
+  // Those two numbers living in two files, silently disagreeing, is the whole bug.
+  useEffect(() => {
+    let live = true
+    wesleyStatus()
+      .then(s => { if (live && s.maxRecordingBytes) setRecBudget(s.maxRecordingBytes) })
+      .catch(() => { /* keep the fallback; recording still works */ })
+    return () => { live = false }
+  }, [])
 
   const threadRef = useRef<HTMLDivElement | null>(null)
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
@@ -207,6 +220,28 @@ export default function Intake() {
   async function onRecordingDone(result: RecResult) {
     setRecording(null)
     setElapsed(0)
+    setRecBytes(0)
+
+    // Checked HERE, not at submit. The old code attached whatever came back and let the
+    // endpoint reject it at the end, which threw away the interview along with the file.
+    // The recorder now hard-stops at the budget, so this should be unreachable — it is
+    // kept because "should be unreachable" is not the same as "is".
+    if (result.videoBlob.size > recBudget) {
+      setRecWarn(
+        `That recording came out at ${formatBytes(result.videoBlob.size)}, over the ` +
+        `${formatBytes(recBudget)} limit, so it hasn't been attached. Record a shorter ` +
+        `stretch — or just tell me what it showed.`,
+      )
+      setRecBusy('')
+      return
+    }
+
+    if (result.stoppedForSize) {
+      setRecWarn(
+        `Recording stopped at the ${formatBytes(recBudget)} limit — everything up to that ` +
+        `point is attached. Record a second clip if there's more to show.`,
+      )
+    }
 
     addAttachment({
       kind: 'video',
@@ -268,7 +303,11 @@ export default function Intake() {
       return
     }
     try {
-      const handle = await startRecording(r => { void onRecordingDone(r) }, setElapsed)
+      const handle = await startRecording(
+        r => { void onRecordingDone(r) },
+        p => { setElapsed(p.elapsedMs); setRecBytes(p.bytes) },
+        recBudget,
+      )
       setRecording(handle)
     } catch {
       // Dismissing the screen picker lands here. It is a normal choice, not an error.
@@ -427,8 +466,16 @@ export default function Intake() {
               <span className="wes-rec-dot" aria-hidden="true" />
               <span className="wes-rec-label">Recording</span>
               <span className="wes-rec-time">{formatClock(elapsed)}</span>
+              {/* Size, not just time — the limit is a file size, and a busy screen eats
+                  it faster than a still one. Time is still shown because that is what a
+                  person is actually tracking while they talk. */}
               <span className="muted">
-                · up to {formatClock(REC_MAX_MS)} ({formatClock(REC_MAX_MS - elapsed)} left)
+                · {formatBytes(recBytes)} of {formatBytes(recBudget)}
+                {' · '}up to {formatClock(REC_MAX_MS)}
+              </span>
+              <span className="wes-rec-bar" aria-hidden="true">
+                <span className="wes-rec-bar__fill"
+                  style={{ width: `${Math.min(100, Math.round((recBytes / recBudget) * 100))}%` }} />
               </span>
               <button type="button" className="btn btn--sm" onClick={() => recording.stop()}>
                 Stop

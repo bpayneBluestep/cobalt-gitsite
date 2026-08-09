@@ -481,6 +481,11 @@ export const setRoadblock = (on: On, active: boolean, reason?: string): Promise<
 
 /** Max upload the endpoint accepts, so the UI can refuse before sending. */
 export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
+/** Video gets far more room — see MAX_RECORDING_BYTES in the endpoint. */
+export const MAX_RECORDING_BYTES = 64 * 1024 * 1024
+/** The ceiling that applies to a given file. Mirrors `uploadCeiling` server-side. */
+export const ceilingFor = (mimeType: string): number =>
+  (mimeType || '').toLowerCase().startsWith('video/') ? MAX_RECORDING_BYTES : MAX_ATTACHMENT_BYTES
 
 export const uploadAttachment = (
   on: On,
@@ -568,7 +573,18 @@ export interface IqRef {
   by: string
 }
 
-export const wesleyStatus = (): Promise<{ available: boolean }> => maestroGet('wesleyStatus')
+/**
+ * Whether Wesley is configured, and the ceilings the recorder must budget against.
+ *
+ * The limits come from the server rather than being written down here as well. They
+ * were duplicated once and drifted: the recorder was producing ~200 KB/s against a
+ * 10 MB cap, so it blew the limit at 53 seconds and only said so at submit.
+ */
+export const wesleyStatus = (): Promise<{
+  available: boolean
+  maxRecordingBytes?: number
+  maxAttachmentBytes?: number
+}> => maestroGet('wesleyStatus')
 
 /**
  * One turn. Send the WHOLE conversation every time — the endpoint holds no session,

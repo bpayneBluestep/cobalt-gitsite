@@ -3022,3 +3022,20 @@ a.subcrumb:hover { color: var(--cobalt); }
 
 /* The done card is centred with the conversation it came from. */
 .wes-done { margin-inline: auto; }
+
+/* The recording chip's size budget. Time was the wrong meter — the ceiling is a file
+   size, and a busy screen fills it faster than a still one. */
+.wes-rec-bar {
+  flex: 1 1 6rem;
+  min-width: 4rem;
+  height: 3px;
+  background: var(--bg-sunk);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.wes-rec-bar__fill {
+  display: block;
+  height: 100%;
+  background: var(--cobalt);
+  transition: width 0.25s linear;
+}

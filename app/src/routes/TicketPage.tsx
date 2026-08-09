@@ -6,7 +6,7 @@ import {
   setRoadblock, uploadAttachment, deleteAttachment,
   setTicketPeople, addComponent, updateComponent, deleteComponent,
   addSubtask, setParent,
-  formatHours, formatMinutes, formatBytes, MAX_ATTACHMENT_BYTES,
+  formatHours, formatMinutes, formatBytes, MAX_ATTACHMENT_BYTES, ceilingFor,
   TICKET_STATUSES, TICKET_PRIORITIES, COMPONENT_KINDS, COMPONENT_CHANGES,
   sprintLabel,
   type Ticket, type TicketFieldKey, type TimeEntry, type ComponentRef,
@@ -290,8 +290,11 @@ export default function TicketPage() {
     if (!ticket || !files || !files.length || busy) return
     const on = { listId: ticket.listId, entryId: ticket.entryId }
     const file = files[0]
-    if (file.size > MAX_ATTACHMENT_BYTES) {
-      setFailure(`${file.name} is ${formatBytes(file.size)}. The limit is ${formatBytes(MAX_ATTACHMENT_BYTES)}.`)
+    // Video gets the bigger ceiling, matching the endpoint — a screen recording dropped
+    // on a ticket is the same proposition as one Wesley captured.
+    const ceiling = ceilingFor(file.type)
+    if (file.size > ceiling) {
+      setFailure(`${file.name} is ${formatBytes(file.size)}. The limit is ${formatBytes(ceiling)}.`)
       return
     }
     setBusy('attach'); setFailure(''); setNotice('')
