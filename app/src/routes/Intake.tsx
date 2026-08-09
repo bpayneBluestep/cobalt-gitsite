@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
-  ApiError, blueIqChat, blueIqTranscribe, blueIqUpload, addIntakeTicket,
+  ApiError, wesleyChat, wesleyTranscribe, wesleyUpload, addIntakeTicket,
   getClientList, getList,
   type IqAttachment, type IqMessage, type IqProposal, type List,
 } from '../api'
@@ -13,9 +13,9 @@ import { sanitizeHtml } from '../lib/html'
 import RichTextEditor from '../components/RichTextEditor'
 
 /*
- * BlueIQ — guided intake.
+ * Wesley — guided intake.
  *
- * Someone with a half-formed need talks it through; BlueIQ interviews them, coaches
+ * Someone with a half-formed need talks it through; Wesley interviews them, coaches
  * them into recording their screen, and assembles a request an engineer can act on
  * without a round-trip. Ported from beh's Ticket Maestro, which is the version that
  * has been in real use.
@@ -26,12 +26,12 @@ import RichTextEditor from '../components/RichTextEditor'
  *
  * Three properties worth keeping when editing this:
  *
- *   * BlueIQ proposes; it never creates. The proposal lands in an editable review
+ *   * Wesley proposes; it never creates. The proposal lands in an editable review
  *     card, and only the user's Submit creates a ticket — through `addTicket`, the
  *     same path and the same validation as one typed by hand.
  *   * Nothing is uploaded until submit. A recording lives as a blob and an object
  *     URL until then, so abandoning the interview leaves nothing behind.
- *   * No user-visible copy says "AI". It is BlueIQ.
+ *   * No user-visible copy says "AI". It is Wesley.
  *
  * Four stages: chat → review → sending → done.
  */
@@ -104,7 +104,7 @@ export default function Intake() {
     setThinking(true)
     setFailure('')
     try {
-      const turn = await blueIqChat(history, {
+      const turn = await wesleyChat(history, {
         hasRecording,
         listName: list?.listName || '',
         clientName: list?.clientName || '',
@@ -133,7 +133,7 @@ export default function Intake() {
     }
   }, [hasRecording, list])
 
-  // The opening move: an empty history means BlueIQ greets and asks the first
+  // The opening move: an empty history means Wesley greets and asks the first
   // question, so the greeting is never hard-coded here.
   useEffect(() => {
     if (booted.current || !list) return
@@ -217,7 +217,7 @@ export default function Intake() {
       localUrl: URL.createObjectURL(result.videoBlob),
     })
 
-    // The narration IS the user's answer — transcribe it and let BlueIQ react, rather
+    // The narration IS the user's answer — transcribe it and let Wesley react, rather
     // than leaving a silent attachment and an unanswered question.
     if (!result.audioBlob) {
       setRecBusy('')
@@ -233,7 +233,7 @@ export default function Intake() {
     setRecBusy('Listening to your recording…')
     try {
       const base64 = await blobToBase64(result.audioBlob)
-      const { transcript } = await blueIqTranscribe(base64, result.audioBlob.type || 'audio/webm')
+      const { transcript } = await wesleyTranscribe(base64, result.audioBlob.type || 'audio/webm')
       const said = (transcript || '').trim()
       setRecBusy('')
       if (!said) {
@@ -293,7 +293,7 @@ export default function Intake() {
         if (!a.blob) { if (a.url) refs.push({ kind: a.kind, url: a.url, fileName: a.fileName }); continue }
         setSending(`Uploading ${n} of ${attachments.length}…`)
         const dataBase64 = await blobToBase64(a.blob)
-        const { ref } = await blueIqUpload(list.id, {
+        const { ref } = await wesleyUpload(list.id, {
           fileName: a.fileName || `attachment-${n}`,
           dataBase64,
           mimeType: a.blob.type || (a.kind === 'video' ? 'video/webm' : 'image/png'),
@@ -348,9 +348,9 @@ export default function Intake() {
 
   if (stage === 'done') {
     return (
-      <section className="page biq">
-        <div className="biq-done">
-          <div className="biq-done-check" aria-hidden="true">
+      <section className="page wes">
+        <div className="wes-done">
+          <div className="wes-done-check" aria-hidden="true">
             <svg viewBox="0 0 24 24" width="42" height="42" fill="none" stroke="currentColor"
               strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M20 6L9 17l-5-5" />
@@ -374,8 +374,8 @@ export default function Intake() {
   }
 
   return (
-    <section className="page biq">
-      <div className="biq-top">
+    <section className="page wes">
+      <div className="wes-top">
         <button type="button" className="btn btn--ghost btn--sm" onClick={() => navigate(boardPath)}>
           ← Back to board
         </button>
@@ -386,32 +386,36 @@ export default function Intake() {
         )}
       </div>
 
-      <div className="biq-header">
-        <span className="biq-spark" aria-hidden="true"><Spark /></span>
+      {/* One card, centred, lifted off the page background. A conversation wants a
+          container: the eye needs to know where Wesley stops and the app starts, and a
+          chat rendered flat onto the page reads as part of the furniture. */}
+      <div className="wes-card">
+      <div className="wes-header">
+        <span className="wes-spark" aria-hidden="true"><Spark /></span>
         <div>
-          <div className="biq-brand-name">BlueIQ</div>
-          <div className="biq-brand-sub">Tell me what you need — I’ll turn it into a request.</div>
+          <div className="wes-brand-name">Wesley</div>
+          <div className="wes-brand-sub">Tell me what you need — I’ll turn it into a request.</div>
         </div>
       </div>
 
       {stage === 'chat' ? (
-        <div className="biq-stage">
-          <div className="biq-thread" ref={threadRef}>
+        <div className="wes-stage">
+          <div className="wes-thread" ref={threadRef}>
             {messages.map((m, i) => (
-              <div key={i} className={`biq-row biq-row--${m.role}`}>
+              <div key={i} className={`wes-row wes-row--${m.role}`}>
                 {m.role === 'assistant' && (
-                  <div className="biq-av" aria-hidden="true"><Spark size={16} /></div>
+                  <div className="wes-av" aria-hidden="true"><Spark size={16} /></div>
                 )}
                 <div
-                  className={`biq-bubble biq-bubble--${m.role}`}
+                  className={`wes-bubble wes-bubble--${m.role}`}
                   dangerouslySetInnerHTML={{ __html: textToHtml(m.content) }}
                 />
               </div>
             ))}
             {thinking && (
-              <div className="biq-row biq-row--assistant">
-                <div className="biq-av" aria-hidden="true"><Spark size={16} /></div>
-                <div className="biq-bubble biq-bubble--assistant biq-typing">
+              <div className="wes-row wes-row--assistant">
+                <div className="wes-av" aria-hidden="true"><Spark size={16} /></div>
+                <div className="wes-bubble wes-bubble--assistant wes-typing">
                   <span /><span /><span />
                 </div>
               </div>
@@ -419,46 +423,46 @@ export default function Intake() {
           </div>
 
           {recording && (
-            <div className="biq-recording">
-              <span className="biq-rec-dot" aria-hidden="true" />
-              <span className="biq-rec-label">Recording</span>
-              <span className="biq-rec-time">{formatClock(elapsed)}</span>
+            <div className="wes-recording">
+              <span className="wes-rec-dot" aria-hidden="true" />
+              <span className="wes-rec-label">Recording</span>
+              <span className="wes-rec-time">{formatClock(elapsed)}</span>
               <span className="muted">
                 · up to {formatClock(REC_MAX_MS)} ({formatClock(REC_MAX_MS - elapsed)} left)
               </span>
               <button type="button" className="btn btn--sm" onClick={() => recording.stop()}>
                 Stop
               </button>
-              <p className="biq-rec-coach">
+              <p className="wes-rec-coach">
                 Talk me through it out loud — say what you expected versus what happened, and
                 point to where things are. (Please don’t read client names aloud.)
               </p>
             </div>
           )}
 
-          {recBusy && <p className="biq-rec-busy"><Spark size={15} /> {recBusy}</p>}
-          {recWarn && <p className="biq-rec-warn" role="status">{recWarn}</p>}
+          {recBusy && <p className="wes-rec-busy"><Spark size={15} /> {recBusy}</p>}
+          {recWarn && <p className="wes-rec-warn" role="status">{recWarn}</p>}
 
-          <div className="biq-composer">
-            <div className="biq-tools">
-              <button type="button" className="biq-tool biq-tool--primary"
+          <div className="wes-composer">
+            <div className="wes-tools">
+              <button type="button" className="wes-tool wes-tool--primary"
                 onClick={beginRecording} disabled={!!recording || !!recBusy}
                 title="Record your screen — the most helpful thing you can do">
                 Record screen
               </button>
-              <label className="biq-tool">
+              <label className="wes-tool">
                 Add screenshot
                 <input type="file" accept="image/*" onChange={onFilePicked} hidden />
               </label>
-              <button type="button" className="biq-tool" onClick={addLink}>Paste a link</button>
+              <button type="button" className="wes-tool" onClick={addLink}>Paste a link</button>
             </div>
 
             {attachments.length > 0 && (
-              <ul className="biq-atts">
+              <ul className="wes-atts">
                 {attachments.map((a, i) => (
-                  <li key={i} className="biq-att">
+                  <li key={i} className="wes-att">
                     {a.kind === 'image' && <img src={a.localUrl || a.url} alt="" />}
-                    <span className="biq-att-name">
+                    <span className="wes-att-name">
                       {a.kind === 'video' ? 'Screen recording'
                         : a.kind === 'url' ? a.url
                         : a.fileName || 'Screenshot'}
@@ -472,7 +476,7 @@ export default function Intake() {
               </ul>
             )}
 
-            <div className="biq-input-row">
+            <div className="wes-input-row">
               <textarea
                 ref={inputRef}
                 value={draft}
@@ -489,7 +493,7 @@ export default function Intake() {
                 Send
               </button>
             </div>
-            <p className="biq-hint">
+            <p className="wes-hint">
               The most helpful thing you can do is <strong>record your screen and talk me
               through it</strong> — show me what’s happening, or point to where you’d want
               something. Please describe what you see rather than typing client names.
@@ -497,12 +501,12 @@ export default function Intake() {
           </div>
         </div>
       ) : (
-        <div className="biq-stage">
-          <div className="biq-review-intro">
-            <span className="biq-spark" aria-hidden="true"><Spark /></span>
+        <div className="wes-stage">
+          <div className="wes-review-intro">
+            <span className="wes-spark" aria-hidden="true"><Spark /></span>
             <div>
-              <div className="biq-review-h">Here’s your request</div>
-              <div className="biq-review-sub">
+              <div className="wes-review-h">Here’s your request</div>
+              <div className="wes-review-sub">
                 Give it a look. Edit anything, or keep refining — then send it our way.
               </div>
             </div>
@@ -512,8 +516,8 @@ export default function Intake() {
 
           <div className="editcard">
             <div className="ef ef--wide">
-              <label htmlFor="biq-title">Title</label>
-              <input id="biq-title" type="text" value={title} autoComplete="off"
+              <label htmlFor="wes-title">Title</label>
+              <input id="wes-title" type="text" value={title} autoComplete="off"
                 onChange={e => setTitle(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') e.preventDefault() }} />
             </div>
@@ -521,7 +525,7 @@ export default function Intake() {
               <label>Description</label>
               <RichTextEditor
                 value={proposal?.description || ''}
-                docKey="biq-review"
+                docKey="wes-review"
                 ariaLabel="Request description"
                 placeholder="Describe the request…"
                 tall
@@ -533,9 +537,9 @@ export default function Intake() {
               {attachments.length === 0 ? (
                 <p className="muted">No screenshots, recordings, or links attached.</p>
               ) : (
-                <ul className="biq-atts biq-atts--review">
+                <ul className="wes-atts wes-atts--review">
                   {attachments.map((a, i) => (
-                    <li key={i} className="biq-att">
+                    <li key={i} className="wes-att">
                       {a.kind === 'video' && <video src={a.localUrl || a.url} controls preload="metadata" />}
                       {a.kind === 'image' && <img src={a.localUrl || a.url} alt="" />}
                       {a.kind === 'url' && (
@@ -558,6 +562,7 @@ export default function Intake() {
           </div>
         </div>
       )}
+      </div>
     </section>
   )
 }

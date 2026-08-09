@@ -706,22 +706,22 @@ export default function TicketPage() {
               in the writing of it — which is exactly when having it kept matters. */}
           {ticket.conversation && ticket.conversation.turns.length > 0 && (
             <section className="tcard">
-              <details className="biq-history">
+              <details className="wes-history">
                 <summary>
-                  <span className="biq-history-h">BlueIQ conversation</span>
+                  <span className="wes-history-h">Wesley conversation</span>
                   <span className="tsec__n">{ticket.conversation.turns.length}</span>
                   <span className="note">
                     How this request was arrived at
                     {ticket.conversation.narration.length > 0 && ', including spoken narration'}
                   </span>
                 </summary>
-                <ol className="biq-history-list">
+                <ol className="wes-history-list">
                   {ticket.conversation.turns.map((t, i) => (
-                    <li key={i} className={`biq-history-turn biq-history-turn--${t.role}`}>
-                      <span className="biq-history-who">
-                        {t.role === 'assistant' ? 'BlueIQ' : ticket.createdBy || 'They'}
+                    <li key={i} className={`wes-history-turn wes-history-turn--${t.role}`}>
+                      <span className="wes-history-who">
+                        {t.role === 'assistant' ? 'Wesley' : ticket.createdBy || 'They'}
                       </span>
-                      <span className="biq-history-text">{t.text}</span>
+                      <span className="wes-history-text">{t.text}</span>
                     </li>
                   ))}
                 </ol>

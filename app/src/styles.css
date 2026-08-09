@@ -2618,21 +2618,47 @@ main { flex: 1; min-height: 0; display: flex; }
    .ef__warn, which is for a value that will be refused. */
 .ef__hint { margin: 0.1rem 0 0; font-size: 0.7rem; line-height: 1.35; color: var(--text-dim); }
 
-/* --- BlueIQ guided intake ------------------------------------------------- */
+/* --- Wesley guided intake ------------------------------------------------- */
 /* A conversation, not a form. The page gives the thread the width and keeps the
    chrome minimal, because the thing being asked for is attention on the questions.
-   Scoped under .biq so none of it can reach the rest of the app. */
+   Scoped under .wes so none of it can reach the rest of the app. */
 
-.biq { max-width: 56rem; }
+/* Centred, and narrower than a full page: a conversation is a column, and a chat
+   thread stretched to 56rem makes every line a journey for the eye. */
+.wes {
+  max-width: 46rem;
+  margin-inline: auto;
+}
 
-.biq-top {
+.wes-top {
   display: flex;
   align-items: center;
   gap: 0.8rem;
-  margin-bottom: 1rem;
+  margin-bottom: 0.9rem;
 }
 
-.biq-header {
+/* The card itself. It has to LIFT off the page — the app background is a pale
+   cobalt wash (a near-black navy in dark mode), and a chat painted straight onto
+   it reads as part of the furniture rather than as someone talking to you. Panel
+   fill plus a real shadow does that; a border alone does not. */
+.wes-card {
+  padding: 1.1rem 1.2rem 1.2rem;
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(15, 25, 48, 0.05), 0 12px 32px -12px rgba(15, 25, 48, 0.22);
+}
+@media (prefers-color-scheme: dark) {
+  .wes-card { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 16px 40px -14px rgba(0, 0, 0, 0.75); }
+}
+:root[data-theme="dark"] .wes-card {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 16px 40px -14px rgba(0, 0, 0, 0.75);
+}
+:root[data-theme="light"] .wes-card {
+  box-shadow: 0 1px 2px rgba(15, 25, 48, 0.05), 0 12px 32px -12px rgba(15, 25, 48, 0.22);
+}
+
+.wes-header {
   display: flex;
   align-items: center;
   gap: 0.7rem;
@@ -2640,19 +2666,19 @@ main { flex: 1; min-height: 0; display: flex; }
   margin-bottom: 1rem;
   border-bottom: 1px solid var(--line);
 }
-.biq-spark { display: inline-flex; color: var(--cobalt); }
-.biq-brand-name {
+.wes-spark { display: inline-flex; color: var(--cobalt); }
+.wes-brand-name {
   font-family: var(--font-display);
   font-size: 0.95rem;
   letter-spacing: 0.02em;
 }
-.biq-brand-sub { font-size: 0.8rem; color: var(--text-dim); }
+.wes-brand-sub { font-size: 0.8rem; color: var(--text-dim); }
 
-.biq-stage { display: flex; flex-direction: column; gap: 0.9rem; }
+.wes-stage { display: flex; flex-direction: column; gap: 0.9rem; }
 
 /* The thread scrolls inside itself so the composer stays put — a conversation
    where the input drifts off the bottom is a conversation people abandon. */
-.biq-thread {
+.wes-thread {
   display: flex;
   flex-direction: column;
   gap: 0.7rem;
@@ -2662,10 +2688,10 @@ main { flex: 1; min-height: 0; display: flex; }
   padding: 0.3rem;
 }
 
-.biq-row { display: flex; gap: 0.5rem; align-items: flex-start; }
-.biq-row--user { justify-content: flex-end; }
+.wes-row { display: flex; gap: 0.5rem; align-items: flex-start; }
+.wes-row--user { justify-content: flex-end; }
 
-.biq-av {
+.wes-av {
   flex: none;
   display: inline-flex;
   align-items: center;
@@ -2677,44 +2703,44 @@ main { flex: 1; min-height: 0; display: flex; }
   border-radius: 999px;
 }
 
-.biq-bubble {
+.wes-bubble {
   max-width: 42rem;
   padding: 0.55rem 0.75rem;
   font-size: 0.88rem;
   line-height: 1.5;
   border-radius: 10px;
 }
-.biq-bubble--assistant { background: var(--bg-sunk); border: 1px solid var(--line); }
-.biq-bubble--user { color: #fff; background: var(--cobalt); }
+.wes-bubble--assistant { background: var(--bg-sunk); border: 1px solid var(--line); }
+.wes-bubble--user { color: #fff; background: var(--cobalt); }
 
-/* Three dots while BlueIQ is thinking. A spinner reads as "loading"; this reads
+/* Three dots while Wesley is thinking. A spinner reads as "loading"; this reads
    as "someone is typing", which is what is actually happening. */
-.biq-typing { display: inline-flex; gap: 0.25rem; align-items: center; padding: 0.7rem 0.8rem; }
-.biq-typing span {
+.wes-typing { display: inline-flex; gap: 0.25rem; align-items: center; padding: 0.7rem 0.8rem; }
+.wes-typing span {
   width: 0.35rem;
   height: 0.35rem;
   background: var(--text-mute);
   border-radius: 999px;
-  animation: biq-blink 1.2s infinite ease-in-out;
+  animation: wes-blink 1.2s infinite ease-in-out;
 }
-.biq-typing span:nth-child(2) { animation-delay: 0.18s; }
-.biq-typing span:nth-child(3) { animation-delay: 0.36s; }
-@keyframes biq-blink { 0%, 60%, 100% { opacity: 0.25; } 30% { opacity: 1; } }
+.wes-typing span:nth-child(2) { animation-delay: 0.18s; }
+.wes-typing span:nth-child(3) { animation-delay: 0.36s; }
+@keyframes wes-blink { 0%, 60%, 100% { opacity: 0.25; } 30% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
-  .biq-typing span { animation: none; opacity: 0.5; }
+  .wes-typing span { animation: none; opacity: 0.5; }
 }
 
-.biq-composer {
+.wes-composer {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
   padding: 0.8rem;
-  background: var(--bg-sunk);
+  background: var(--bg-raise);
   border: 1px solid var(--line);
   border-radius: 8px;
 }
-.biq-tools { display: flex; flex-wrap: wrap; gap: 0.4rem; }
-.biq-tool {
+.wes-tools { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.wes-tool {
   padding: 0.35rem 0.7rem;
   font: inherit;
   font-size: 0.78rem;
@@ -2724,13 +2750,13 @@ main { flex: 1; min-height: 0; display: flex; }
   border-radius: 999px;
   cursor: pointer;
 }
-.biq-tool:hover { border-color: var(--cobalt); }
-.biq-tool:disabled { opacity: 0.5; cursor: default; }
+.wes-tool:hover { border-color: var(--cobalt); }
+.wes-tool:disabled { opacity: 0.5; cursor: default; }
 /* Recording is the ask, so it is the one that looks like the ask. */
-.biq-tool--primary { color: var(--cobalt); border-color: var(--cobalt); }
+.wes-tool--primary { color: var(--cobalt); border-color: var(--cobalt); }
 
-.biq-input-row { display: flex; gap: 0.5rem; align-items: flex-end; }
-.biq-input-row textarea {
+.wes-input-row { display: flex; gap: 0.5rem; align-items: flex-end; }
+.wes-input-row textarea {
   flex: 1 1 auto;
   min-height: 2.4rem;
   max-height: 11rem;
@@ -2743,12 +2769,12 @@ main { flex: 1; min-height: 0; display: flex; }
   border-radius: 6px;
   resize: vertical;
 }
-.biq-input-row textarea:focus { border-color: var(--cobalt); outline: none; }
+.wes-input-row textarea:focus { border-color: var(--cobalt); outline: none; }
 
-.biq-hint { margin: 0; font-size: 0.74rem; line-height: 1.45; color: var(--text-dim); }
+.wes-hint { margin: 0; font-size: 0.74rem; line-height: 1.45; color: var(--text-dim); }
 
 /* --- attachments --- */
-.biq-atts {
+.wes-atts {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
@@ -2756,7 +2782,7 @@ main { flex: 1; min-height: 0; display: flex; }
   padding: 0;
   list-style: none;
 }
-.biq-att {
+.wes-att {
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -2767,21 +2793,21 @@ main { flex: 1; min-height: 0; display: flex; }
   border: 1px solid var(--line);
   border-radius: 999px;
 }
-.biq-att img { width: 1.6rem; height: 1.6rem; object-fit: cover; border-radius: 4px; }
-.biq-att-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wes-att img { width: 1.6rem; height: 1.6rem; object-fit: cover; border-radius: 4px; }
+.wes-att-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* On review the attachments are evidence to look at, not chips to manage. */
-.biq-atts--review { flex-direction: column; align-items: stretch; }
-.biq-atts--review .biq-att {
+.wes-atts--review { flex-direction: column; align-items: stretch; }
+.wes-atts--review .wes-att {
   max-width: none;
   padding: 0.5rem;
   border-radius: 6px;
 }
-.biq-atts--review video { width: 100%; max-height: 22rem; border-radius: 6px; }
-.biq-atts--review img { width: 100%; height: auto; max-height: 22rem; object-fit: contain; }
+.wes-atts--review video { width: 100%; max-height: 22rem; border-radius: 6px; }
+.wes-atts--review img { width: 100%; height: auto; max-height: 22rem; object-fit: contain; }
 
 /* --- recording --- */
-.biq-recording {
+.wes-recording {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -2792,46 +2818,46 @@ main { flex: 1; min-height: 0; display: flex; }
   border: 1px solid #ce4a5b;
   border-radius: 8px;
 }
-.biq-rec-dot {
+.wes-rec-dot {
   width: 0.55rem;
   height: 0.55rem;
   background: #ce4a5b;
   border-radius: 999px;
-  animation: biq-pulse 1.4s infinite ease-in-out;
+  animation: wes-pulse 1.4s infinite ease-in-out;
 }
-@keyframes biq-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
-@media (prefers-reduced-motion: reduce) { .biq-rec-dot { animation: none; } }
-.biq-rec-label { font-family: var(--font-display); letter-spacing: 0.04em; }
-.biq-rec-time { font-family: var(--font-display); }
+@keyframes wes-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+@media (prefers-reduced-motion: reduce) { .wes-rec-dot { animation: none; } }
+.wes-rec-label { font-family: var(--font-display); letter-spacing: 0.04em; }
+.wes-rec-time { font-family: var(--font-display); }
 /* The coaching line takes the full width under the chip: what to SAY while
    recording is the difference between a useful recording and a silent one. */
-.biq-rec-coach { flex: 1 0 100%; margin: 0.2rem 0 0; font-size: 0.75rem; color: var(--text-dim); }
+.wes-rec-coach { flex: 1 0 100%; margin: 0.2rem 0 0; font-size: 0.75rem; color: var(--text-dim); }
 
-.biq-rec-busy { display: flex; align-items: center; gap: 0.4rem; margin: 0; font-size: 0.8rem; color: var(--text-dim); }
-.biq-rec-warn { margin: 0; font-size: 0.8rem; color: var(--warn); }
+.wes-rec-busy { display: flex; align-items: center; gap: 0.4rem; margin: 0; font-size: 0.8rem; color: var(--text-dim); }
+.wes-rec-warn { margin: 0; font-size: 0.8rem; color: var(--warn); }
 
 /* --- review + done --- */
-.biq-review-intro { display: flex; gap: 0.7rem; align-items: flex-start; }
-.biq-review-h { font-family: var(--font-display); font-size: 0.95rem; }
-.biq-review-sub { font-size: 0.82rem; color: var(--text-dim); }
+.wes-review-intro { display: flex; gap: 0.7rem; align-items: flex-start; }
+.wes-review-h { font-family: var(--font-display); font-size: 0.95rem; }
+.wes-review-sub { font-size: 0.82rem; color: var(--text-dim); }
 
-.biq-done { max-width: 34rem; margin: 3rem auto; text-align: center; }
-.biq-done-check { display: flex; justify-content: center; color: var(--cobalt); }
-.biq-done h2 { margin: 0.8rem 0 0.4rem; }
+.wes-done { max-width: 34rem; margin: 3rem auto; text-align: center; }
+.wes-done-check { display: flex; justify-content: center; color: var(--cobalt); }
+.wes-done h2 { margin: 0.8rem 0 0.4rem; }
 
 /* The guided door on the ticket board. */
 .btn--iq { display: inline-flex; align-items: center; gap: 0.35rem; }
 
 /* --- the saved conversation, on the ticket --- */
-.biq-history summary {
+.wes-history summary {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   gap: 0.5rem;
   cursor: pointer;
 }
-.biq-history-h { font-family: var(--font-display); font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; }
-.biq-history-list {
+.wes-history-h { font-family: var(--font-display); font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; }
+.wes-history-list {
   margin: 0.9rem 0 0;
   padding: 0;
   list-style: none;
@@ -2839,25 +2865,25 @@ main { flex: 1; min-height: 0; display: flex; }
   flex-direction: column;
   gap: 0.6rem;
 }
-.biq-history-turn {
+.wes-history-turn {
   display: grid;
   grid-template-columns: 6rem 1fr;
   gap: 0.6rem;
   font-size: 0.82rem;
   line-height: 1.5;
 }
-.biq-history-who {
+.wes-history-who {
   font-family: var(--font-display);
   font-size: 0.7rem;
   color: var(--text-mute);
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.biq-history-turn--assistant .biq-history-who { color: var(--cobalt); }
-.biq-history-text { white-space: pre-wrap; }
+.wes-history-turn--assistant .wes-history-who { color: var(--cobalt); }
+.wes-history-text { white-space: pre-wrap; }
 
 @media (max-width: 640px) {
-  .biq-history-turn { grid-template-columns: 1fr; gap: 0.15rem; }
+  .wes-history-turn { grid-template-columns: 1fr; gap: 0.15rem; }
 }
 
 /* --------------------------------------------------------------- subtasks
@@ -2983,3 +3009,16 @@ a.subcrumb:hover { color: var(--cobalt); }
   .sub__name { flex-basis: 100%; }
   .sub__hrs { margin-left: auto; }
 }
+
+/* Board bar actions, grouped. The bar is space-between with exactly two children —
+   tabs and this — because a third child gets centred by the layout, which is how
+   Ask Wesley ended up stranded in the middle of the board. */
+.board2__acts {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* The done card is centred with the conversation it came from. */
+.wes-done { margin-inline: auto; }

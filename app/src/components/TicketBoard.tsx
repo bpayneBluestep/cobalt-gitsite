@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
-  addTicket, updateTicket, ApiError, formatHours, blueIqStatus,
+  addTicket, updateTicket, ApiError, formatHours, wesleyStatus,
   TICKET_STATUSES, TICKET_PRIORITIES, TICKET_TABS, PRIORITY_RANK,
   type List, type Ticket, type TicketFieldKey,
 } from '../api'
@@ -74,12 +74,12 @@ export default function TicketBoard({
 
   // Asked once per mount rather than assumed: an org with no integration key should
   // not be shown a door that opens onto an error.
-  const [blueIqAvailable, setBlueIqAvailable] = useState(false)
+  const [wesleyAvailable, setWesleyAvailable] = useState(false)
   useEffect(() => {
     let live = true
-    blueIqStatus()
-      .then(s => { if (live) setBlueIqAvailable(!!s.available) })
-      .catch(() => { if (live) setBlueIqAvailable(false) })
+    wesleyStatus()
+      .then(s => { if (live) setWesleyAvailable(!!s.available) })
+      .catch(() => { if (live) setWesleyAvailable(false) })
     return () => { live = false }
   }, [])
 
@@ -327,21 +327,27 @@ export default function TicketBoard({
             </button>
           ))}
         </nav>
-        {/* Two doors, and the guided one is deliberately the prominent one. Someone who
+        {/* Both doors in ONE group, so the bar's space-between has exactly two children:
+            tabs left, actions right. With three children the layout centres the middle
+            one, which is how Ask Wesley ended up marooned in the middle of the screen.
+
+            Two doors, and the guided one is deliberately the prominent one. Someone who
             knows exactly what they want types it; someone who would have written "the
             report is broken" gets interviewed into a request an engineer can act on.
-            Hidden when BlueIQ has no key, so it never offers something that will fail. */}
-        {blueIqAvailable && (
-          <Link
-            className="btn btn--iq"
-            to={list.clientId ? `/clients/${list.clientId}/request` : `/request?listId=${list.id}`}
-          >
-            <span aria-hidden="true">✦</span> Guided request
-          </Link>
-        )}
-        <button type="button" className={blueIqAvailable ? 'btn btn--ghost' : 'btn'} onClick={openNew}>
-          <span aria-hidden="true">+</span> New ticket
-        </button>
+            Hidden when Wesley has no key, so it never offers something that will fail. */}
+        <div className="board2__acts">
+          {wesleyAvailable && (
+            <Link
+              className="btn btn--iq"
+              to={list.clientId ? `/clients/${list.clientId}/request` : `/request?listId=${list.id}`}
+            >
+              <span aria-hidden="true">✦</span> Ask Wesley
+            </Link>
+          )}
+          <button type="button" className={wesleyAvailable ? 'btn btn--ghost' : 'btn'} onClick={openNew}>
+            <span aria-hidden="true">+</span> New ticket
+          </button>
+        </div>
       </div>
 
       <div className="board2__tools">

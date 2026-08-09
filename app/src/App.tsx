@@ -75,7 +75,7 @@ export default function App() {
               works in the same slot for a ticket that never got a number. */}
           <Route path="/tickets/:key" element={<TicketPage />} />
 
-          {/* BlueIQ guided intake. Addressed by the client it is for, so the entry
+          {/* Wesley guided intake. Addressed by the client it is for, so the entry
               point on a client's board is a plain link and the page can be sent to
               someone who needs to raise a request. */}
           <Route path="/clients/:clientId/request" element={<Intake />} />
