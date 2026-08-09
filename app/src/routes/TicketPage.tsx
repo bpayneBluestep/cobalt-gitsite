@@ -11,7 +11,8 @@ import {
   sprintLabel,
   type Ticket, type TicketFieldKey, type TimeEntry, type ComponentRef, type ActivityItem,
 } from '../api'
-import { sanitizeHtml } from '../lib/html'
+import { sanitizeHtml, htmlToText } from '../lib/html'
+import { openInClaudeCode } from '../lib/claudeCode'
 import { parseDuration, elapsedSince, todayISO, whenLabel, whenExact } from '../lib/time'
 import RichTextEditor from '../components/RichTextEditor'
 import UserPicker from '../components/UserPicker'
@@ -103,6 +104,50 @@ function toBase64(file: File): Promise<string> {
   })
 }
 
+/*
+ * The ticket, as a prompt for Claude Code.
+ *
+ * Deliberately a briefing and not a dump. Claude Code opens with this org's MCP tools
+ * and `b6p` already available, so it can read anything it needs from the platform
+ * itself — what it cannot do is know WHICH ticket you were looking at. So this sends
+ * the identifying facts, the description, and the components already touched, and
+ * leaves the fetching to the session. That also keeps it well inside the scheme's
+ * 5,000-character ceiling for every ticket we have.
+ *
+ * The ticket's own URL goes last so the session can point a human back at it.
+ */
+function claudePrompt(t: Ticket): string {
+  const number = t.ticketNumber === null ? t.entryId : `#${t.ticketNumber}`
+  const lines = [
+    `I'm working on Cobalt ticket ${number} — ${t.title || 'untitled'}.`,
+    '',
+    `Client: ${t.clientName || t.listName || 'internal'}`,
+    `Status: ${t.status || 'Open'} · Priority: ${t.priority || 'Normal'}` +
+      (t.sprint ? ` · Sprint ${t.sprint}` : ' · unplanned'),
+    `Accountable: ${t.accountableName || '—'} · Responsible: ${t.responsibleName || '—'}`,
+  ]
+
+  if (t.dueDate) lines.push(`Due: ${t.dueDate}`)
+  if (t.estHours !== null) lines.push(`Estimate: ${t.estHours}h · Logged: ${t.loggedHours || 0}h`)
+  if (t.roadblocked) lines.push(`ROADBLOCKED: ${t.roadblockReason || 'no reason given'}`)
+  if (t.parentNumber !== null) lines.push(`Subtask of #${t.parentNumber} — ${t.parentTitle}`)
+
+  const details = htmlToText(t.details)
+  if (details) lines.push('', 'Description:', details)
+
+  if (t.components.length) {
+    lines.push('', 'Components already touched:')
+    for (const c of t.components) lines.push(`- ${c.kind} · ${c.change} · ${c.name} — ${c.url}`)
+  }
+
+  lines.push(
+    '',
+    'Read whatever you need from the platform, then help me work this ticket.',
+    `Ticket: ${window.location.href}`,
+  )
+  return lines.join('\n')
+}
+
 export default function TicketPage() {
   const { key = '' } = useParams()
   const [state, setState] = useState<State>({ phase: 'loading' })
@@ -112,6 +157,10 @@ export default function TicketPage() {
   const [notice, setNotice] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [copied, setCopied] = useState(false)
+  // Set on an "Open in Claude Code" click. The handler gives us no success signal —
+  // an uninstalled scheme is indistinguishable from a working one — so the label says
+  // what we actually know: the prompt is on the clipboard either way.
+  const [handedOff, setHandedOff] = useState(false)
 
   // Time entry form
   const [timeAmount, setTimeAmount] = useState('')
@@ -270,6 +319,16 @@ export default function TicketPage() {
     setFailure('Copying is not available here. The link is ' + url)
   }
 
+  function openInClaude() {
+    if (!ticket) return
+    const shortened = openInClaudeCode(claudePrompt(ticket))
+    setHandedOff(true)
+    window.setTimeout(() => setHandedOff(false), 4000)
+    if (shortened) {
+      setNotice('This ticket is long, so the prompt was shortened to fit Claude Code’s limit.')
+    }
+  }
+
   // -- time -----------------------------------------------------------------
 
   function submitTime() {
@@ -406,6 +465,12 @@ export default function TicketPage() {
           <span className="tpage__spacer" />
           <button type="button" className="btn btn--ghost btn--sm" onClick={copyLink}>
             {copied ? 'Link copied' : 'Copy link'}
+          </button>
+          {/* Hands this ticket to Claude Code on the machine you clicked from. The title
+              carries the fallback, because a missing handler fails silently. */}
+          <button type="button" className="btn btn--ghost btn--sm" onClick={openInClaude}
+            title="Opens Claude Code with this ticket as the prompt. The prompt is also copied, so you can paste it if Claude Code isn't installed.">
+            {handedOff ? 'Sent to Claude Code' : 'Open in Claude Code'}
           </button>
           <Link className="btn btn--ghost btn--sm" to={boardPath}>Back to board</Link>
           {/* Roadblock and delete are actions, not sections — a button each, next to
