@@ -111,8 +111,8 @@ function toBase64(file: File): Promise<string> {
  * and `b6p` already available, so it can read anything it needs from the platform
  * itself — what it cannot do is know WHICH ticket you were looking at. So this sends
  * the identifying facts, the description, and the components already touched, and
- * leaves the fetching to the session. That also keeps it well inside the scheme's
- * 5,000-character ceiling for every ticket we have.
+ * leaves the fetching to the session. That also keeps it far inside Claude Desktop's
+ * ~14,000-character ceiling for every ticket we have.
  *
  * The ticket's own URL goes last so the session can point a human back at it.
  */
@@ -466,11 +466,11 @@ export default function TicketPage() {
           <button type="button" className="btn btn--ghost btn--sm" onClick={copyLink}>
             {copied ? 'Link copied' : 'Copy link'}
           </button>
-          {/* Hands this ticket to Claude Code on the machine you clicked from. The title
-              carries the fallback, because a missing handler fails silently. */}
+          {/* Hands this ticket to Claude Desktop on the machine you clicked from. The
+              title carries the fallback, because a missing handler fails silently. */}
           <button type="button" className="btn btn--ghost btn--sm" onClick={openInClaude}
-            title="Opens Claude Code with this ticket as the prompt. The prompt is also copied, so you can paste it if Claude Code isn't installed.">
-            {handedOff ? 'Sent to Claude Code' : 'Open in Claude Code'}
+            title="Opens Claude Desktop's Code area with this ticket as the prompt. The prompt is also copied, so you can paste it if Claude Desktop isn't installed.">
+            {handedOff ? 'Sent to Claude' : 'Open in Claude Code'}
           </button>
           <Link className="btn btn--ghost btn--sm" to={boardPath}>Back to board</Link>
           {/* Roadblock and delete are actions, not sections — a button each, next to
