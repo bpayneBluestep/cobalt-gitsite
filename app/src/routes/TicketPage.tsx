@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import {
-  ApiError, getTicket, updateTicket, deleteTicket,
+  ApiError, getTicket, updateTicket, deleteTicket, getCompany,
   logTime, editTime, deleteTime, startTimer, stopTimer,
   setRoadblock, uploadAttachment, deleteAttachment,
   setTicketPeople, addComponent, updateComponent, deleteComponent,
@@ -116,16 +116,25 @@ function toBase64(file: File): Promise<string> {
  *
  * The ticket's own URL goes last so the session can point a human back at it.
  */
-function claudePrompt(t: Ticket): string {
+function claudePrompt(t: Ticket, ehrLink: string): string {
   const number = t.ticketNumber === null ? t.entryId : `#${t.ticketNumber}`
   const lines = [
     `I'm working on Cobalt ticket ${number} — ${t.title || 'untitled'}.`,
     '',
     `Client: ${t.clientName || t.listName || 'internal'}`,
+  ]
+
+  // The client's own BlueStep org — the single most useful thing in here, because it
+  // tells the session WHERE the work actually lands. Omitted rather than sent empty:
+  // a ticket on an internal list has no client, and a handful of clients have no org
+  // recorded in beh, and a blank label reads as a broken lookup.
+  if (ehrLink) lines.push(`Client's BlueStep org: ${ehrLink}`)
+
+  lines.push(
     `Status: ${t.status || 'Open'} · Priority: ${t.priority || 'Normal'}` +
       (t.sprint ? ` · Sprint ${t.sprint}` : ' · unplanned'),
     `Accountable: ${t.accountableName || '—'} · Responsible: ${t.responsibleName || '—'}`,
-  ]
+  )
 
   if (t.dueDate) lines.push(`Due: ${t.dueDate}`)
   if (t.estHours !== null) lines.push(`Estimate: ${t.estHours}h · Logged: ${t.loggedHours || 0}h`)
@@ -319,13 +328,33 @@ export default function TicketPage() {
     setFailure('Copying is not available here. The link is ' + url)
   }
 
-  function openInClaude() {
+  /*
+   * The org link lives on the COMPANY, not the ticket, so it takes a second read —
+   * done here on click rather than with the ticket, because most people who open a
+   * ticket never press this and every page view would pay for it.
+   *
+   * Awaiting before following the link is safe: a browser only lets an external
+   * scheme launch while the click's user activation is still live, and that lasts
+   * seconds — far longer than one API call. A failed or missing lookup is not worth
+   * blocking on, so the prompt simply goes without the line.
+   */
+  async function openInClaude() {
     if (!ticket) return
-    const shortened = openInClaudeCode(claudePrompt(ticket))
+
+    let ehrLink = ''
+    if (ticket.clientId) {
+      try {
+        ehrLink = (await getCompany(ticket.clientId)).ehrLink || ''
+      } catch {
+        // Leave it out. The briefing is still worth sending without it.
+      }
+    }
+
+    const shortened = openInClaudeCode(claudePrompt(ticket, ehrLink))
     setHandedOff(true)
     window.setTimeout(() => setHandedOff(false), 4000)
     if (shortened) {
-      setNotice('This ticket is long, so the prompt was shortened to fit Claude Code’s limit.')
+      setNotice('This ticket is long, so the prompt was shortened to fit Claude’s limit.')
     }
   }
 
