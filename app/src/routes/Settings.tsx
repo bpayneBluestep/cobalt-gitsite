@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ApiError, getUsers, updateEmployee, setSupervisor, createUser,
-  DEPARTMENTS, EMPLOYMENT_TYPES,
-  type User, type UserList, type EmployeeFieldKey,
+  DEPARTMENTS, EMPLOYMENT_TYPES, STAFF_ROLES,
+  type User, type UserList, type EmployeeFieldKey, type EmployeeWrite,
 } from '../api'
 import PhoneInput from '../components/PhoneInput'
 import { isPhoneOk } from '../lib/phone'
@@ -10,10 +10,16 @@ import { isPhoneOk } from '../lib/phone'
 /*
  * Settings → Users.
  *
- * A person here is a Staff record with employment details on the Employee Info form.
- * Supervisor is picked from the same list, which is why it can only ever point at a real
- * user — the endpoint resolves the name from that record rather than trusting what the
- * browser sends, so the stored name is always the real one.
+ * A person here carries both the Staff and User categories, with employment details on the
+ * Employee Info form. Supervisor is picked from the same list, which is why it can only
+ * ever point at a real user — the endpoint resolves the name from that record rather than
+ * trusting what the browser sends, so the stored name is always the real one.
+ *
+ * ROLES ARE PERMISSIONS. Ticking one puts that person into a dynamic security group on the
+ * platform; unticking removes them. That is why the roles editor sits behind Edit rather
+ * than being an inline toggle in the table — a permission change should take a deliberate
+ * act, not a stray click on a row. Unticking "Currently employed" removes every role at
+ * once, because each role's query also requires it.
  *
  * One honest limit, stated on the page rather than buried: adding someone creates their
  * person record, NOT a BlueStep login. The scripting API cannot mint credentials, so an
@@ -29,20 +35,28 @@ type State =
 const LOGIN_URL = '/shared/login/login.jsp?desturl=' +
   encodeURIComponent(window.location.pathname + window.location.search)
 
-type Draft = Record<EmployeeFieldKey | 'name', string>
+/*
+ * First and last name are two fields, because a person's name is two facts. The endpoint
+ * can split a single string on the last space, but that guesses which words are the
+ * surname — "Mary Anne van der Berg" has no rule worth trusting — so this form never asks
+ * it to. Name is create-only; renaming afterwards is not offered here.
+ */
+type Draft = Record<EmployeeFieldKey | 'firstName' | 'lastName', string> & { roles: string[] }
 
 const EMPTY: Draft = {
-  name: '', jobTitle: '', department: '', dateOfHire: '', employmentType: 'Full-time',
-  workEmail: '', workPhone: '', employed: 'true', notes: '',
+  firstName: '', lastName: '',
+  jobTitle: '', department: '', dateOfHire: '', employmentType: 'Full-time',
+  workEmail: '', workPhone: '', employed: 'true', notes: '', roles: [],
 }
 
 function draftOf(u: User): Draft {
   return {
-    name: u.name || '',
+    firstName: '', lastName: '',
     jobTitle: u.jobTitle || '', department: u.department || '',
     dateOfHire: u.dateOfHire || '', employmentType: u.employmentType || '',
     workEmail: u.workEmail || '', workPhone: u.workPhone || '',
     employed: u.employed ? 'true' : 'false', notes: u.notes || '',
+    roles: u.roles ? [...u.roles] : [],
   }
 }
 
@@ -70,6 +84,13 @@ export default function Settings() {
   const d = state.phase === 'ready' ? state.data : null
   const rows = useMemo(() => d?.rows || [], [d])
 
+  // The server owns the role vocabulary; the local constant is only a pre-load fallback,
+  // so a role added on the platform shows up here without a redeploy.
+  const roleOptions = useMemo(
+    () => (d?.staffRoles?.length ? d.staffRoles : [...STAFF_ROLES]),
+    [d],
+  )
+
   function run(label: string, work: Promise<unknown>, said: string) {
     setBusy(label); setFailure(''); setNotice('')
     work
@@ -80,19 +101,36 @@ export default function Settings() {
 
   function save() {
     if (busy) return
-    const fields: Partial<Record<EmployeeFieldKey | 'name', string>> = {
+    const fields: EmployeeWrite = {
       jobTitle: draft.jobTitle.trim(), department: draft.department,
       dateOfHire: draft.dateOfHire, employmentType: draft.employmentType,
       workEmail: draft.workEmail.trim(), workPhone: draft.workPhone.trim(),
       employed: draft.employed, notes: draft.notes,
+      // Always sent, so clearing the last role actually removes it.
+      roles: draft.roles,
     }
     if (editing === 'new') {
-      if (!draft.name.trim()) { setFailure('A new person needs a name.'); return }
-      run('save', createUser({ ...fields, name: draft.name.trim() }),
-        `${draft.name.trim()} added — remember they still need a login.`)
+      const first = draft.firstName.trim()
+      const last = draft.lastName.trim()
+      if (!first || !last) {
+        setFailure('A new person needs both a first and a last name.')
+        return
+      }
+      run('save', createUser({ ...fields, firstName: first, lastName: last }),
+        `${first} ${last} added — remember they still need a login.`)
       return
     }
     run('save', updateEmployee(editing as string, fields), 'Employee details saved.')
+  }
+
+  /** Roles are a set — tick to add, untick to remove. */
+  function toggleRole(role: string) {
+    setDraft(x => ({
+      ...x,
+      roles: x.roles.indexOf(role) < 0
+        ? [...x.roles, role]
+        : x.roles.filter(r => r !== role),
+    }))
   }
 
   const dash = <span className="muted">—</span>
@@ -162,12 +200,23 @@ export default function Settings() {
               </div>
               <div className="efgrid">
                 {editing === 'new' && (
-                  <div className="ef ef--wide">
-                    <label htmlFor="u-name">Name<span className="ef__req" aria-hidden="true">*</span></label>
-                    <input id="u-name" type="text" value={draft.name} autoFocus autoComplete="off"
-                      placeholder="Surname, First"
-                      onChange={e => setDraft(x => ({ ...x, name: e.target.value }))} />
-                  </div>
+                  <>
+                    <div className="ef">
+                      <label htmlFor="u-first">
+                        First name<span className="ef__req" aria-hidden="true">*</span>
+                      </label>
+                      <input id="u-first" type="text" value={draft.firstName} autoFocus
+                        autoComplete="off"
+                        onChange={e => setDraft(x => ({ ...x, firstName: e.target.value }))} />
+                    </div>
+                    <div className="ef">
+                      <label htmlFor="u-last">
+                        Last name<span className="ef__req" aria-hidden="true">*</span>
+                      </label>
+                      <input id="u-last" type="text" value={draft.lastName} autoComplete="off"
+                        onChange={e => setDraft(x => ({ ...x, lastName: e.target.value }))} />
+                    </div>
+                  </>
                 )}
                 <div className="ef">
                   <label htmlFor="u-title">Job title</label>
@@ -213,6 +262,29 @@ export default function Settings() {
                     <span>Currently employed</span>
                   </label>
                 </div>
+                <fieldset className="ef ef--wide rolebox">
+                  <legend className="rolebox__legend">Roles</legend>
+                  <p className="rolebox__hint">
+                    What this person may see. Any number of roles — someone can be both a
+                    Relate Engineer and Client Success. Each one grants access on the
+                    platform, and unticking removes it.
+                  </p>
+                  <div className="rolebox__grid">
+                    {roleOptions.map(role => (
+                      <label className="checkline" key={role}>
+                        <input type="checkbox" checked={draft.roles.indexOf(role) >= 0}
+                          onChange={() => toggleRole(role)} />
+                        <span>{role}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {draft.employed !== 'true' && draft.roles.length > 0 && (
+                    <p className="rolebox__warn">
+                      Not currently employed — these roles are stored but grant nothing until
+                      that box is ticked again.
+                    </p>
+                  )}
+                </fieldset>
               </div>
               <div className="editcard__foot">
                 <span className="editcard__status">{busy === 'save' ? 'Saving…' : ''}</span>
@@ -234,6 +306,7 @@ export default function Settings() {
                   <th scope="col">Name</th>
                   <th scope="col">Title</th>
                   <th scope="col">Department</th>
+                  <th scope="col">Roles</th>
                   <th scope="col">Hired</th>
                   <th scope="col">Reports to</th>
                   <th scope="col"><span className="visually-hidden">Actions</span></th>
@@ -259,6 +332,23 @@ export default function Settings() {
                     </th>
                     <td>{u.jobTitle || dash}</td>
                     <td>{u.department || dash}</td>
+                    {/*
+                      * Roles read as chips rather than a comma list: six of them in a
+                      * table cell need to stay scannable, and a dimmed chip is how
+                      * "stored but granting nothing" shows without a second column.
+                      */}
+                    <td>
+                      {u.roles?.length
+                        ? (
+                          <span className={'rolechips' + (u.employed ? '' : ' rolechips--inactive')}
+                            title={u.employed
+                              ? u.roles.join(', ')
+                              : `Not currently employed — ${u.roles.join(', ')} grant nothing`}>
+                            {u.roles.map(r => <span className="rolechip" key={r}>{r}</span>)}
+                          </span>
+                        )
+                        : dash}
+                    </td>
                     <td className="nowrap">{u.dateOfHire || dash}</td>
                     <td>
                       <select
@@ -293,9 +383,10 @@ export default function Settings() {
           </div>
 
           <p className="panel__foot">
-            A person here is a Staff record. Adding one creates the record and its
-            employment details — issuing the BlueStep login is a separate step in the
-            platform’s account tooling, which no script can do.
+            A person here is both a Staff and a User record. Adding one creates the record,
+            both categories, and its employment details — issuing the BlueStep login is a
+            separate step in the platform’s account tooling, which no script can do.
+            Roles take effect on the platform as soon as they are saved.
           </p>
         </>
       )}

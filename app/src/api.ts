@@ -1144,14 +1144,32 @@ export function sprintLabel(key: string): string {
 }
 
 // ------------------------------------------------------------- settings: users
-// A "user" is a Staff record in the All Users query with employment details on the
-// Employee Info form. Supervisor is a text id plus a denormalised name — the standing
-// pattern in this project rather than a relationship field.
+// A person in Cobalt carries BOTH the Staff and User categories — never one or the other —
+// with employment details on the Employee Info form. Both matter: User is what the All
+// Users query lists, and Staff is what every "Security - <Role>" query requires, so a
+// User-only record could have roles ticked and be granted nothing. `createUser` creates
+// through a query that demands both so they attach together.
+//
+// Supervisor is a text id plus a denormalised name — the standing pattern in this project
+// rather than a relationship field.
 
 export const DEPARTMENTS = [
   'Engineering', 'Implementation', 'Support', 'Sales', 'Leadership', 'Operations',
 ] as const
 export const EMPLOYMENT_TYPES = ['Full-time', 'Part-time', 'Contract', 'Intern'] as const
+
+/*
+ * Permission roles. A fallback, not the source of truth — `users` returns `staffRoles`
+ * and the UI should prefer that, so adding a role on the platform does not need a
+ * redeploy here. This copy exists only so the checkbox group can render before the first
+ * response lands.
+ *
+ * A role is not a department: someone sits in one department but can hold several roles,
+ * and "Leadership" appears in both lists meaning different things.
+ */
+export const STAFF_ROLES = [
+  'Leadership', 'Accounting', 'Sales', 'Relate Engineer', 'Infra Engineer', 'Client Success',
+] as const
 
 export interface User {
   id: string
@@ -1164,6 +1182,11 @@ export interface User {
   workPhone: string
   employed: boolean
   notes: string
+  /**
+   * Permission roles, any number of them. Ticking one puts the person in the matching
+   * dynamic security group — this is a permission change, not a label.
+   */
+  roles: string[]
   supervisorId: string
   supervisorName: string
   /** False when nothing on Employee Info has been filled in yet. */
@@ -1176,6 +1199,8 @@ export interface User {
 export interface UserList {
   departments: string[]
   employmentTypes: string[]
+  /** The server's role vocabulary — prefer this over the STAFF_ROLES fallback. */
+  staffRoles: string[]
   total: number
   withEmployeeInfo: number
   rows: User[]
@@ -1185,20 +1210,45 @@ export type EmployeeFieldKey =
   'jobTitle' | 'department' | 'dateOfHire' | 'employmentType'
   | 'workEmail' | 'workPhone' | 'employed' | 'notes'
 
+/**
+ * An employment write. Every field is a string except `roles`, which is a real array —
+ * the endpoint validates it as a set, and stringifying it would arrive as one bogus
+ * option name rather than several roles.
+ *
+ * Sending `roles: []` clears every role. Omitting the key leaves them untouched.
+ */
+export type EmployeeWrite =
+  Partial<Record<EmployeeFieldKey, string> & { roles: string[] }>
+
 export const getUsers = (includeFormer = false): Promise<UserList> =>
   maestroGet('users', includeFormer ? { includeFormer: 'true' } : {})
 
-export const updateEmployee = (id: string, fields: Partial<Record<EmployeeFieldKey, string>>): Promise<User> =>
+export const updateEmployee = (id: string, fields: EmployeeWrite): Promise<User> =>
   maestroPost('updateEmployee', { id, fields })
 
 /** An empty supervisorId clears it. Self and a two-person cycle are refused. */
 export const setSupervisor = (id: string, supervisorId: string): Promise<User> =>
   maestroPost('setSupervisor', { id, supervisorId })
 
-/** Creates the person RECORD only — the API cannot mint a BlueStep login. */
+/**
+ * Creates the person RECORD only — the API cannot mint a BlueStep login.
+ *
+ * `firstName` and `lastName` are sent separately and are both required. The endpoint does
+ * accept a single `name` and split it on the last space, but that fallback guesses which
+ * words are the surname, so this app never uses it.
+ *
+ * The response reports what actually landed: `categoriesAttached` is read back from the
+ * record, and `needsStaffCategory` is true only if Staff genuinely failed to attach.
+ */
 export const createUser = (
-  fields: Partial<Record<EmployeeFieldKey | 'name', string>>,
-): Promise<User & { loginCreated: boolean; note: string }> => maestroPost('createUser', { fields })
+  fields: EmployeeWrite & { firstName: string; lastName: string },
+): Promise<User & {
+  loginCreated: boolean
+  nameWritten: boolean
+  categoriesAttached: string[]
+  needsStaffCategory: boolean
+  note: string
+}> => maestroPost('createUser', { fields })
 
 // ------------------------------------------------------------- account owner
 // One open stint (no `to`) is the current owner; the closed ones are the history.

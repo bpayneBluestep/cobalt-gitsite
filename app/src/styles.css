@@ -3129,3 +3129,70 @@ a.subcrumb:hover { color: var(--cobalt); }
   flex-wrap: wrap;
 }
 .clients__org { width: 1%; white-space: nowrap; text-align: right; }
+
+/* ===========================================================================
+   Roles — a permission, dressed as a checkbox
+
+   Ticking a role puts someone in a dynamic security group on the platform. So the
+   editor is a bordered fieldset rather than another field in the grid: it reads as
+   a decision with consequences, not as one more detail like a phone number.
+   =========================================================================== */
+.rolebox {
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--bg-sunk);
+  padding: 0.7rem 0.85rem 0.8rem;
+  gap: 0;
+}
+.rolebox__legend {
+  padding: 0 0.35rem;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+.rolebox__hint {
+  margin: 0 0 0.55rem;
+  font-size: 0.74rem;
+  line-height: 1.45;
+  color: var(--text-dim);
+  max-width: 60ch;
+}
+.rolebox__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.1rem 0.9rem;
+}
+/* Stored roles on someone who has left. Stated, not hidden — the data is still there. */
+.rolebox__warn {
+  margin: 0.6rem 0 0;
+  font-size: 0.73rem;
+  line-height: 1.45;
+  color: var(--warn, var(--text-dim));
+}
+
+/* Role chips in the table. Wrap rather than truncate: which roles someone holds is
+   the whole point of the column, so hiding the sixth would defeat it. */
+.rolechips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+.rolechip {
+  padding: 0.1rem 0.4rem;
+  font-size: 0.68rem;
+  line-height: 1.5;
+  white-space: nowrap;
+  color: var(--text-dim);
+  background: var(--bg-sunk);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+/* Not currently employed: the roles are stored but grant nothing. Dimmed and struck
+   through, so the row shows "on paper only" without needing an extra column. */
+.rolechips--inactive .rolechip {
+  color: var(--text-mute);
+  text-decoration: line-through;
+  opacity: 0.75;
+}
