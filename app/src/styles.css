@@ -3479,41 +3479,240 @@ a.subcrumb:hover { color: var(--cobalt); }
   line-height: 1.5;
 }
 
-/* ---- who is signed in, in the topbar ---- */
+/* ---- account menu (identity, display mode, sign out) ---- */
 
-.whoami {
-  display: flex;
+.usermenu { position: relative; }
+
+.usermenu__btn {
+  display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding-left: 0.6rem;
-  margin-left: 0.15rem;
-  border-left: 1px solid var(--line);
-  min-width: 0;
+  gap: 0.45rem;
+  max-width: 14rem;
+  padding: 0.25rem 0.4rem 0.25rem 0.25rem;
+  color: var(--text-dim);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
 }
 
-.whoami__name {
-  max-width: 12ch;
+.usermenu__btn:hover { color: var(--text); border-color: var(--line); }
+
+.usermenu__btn[data-open] {
+  color: var(--text);
+  background: var(--bg-raise);
+  border-color: var(--line-strong);
+}
+
+.usermenu__avatar {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--cobalt);
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.usermenu__name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.8125rem;
-  color: var(--text-dim);
 }
 
-.whoami__out {
-  font-family: var(--font-display);
-  font-size: 0.62rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  text-decoration: none;
+.usermenu__menu {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  z-index: 20;
+  min-width: 15rem;
+  padding: 0.35rem;
+  background: var(--bg-panel);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  box-shadow: 0 8px 24px rgb(6 10 19 / 0.28);
+}
+
+.usermenu__id {
+  padding: 0.35rem 0.4rem 0.45rem;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 0.25rem;
+}
+
+.usermenu__idname { margin: 0; font-weight: 600; font-size: 0.875rem; }
+
+.usermenu__idroles {
+  margin: 0.15rem 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
   color: var(--text-mute);
-  white-space: nowrap;
+  font-size: 0.75rem;
 }
 
-.whoami__out:hover { color: var(--cobalt); }
+.usermenu__super {
+  font-family: var(--font-display);
+  font-size: 0.55rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #fff;
+  background: var(--warn);
+  border-radius: var(--r);
+  padding: 0.05rem 0.25rem;
+}
 
-/* On a narrow screen the name is the first thing worth losing — the sign-out link is
-   the part that has to stay reachable. */
+.usermenu__group {
+  margin-top: 0.25rem;
+  padding-top: 0.25rem;
+  border-top: 1px solid var(--line);
+}
+
+/* Three equal segments, so the current mode reads as a position rather than as a
+   colour the user has to interpret. */
+.usermenu__seg {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  margin: 0 0.4rem 0.15rem;
+  padding: 2px;
+  background: var(--bg-sunk);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+
+.usermenu__seg button {
+  font-family: var(--font-display);
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+  background: none;
+  border: 0;
+  border-radius: calc(var(--r) - 1px);
+  padding: 0.28rem 0.2rem;
+  cursor: pointer;
+}
+
+.usermenu__seg button:hover { color: var(--text); }
+
+.usermenu__seg button[data-on] {
+  color: #fff;
+  background: var(--cobalt);
+}
+
+/* Reuses .tools__item, which is an <a> everywhere else — reset what a button brings. */
+.usermenu__out {
+  width: 100%;
+  font: inherit;
+  font-size: 0.8125rem;
+  text-align: left;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.usermenu__out:disabled { opacity: 0.6; cursor: default; }
+
 @media (max-width: 720px) {
-  .whoami__name { display: none; }
+  .usermenu__name { display: none; }
+  .usermenu__btn { max-width: none; }
+}
+
+/* ---- locations map (the org unit tree, from /getNavTree) ---- */
+
+.locmap {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: start center;
+  padding: 3rem 1rem;
+  background: rgb(6 10 19 / 0.55);
+  overflow: auto;
+}
+
+.locmap__card {
+  width: 100%;
+  max-width: 34rem;
+  background: var(--bg-panel);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  box-shadow: 0 24px 60px -20px rgb(6 10 19 / 0.6);
+}
+
+.locmap__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.locmap__head h2 { margin: 0; font-size: 0.95rem; }
+
+.locmap__head p {
+  margin: 0.15rem 0 0;
+  color: var(--text-mute);
+  font-size: 0.8125rem;
+}
+
+.locmap__x {
+  margin-left: auto;
+  flex: none;
+  width: 1.6rem;
+  height: 1.6rem;
+  display: grid;
+  place-items: center;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--text-mute);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  cursor: pointer;
+}
+
+.locmap__x:hover { color: var(--text); border-color: var(--line); }
+
+.locmap__body { padding: 0.75rem 1rem; max-height: 60vh; overflow: auto; }
+
+.locmap__msg { margin: 0.5rem 0; color: var(--text-mute); font-size: 0.875rem; }
+
+.locmap__list { list-style: none; margin: 0; padding: 0; }
+
+/* Indent by nesting rather than by depth arithmetic — the tree can be any depth and
+   this needs no rule per level. */
+.locmap__list .locmap__list {
+  margin-left: 0.85rem;
+  padding-left: 0.6rem;
+  border-left: 1px solid var(--line);
+}
+
+.locmap__link,
+.locmap__group {
+  display: block;
+  padding: 0.2rem 0.3rem;
+  border-radius: var(--r);
+  font-size: 0.875rem;
+}
+
+.locmap__link { color: var(--text); text-decoration: none; }
+.locmap__link:hover { background: var(--bg-raise); color: var(--cobalt); }
+
+.locmap__group { color: var(--text-mute); }
+
+.locmap__foot {
+  margin: 0;
+  padding: 0.6rem 1rem 0.75rem;
+  border-top: 1px solid var(--line);
+  color: var(--text-mute);
+  font-size: 0.75rem;
 }

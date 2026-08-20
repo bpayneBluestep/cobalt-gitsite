@@ -15,7 +15,7 @@
  */
 
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
-import { ApiError, getSession, onSessionLost, type Capability, type Session } from './api'
+import { ApiError, getSession, logout, onSessionLost, type Capability, type Session } from './api'
 
 interface SessionState {
   session: Session | null
@@ -39,11 +39,13 @@ interface SessionState {
   roles: string[]
   /** Re-probe the session. What the login gate calls once it has signed someone in. */
   reload: () => void
+  /** Invalidate the session on the platform, then drop to the gate without a page load. */
+  signOut: () => void
 }
 
 const NO_CAPABILITIES = () => false
 
-const INITIAL: Omit<SessionState, 'reload'> = {
+const INITIAL: Omit<SessionState, 'reload' | 'signOut'> = {
   session: null,
   loading: true,
   error: '',
@@ -52,7 +54,7 @@ const INITIAL: Omit<SessionState, 'reload'> = {
   roles: [],
 }
 
-const Ctx = createContext<SessionState>({ ...INITIAL, reload: () => {} })
+const Ctx = createContext<SessionState>({ ...INITIAL, reload: () => {}, signOut: () => {} })
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState(INITIAL)
@@ -63,6 +65,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const reload = useCallback(() => {
     setState(s => ({ ...s, loading: true, error: '', signedOut: false }))
     setAttempt(n => n + 1)
+  }, [])
+
+  const signOut = useCallback(() => {
+    // Show the gate as soon as the request settles, whichever way it settled — the user
+    // asked to be signed out, and `logout` never rejects.
+    logout().then(() => setState({ ...INITIAL, loading: false, signedOut: true }))
   }, [])
 
   useEffect(() => {
@@ -106,7 +114,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setState(s => (s.signedOut ? s : { ...INITIAL, loading: false, signedOut: true }))
   }), [])
 
-  return <Ctx.Provider value={{ ...state, reload }}>{children}</Ctx.Provider>
+  return <Ctx.Provider value={{ ...state, reload, signOut }}>{children}</Ctx.Provider>
 }
 
 export const useSession = () => useContext(Ctx)

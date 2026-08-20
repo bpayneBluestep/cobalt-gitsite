@@ -21,8 +21,8 @@ import Intake from './routes/Intake'
 import { SECTIONS } from './sections'
 import { logoutUrl, type Capability } from './api'
 import { SessionProvider, useSession } from './session'
-import ThemeToggle from './components/ThemeToggle'
 import ToolsMenu from './components/ToolsMenu'
+import UserMenu from './components/UserMenu'
 
 /*
  * A route nobody without the capability may open.
@@ -81,7 +81,7 @@ const CAPABILITY_LABELS: Record<Capability, string> = {
 }
 
 function Shell() {
-  const { loading, error, signedOut, can, roles, session, reload } = useSession()
+  const { loading, error, signedOut, can, roles, reload } = useSession()
 
   /*
    * Three whole-screen states, ahead of the frame rather than inside it.
@@ -136,16 +136,11 @@ function Shell() {
 
         <div className="topbar__end">
           {can('viewSchema') && <ToolsMenu />}
-          <ThemeToggle />
-          {/* Now that there is a login there has to be a visible way out of it, and a
-              visible answer to "who am I signed in as" — which matters more than usual
-              here, because what the app shows depends on the answer. */}
-          <div className="whoami">
-            <span className="whoami__name" title={session?.fullName || ''}>
-              {session?.fullName || 'Signed in'}
-            </span>
-            <a className="whoami__out" href={logoutUrl()}>Sign out</a>
-          </div>
+          {/* Identity, display mode and the way out, all behind one control — the same
+              shape as the eccrm CRM's account menu. The standalone theme button that used
+              to sit here moved inside it; the sign-in screen still has one, because you
+              cannot open an account menu before you have an account. */}
+          <UserMenu />
         </div>
       </header>
 

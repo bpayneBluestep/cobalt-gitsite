@@ -323,7 +323,30 @@ export function globalLoginUrl(): string {
   return `${LOGIN_URL}?step=two&_globalLogin=true&desturl=${encodeURIComponent(returnPath())}`
 }
 
-/** Sign out on the platform and come back to the gate. */
+/**
+ * Sign out without leaving the app.
+ *
+ * Fetching logout.jsp invalidates the session server-side; the caller then drops to the
+ * gate locally. That beats a full-page redirect: the bundle stays loaded, so signing out
+ * and back in is instant and lands exactly where it started rather than at the org home
+ * page. Mirrors what the eccrm CRM does.
+ *
+ * A failure here is not reported. If the request did not land the session may still be
+ * alive, but the user asked to be signed out — showing them the gate is the right
+ * response either way, and the next call they make will bounce and confirm it.
+ */
+export async function logout(): Promise<void> {
+  try {
+    await fetch(LOGOUT_URL, { credentials: 'include', cache: 'no-store' })
+  } catch {
+    /* drop to the gate regardless */
+  }
+}
+
+/**
+ * A full-page sign-out, for the one case the in-app version cannot serve: the session is
+ * unreadable, so there is no working app to stay inside.
+ */
 export function logoutUrl(): string {
   return `${LOGOUT_URL}?desturl=${encodeURIComponent(returnPath())}`
 }

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import LocationsMap from './LocationsMap'
 
 /*
  * Native BlueStep admin tools, folded into this SPA's toolbar — the same idea as
@@ -17,7 +18,10 @@ import { Link } from 'react-router-dom'
  *     scope themselves to the page you're on. A GitSite is not a BlueStep page
  *     object, so there is nothing to scope to — Current Container Child Tree,
  *     Change History and Alternate Identifiers are left out rather than shipped
- *     pointing at nothing.
+ *     pointing at nothing. This is the ONLY remaining gap against eccrm's menu,
+ *     and it is not closeable: those four items answer "about this page", and
+ *     there is no page. Console Trace is the same story — it toggles a global the
+ *     embedding page defines.
  *
  * Every href is root-relative so it resolves against whatever host is serving
  * the SPA, and opens in a new tab so the explorer isn't lost. Access is enforced
@@ -81,6 +85,7 @@ const GROUPS: Group[] = [
 
 export default function ToolsMenu() {
   const [open, setOpen] = useState(false)
+  const [mapOpen, setMapOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
   const btnRef = useRef<HTMLButtonElement>(null)
 
@@ -105,6 +110,8 @@ export default function ToolsMenu() {
   }, [open])
 
   return (
+    <>
+    {mapOpen && <LocationsMap onClose={() => setMapOpen(false)} />}
     <div className="tools" ref={wrapRef}>
       <button
         type="button"
@@ -128,6 +135,18 @@ export default function ToolsMenu() {
               <span className="tools__label">Schema explorer</span>
               <span className="tools__note">record types &amp; fields</span>
             </Link>
+            {/* The one piece of native chrome that ports unchanged: /getNavTree takes no
+                page id, so it works in a standalone GitSite where the popup-based items
+                cannot. */}
+            <button
+              type="button"
+              className="tools__item"
+              role="menuitem"
+              onClick={() => { setOpen(false); setMapOpen(true) }}
+            >
+              <span className="tools__label">Locations map</span>
+              <span className="tools__note">the org's unit tree</span>
+            </button>
           </div>
 
           {GROUPS.map(group => (
@@ -153,5 +172,6 @@ export default function ToolsMenu() {
         </div>
       )}
     </div>
+    </>
   )
 }
