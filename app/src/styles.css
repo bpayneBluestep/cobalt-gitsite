@@ -4681,3 +4681,95 @@ code,
    identifiers, and they read better in the UI face. */
 .pane__title,
 .schemabar__title { font-family: var(--font-display); }
+
+/* ---------------------------------------------------------------------------
+ * Form controls — base rules
+ *
+ * There were none. Every input, select and textarea in this stylesheet was scoped to a
+ * container (`.ef select`, `.tickets__move select`, `.block input[type="text"]`…), so any
+ * control outside one of those contexts rendered fully native — black on white, native
+ * metrics, ignoring the theme entirely.
+ *
+ * In light mode that passed unnoticed for months, because a native control on Windows is
+ * white and so is `--bg-panel`. Dark mode is where it showed: a white select sitting in a
+ * dark toolbar. Worth remembering as a class of bug — a missing rule that the default
+ * value happens to satisfy in one theme is invisible until the other theme exists.
+ *
+ * These are ELEMENT selectors, deliberately: specificity 0,0,1 means every existing
+ * class-scoped rule above still wins wherever a context wants something different. This
+ * only fills the gap where nothing else applies.
+ *
+ * `color-scheme` is the other half. It is what makes the parts a page cannot style — the
+ * native dropdown popup a select opens, the date picker's calendar, scrollbars — follow
+ * the theme. Without it a dark app opens a blinding white month picker.
+ * ------------------------------------------------------------------------- */
+
+:root[data-theme="dark"] { color-scheme: dark; }
+:root[data-theme="light"] { color-scheme: light; }
+
+input[type="text"],
+input[type="search"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="date"],
+input[type="month"],
+input[type="time"],
+input[type="url"],
+input[type="tel"],
+select,
+textarea {
+  min-height: 32px;
+  padding: var(--s-snudge) var(--s-s);
+  font-family: inherit;
+  font-size: var(--t-body1);
+  color: var(--text);
+  background: var(--bg-panel);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  transition: border-color var(--d-faster) var(--curve-ease),
+              box-shadow var(--d-fast) var(--curve-decel);
+}
+
+textarea { min-height: 64px; resize: vertical; }
+
+/* A select is shorter than a text field in Fluent, because it holds a chosen value
+   rather than accepting typing. */
+select { min-height: 28px; padding: var(--s-xs) var(--s-snudge); font-size: var(--t-caption1); }
+
+input::placeholder,
+textarea::placeholder { color: var(--text-mute); }
+
+input:disabled,
+select:disabled,
+textarea:disabled {
+  color: var(--text-mute);
+  background: var(--bg-sunk);
+  border-color: var(--line);
+  cursor: default;
+}
+
+/* Checkboxes and radios pick up the brand colour with one line, and stop being 13px. */
+input[type="checkbox"],
+input[type="radio"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--cobalt);
+  cursor: pointer;
+}
+
+/* Search fields get their native clear button tinted to match rather than staying blue. */
+input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) opacity(0.6); }
+
+/* ---------------------------------------------------------------------------
+ * A last contrast correction
+ *
+ * `--bg-sunk` and `--bg` were two steps apart on paper and nearly identical on screen,
+ * which left the pipeline's columns reading as one flat field with cards floating in it.
+ * The board's whole legibility rests on the column being a visible container, so the sunk
+ * tone moves down far enough to be seen.
+ * ------------------------------------------------------------------------- */
+
+:root,
+:root[data-theme="light"] { --bg-sunk: #dde4f1; }
