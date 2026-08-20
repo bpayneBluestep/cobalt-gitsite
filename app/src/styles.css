@@ -3330,6 +3330,11 @@ a.subcrumb:hover { color: var(--cobalt); }
 }
 
 .login__card {
+  /* This is a <main>, and the shell's `main { display: flex }` at the top of this file
+     applies to it — which laid every child of the card out in a horizontal ROW. The
+     element stays <main> because that is the correct landmark for a page whose whole
+     content is the sign-in form; the display is reasserted here instead. */
+  display: block;
   width: 100%;
   max-width: 23rem;
   padding: 1.5rem 1.5rem 1.35rem;
