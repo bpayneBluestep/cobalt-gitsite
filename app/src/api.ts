@@ -1177,7 +1177,15 @@ export interface Pipeline {
   ownerId: string | null
   search: string | null
   companiesScanned: number
+  /** Open deals the board can actually place — the sum of the columns. */
   openTotal: number
+  /**
+   * Open deals sitting at a Won or Lost phase with the `closed` box never ticked, so no
+   * column can hold them. Almost all are imported rows whose outcome was recorded as a
+   * phase and not as a close — which means they are also still inflating the forecast.
+   */
+  unplacedTotal: number
+  unplacedPhases: { phase: string; count: number }[]
   /** Counted server-side so every screen agrees what "needs attention" means. */
   staleTotal: number
   neverTouchedTotal: number

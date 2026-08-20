@@ -254,6 +254,22 @@ export default function CrmPipeline() {
             </p>
           )}
 
+          {/*
+            Named rather than quietly excluded. These deals are not closed, so they are
+            still in every forecast, and they are invisible on the board — the worst of
+            both. Saying so is the only way anyone fixes them.
+          */}
+          {d.unplacedTotal > 0 && (
+            <p className="board2__notice" role="status">
+              {d.unplacedTotal} deal{d.unplacedTotal === 1 ? '' : 's'} sit{d.unplacedTotal === 1 ? 's' : ''} at{' '}
+              {d.unplacedPhases.map(p => `${p.phase} (${p.count})`).join(', ')} without being
+              marked closed, so {d.unplacedTotal === 1 ? 'it has' : 'they have'} no column here —
+              and {d.unplacedTotal === 1 ? 'is' : 'are'} still counted in the forecast. Open{' '}
+              {d.unplacedTotal === 1 ? 'it' : 'them'} from{' '}
+              <Link className="inlink" to="/crm/closed">Won &amp; lost</Link> and tick the outcome.
+            </p>
+          )}
+
           {!maySeeMoney && (
             <p className="board2__notice" role="status">
               Deal values are hidden — showing revenue needs Sales or Accounting. Everything
