@@ -13,6 +13,9 @@ import NoAccess from './routes/NoAccess'
 import LoginGate from './routes/LoginGate'
 import CrmDashboard from './routes/CrmDashboard'
 import CrmPipeline from './routes/CrmPipeline'
+import CrmClosed from './routes/CrmClosed'
+import CrmFollowUps from './routes/CrmFollowUps'
+import CompanyDeals from './routes/CompanyDeals'
 import CrmProspecting from './routes/CrmProspecting'
 import Sprints from './routes/Sprints'
 import Settings from './routes/Settings'
@@ -176,6 +179,8 @@ function Shell() {
             <Route path="/crm" element={<Guarded needs="viewDeals" what="CRM"><CrmDashboard /></Guarded>} />
             <Route path="/crm/pipeline" element={<Guarded needs="viewDeals" what="The pipeline"><CrmPipeline /></Guarded>} />
             <Route path="/crm/prospecting" element={<Guarded needs="viewDeals" what="Prospecting"><CrmProspecting /></Guarded>} />
+            <Route path="/crm/follow-ups" element={<Guarded needs="viewDeals" what="Follow-ups"><CrmFollowUps /></Guarded>} />
+            <Route path="/crm/closed" element={<Guarded needs="viewDeals" what="Won and lost deals"><CrmClosed /></Guarded>} />
             <Route path="/sprints" element={<Guarded needs="viewSprints" what="Sprints"><Sprints /></Guarded>} />
             <Route path="/settings" element={<Guarded needs="viewStaff" what="Settings"><Settings /></Guarded>} />
 
@@ -191,6 +196,14 @@ function Shell() {
               element={<Guarded needs="viewClients" what="This client"><CompanyRecord /></Guarded>}
             >
               <Route index element={<CompanyInfo />} />
+              {/*
+                Deals on every company, lead and client alike — a client's deals are
+                upsells. Tickets stay routed for everyone even though the TAB is hidden
+                for a lead: a link from elsewhere should still resolve rather than fall
+                through to the catch-all, and the board says plainly when there is
+                nothing on it.
+              */}
+              <Route path="deals" element={<CompanyDeals />} />
               <Route path="tickets" element={<ClientTickets />} />
               <Route path="contacts" element={<CompanyContacts />} />
               <Route path="files" element={<CompanyFiles />} />

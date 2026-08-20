@@ -6,6 +6,8 @@ import {
 } from '../api'
 import { sanitizeHtml } from '../lib/html'
 import RichTextEditor from './RichTextEditor'
+import UserPicker from './UserPicker'
+import DealActivity from './DealActivity'
 import { useSession } from '../session'
 
 /*
@@ -19,12 +21,26 @@ import { useSession } from '../session'
  * dropdown. Closing a deal is not the same kind of act as moving it along: it needs
  * a loss reason when lost, and it is the one change people want to be sure about
  * before it lands.
+ *
+ * The history and the follow-up are NOT fields here — they live in `DealActivity`
+ * below, and they save themselves. A note is not a draft: you do not write "spoke to
+ * Sarah" and then decide whether to keep it, and holding it in an unsaved form is how
+ * it gets lost when the card closes.
  */
 
-type Draft = Record<DealFieldKey, string>
+/**
+ * The fields this card edits.
+ *
+ * A narrower list than `DealFieldKey` on purpose: `nextStep` and `nextFollowUp` are
+ * writable, but they belong to the follow-up control below, and two controls for one
+ * value drift the moment both are on screen.
+ */
+type EditableKey = Exclude<DealFieldKey, 'nextStep' | 'nextFollowUp'>
+
+type Draft = Record<EditableKey, string>
 
 const EMPTY: Draft = {
-  title: '', phase: 'Open Lead', owner: '', leadSource: '',
+  title: '', phase: 'Open Lead', ownerId: '', leadSource: '',
   mrr: '', fees: '', confidence: 'Yellow', firstBillingMonth: '', demoDate: '',
   notes: '', lossReason: '',
 }
@@ -33,7 +49,7 @@ function draftOf(d: Deal): Draft {
   return {
     title: d.title || '',
     phase: d.phase || 'Open Lead',
-    owner: d.owner || '',
+    ownerId: d.ownerId || '',
     leadSource: d.leadSource || '',
     mrr: d.mrr === null || d.mrr === undefined ? '' : String(d.mrr),
     fees: d.fees === null || d.fees === undefined ? '' : String(d.fees),
@@ -45,16 +61,46 @@ function draftOf(d: Deal): Draft {
   }
 }
 
-function changedFields(draft: Draft, saved: Deal): Partial<Record<DealFieldKey, string>> {
-  const out: Partial<Record<DealFieldKey, string>> = {}
+function changedFields(draft: Draft, saved: Deal): Partial<Record<EditableKey, string>> {
+  const out: Partial<Record<EditableKey, string>> = {}
   const was = draftOf(saved)
-  for (const key of Object.keys(draft) as DealFieldKey[]) {
+  for (const key of Object.keys(draft) as EditableKey[]) {
     // Notes is markup: compare sanitised, or a browser's own tidying reads as an edit.
     const now = key === 'notes' ? sanitizeHtml(draft[key]) : draft[key]
     const before = key === 'notes' ? sanitizeHtml(was[key]) : was[key]
     if (now !== before) out[key] = now
   }
   return out
+}
+
+/**
+ * "23 days · 23 in phase" — whether the deal is progressing.
+ *
+ * Two numbers because they answer different questions, and the second one is the one
+ * that matters: a deal can be young and stuck, or old and moving steadily. "at least"
+ * appears when the phase entry date is the same as the open date, which means either it
+ * never moved or the entry predates the field — both true, neither precise.
+ */
+function AgeLine({ deal }: { deal: Deal }) {
+  if (deal.ageDays === null) return null
+  const phase = deal.phaseAgeDays
+  return (
+    <span className="dage">
+      <span>{deal.ageDays}d old</span>
+      {phase !== null && (
+        <span className="dage__ph" data-stuck={deal.stuck ? '' : undefined}>
+          {deal.phaseSinceEstimated ? '≥' : ''}{phase}d in {deal.phase}
+        </span>
+      )}
+      {deal.neverTouched
+        ? <span className="dage__cold" title="No call, email or note has ever been logged">never touched</span>
+        : deal.stale
+          ? <span className="dage__cold">
+              {deal.touchAgeDays}d since last touch
+            </span>
+          : null}
+    </span>
+  )
 }
 
 export default function DealEditor({
@@ -96,7 +142,7 @@ export default function DealEditor({
   const pending = deal ? changedFields(draft, deal) : {}
   const dirty = isNew || Object.keys(pending).length > 0
 
-  function edit(key: DealFieldKey, value: string) {
+  function edit(key: EditableKey, value: string) {
     setDraft(d => ({ ...d, [key]: value }))
     setFailure('')
   }
@@ -115,8 +161,10 @@ export default function DealEditor({
 
     if (isNew) {
       // Send only what was filled in, so a blank never overwrites a server default.
-      const fields: Partial<Record<DealFieldKey, string>> = {}
-      for (const k of Object.keys(draft) as DealFieldKey[]) {
+      // An unset owner is left out entirely, which is what makes the server fall back
+      // to the company's owner and then to you.
+      const fields: Partial<Record<EditableKey, string>> = {}
+      for (const k of Object.keys(draft) as EditableKey[]) {
         const v = k === 'notes' ? sanitizeHtml(draft[k]) : draft[k].trim()
         if (v) fields[k] = v
       }
@@ -134,7 +182,7 @@ export default function DealEditor({
       setFailure('Pick a loss reason — a lost deal with no reason teaches nobody anything.')
       return
     }
-    const fields: Partial<Record<DealFieldKey, string>> = { phase: outcome }
+    const fields: Partial<Record<EditableKey, string>> = { phase: outcome }
     if (outcome === 'Lost') fields.lossReason = draft.lossReason
     run('close', updateDeal(companyId, deal.entryId, fields), () => { setClosing(''); onClose() })
   }
@@ -154,10 +202,11 @@ export default function DealEditor({
         <h2>{isNew ? `New deal — ${companyName}` : draft.title || 'Deal'}</h2>
         <p className="note">
           {isNew
-            ? 'It inherits the company’s source and owner unless you set them here.'
+            ? 'It inherits the company’s source and owner unless you set them here — and falls back to you.'
             : `${companyName}${deal!.createdAt ? ` · opened ${deal!.createdAt}` : ''}` +
               `${deal!.closedAt ? ` · closed ${deal!.closedAt}` : ''}`}
         </p>
+        {!isNew && deal!.isOpen && <AgeLine deal={deal!} />}
       </div>
 
       {failure && <p className="editcard__err" role="alert">{failure}</p>}
@@ -225,8 +274,22 @@ export default function DealEditor({
         </div>
         <div className="ef">
           <label htmlFor="d-owner">Owner</label>
-          <input id="d-owner" type="text" value={draft.owner} autoComplete="off"
-            onChange={e => edit('owner', e.target.value)} />
+          {/*
+            Picked, never typed. Owner was free text until 2026-08-20, and that is
+            exactly why: "Brandon Payne", "Payne, Brandon" and "brandon" were three
+            owners as far as every by-owner total was concerned, and no amount of careful
+            typing fixes that at the reporting end.
+          */}
+          <UserPicker id="d-owner" value={draft.ownerId} placeholder="Nobody yet"
+            disabled={!mayEdit} onChange={id => edit('ownerId', id)} />
+          {/* A deal imported with a name and no matching user record still has to show
+              who it says owns it, or the row reads as unowned when it is not. */}
+          {!isNew && !draft.ownerId && deal!.owner && (
+            <p className="ef__hint">
+              Currently “{deal!.owner}”, imported as a name with no matching staff record.
+              Pick someone to make it filterable.
+            </p>
+          )}
         </div>
         <div className="ef">
           <label htmlFor="d-source">Lead source</label>
@@ -236,14 +299,18 @@ export default function DealEditor({
           </select>
         </div>
         <div className="ef ef--wide">
-          <label htmlFor="d-notes">Notes</label>
+          <label htmlFor="d-notes">Background</label>
           <RichTextEditor
             value={deal ? deal.notes || '' : ''}
             docKey={deal ? deal.entryId : 'new-' + companyId}
-            ariaLabel="Deal notes"
+            ariaLabel="Deal background"
             placeholder="What you know, who decides, what is in the way…"
             onChange={html => edit('notes', html)}
           />
+          <p className="ef__hint">
+            Standing context, rewritten as it changes. Individual calls and emails go in
+            the history below, where they keep their date.
+          </p>
         </div>
       </fieldset>
 
@@ -284,10 +351,10 @@ export default function DealEditor({
             !deal!.isWon && !deal!.isLost && (
               <div className="dealcard__closebtns">
                 <span className="panel__note">Outcome</span>
-                <button type="button" className="btn btn--sm" onClick={() => setClosing('Won')} disabled={!!busy}>
+                <button type="button" className="btn btn--sm" onClick={() => setClosing('Won')}>
                   Won
                 </button>
-                <button type="button" className="btn btn--ghost btn--sm" onClick={() => setClosing('Lost')} disabled={!!busy}>
+                <button type="button" className="btn btn--ghost btn--sm" onClick={() => setClosing('Lost')}>
                   Lost
                 </button>
               </div>
@@ -334,6 +401,17 @@ export default function DealEditor({
           </>
         )}
       </div>
+
+      {/*
+        Only for a deal that exists. A new one has no id to hang history on, and asking
+        someone to log a call against something not yet saved is a trap.
+      */}
+      {!isNew && (
+        <>
+          <h3 className="dealcard__hist">History</h3>
+          <DealActivity companyId={companyId} entryId={deal!.entryId} onChanged={onSaved} />
+        </>
+      )}
     </div>
   )
 }

@@ -435,7 +435,10 @@ export interface Company {
   contactTitle: string
   contactEmail: string
   contactPhone: string
+  /** The owner's name, cached from `ownerId`. Display only — never write this. */
   owner: string
+  /** The staff record id behind `owner`. Empty on rows imported with a name only. */
+  ownerId: string
   leadSource: string
   leadStatus: string
   beds: number | null
@@ -504,7 +507,7 @@ export type CompanyFieldKey = (typeof COMPANY_FIELDS)[number]['key']
  * write through the same `updateCompany` action; only the rendering differs.
  */
 export type CrmFieldKey =
-  'contactName' | 'contactTitle' | 'contactEmail' | 'contactPhone' | 'owner'
+  'contactName' | 'contactTitle' | 'contactEmail' | 'contactPhone' | 'ownerId'
   | 'leadSource' | 'leadStatus' | 'beds' | 'lastTouch' | 'nextFollowUp' | 'crmNotes'
 
 /** Save only the keys that changed. The reply is the record as re-read server-side. */
@@ -1016,7 +1019,10 @@ export interface Deal {
   entryId: string
   title: string
   phase: string
+  /** The owner's name, cached from `ownerId`. Display only — never write this. */
   owner: string
+  /** The staff record id behind `owner`. Empty on deals imported with a name only. */
+  ownerId: string
   leadSource: string
   mrr: number | null
   fees: number | null
@@ -1034,6 +1040,13 @@ export interface Deal {
   createdAt: string
   closedAt: string
 
+  /** What happens next, and when. Two halves of one thought — set together. */
+  nextStep: string
+  nextFollowUp: string
+  /** Server-stamped: last time anyone worked it, and when it entered this phase. */
+  lastTouch: string
+  phaseSince: string
+
   /** Derived server-side from the phase — never stored, so they cannot disagree. */
   isOpen: boolean
   isWon: boolean
@@ -1041,6 +1054,33 @@ export interface Deal {
   probability: number
   annualValue: number
   weightedMrr: number
+
+  /**
+   * Age, in two numbers that answer different questions: how long it has existed, and
+   * how long it has sat where it is now. The second is the one that says whether it is
+   * moving — a deal can be young and stuck, or old and progressing.
+   */
+  ageDays: number | null
+  phaseAgeDays: number | null
+  touchAgeDays: number | null
+  /**
+   * The phase entry date is the same as the open date — either it genuinely never
+   * moved, or the entry predates the field. Render as "at least N days", not exactly N.
+   */
+  phaseSinceEstimated: boolean
+
+  /** No activity has ever been logged. Distinct from `stale`, which needs evidence. */
+  neverTouched: boolean
+  /** Touched, but not lately. */
+  stale: boolean
+  /** Has not changed phase in a long time. */
+  stuck: boolean
+
+  followUpState: 'none' | 'today' | 'overdue' | 'scheduled' | 'closed'
+  /** Days until the follow-up; negative when overdue. Null when none is set. */
+  followUpInDays: number | null
+  /** How many history entries there are. The entries themselves come from `getDeal`. */
+  activityCount: number
 
   companyId: string
   companyName: string
@@ -1050,6 +1090,37 @@ export interface Deal {
 }
 
 /** A company as the CRM sees it: Company Info plus its deal roll-up. */
+/**
+ * The kinds of contact a deal note can record.
+ *
+ * A closed vocabulary rather than free text, because the point of typing a note is to
+ * make the log countable — "six calls and no meeting" says the deal is stuck, and no
+ * amount of prose does.
+ */
+export const ACTIVITY_KINDS = [
+  'Note', 'Call', 'Email', 'Meeting', 'Demo', 'Proposal', 'Contract',
+] as const
+
+export type ActivityKind = typeof ACTIVITY_KINDS[number]
+
+export interface ActivityItem {
+  id: string
+  /** `comment` is a person's note; `event` is something the server recorded. */
+  type: 'comment' | 'event'
+  who: string
+  /** An ISO instant, not a date — history is ordered to the second. */
+  at: string
+  text: string
+  /** Present on deal comments only. Tickets have no notion of a contact kind. */
+  kind?: string
+}
+
+/** One deal with its history — what a list view deliberately leaves out. */
+export interface DealDetail extends Deal {
+  activity: ActivityItem[]
+  activityKinds: string[]
+}
+
 export interface Lead extends Company {
   dealCount: number
   openDealCount: number
@@ -1070,6 +1141,11 @@ export interface LeadList {
   statuses: string[]
   sources: string[]
   categories: string[]
+  filters: {
+    status: string | null; source: string | null
+    owner: string | null; ownerId: string | null
+    search: string | null; category: string | null
+  }
   total: number
   prospecting: number
   neverWorked: number
@@ -1094,18 +1170,94 @@ export interface Pipeline {
   confidences: string[]
   sources: string[]
   lossReasons: string[]
+  activityKinds: string[]
+  staleTouchDays: number
+  stalePhaseDays: number
   owner: string | null
+  ownerId: string | null
+  search: string | null
   companiesScanned: number
   openTotal: number
+  /** Counted server-side so every screen agrees what "needs attention" means. */
+  staleTotal: number
+  neverTouchedTotal: number
+  stuckTotal: number
+  overdueTotal: number
+  dueTodayTotal: number
   columns: PipelineColumn[]
+}
+
+/** Won and lost, out of the pipeline. A log, so it reads newest first. */
+export interface ClosedDeals {
+  phases: string[]
+  lossReasons: string[]
+  owner: string | null
+  ownerId: string | null
+  search: string | null
+  outcome: string | null
+  companiesScanned: number
+  total: number
+  wonCount: number
+  lostCount: number
+  wonMrr: number
+  lostMrr: number
+  /** Null when nothing has been decided — a 0% win rate is a claim, that is not it. */
+  winRate: number | null
+  /** Counted over the FILTERED set, so "why do my deals die" is answerable. */
+  byReason: { reason: string; count: number }[]
+  rows: Deal[]
+}
+
+/** One row of the follow-up queue — a deal's follow-up, or a company's. */
+export interface FollowUp {
+  kind: 'deal' | 'company'
+  companyId: string
+  companyName: string
+  /** The deal entry, or '' for a company-level follow-up. */
+  entryId: string
+  title: string
+  phase: string
+  owner: string
+  ownerId: string
+  contactName: string
+  contactEmail: string
+  contactPhone: string
+  due: string
+  nextStep: string
+  lastTouch: string
+  mrr: number | null
+  leadStatus?: string
+  state: 'overdue' | 'today' | 'scheduled'
+  overdue: boolean
+  dueToday: boolean
+}
+
+export interface FollowUpQueue {
+  today: string
+  owner: string | null
+  ownerId: string | null
+  search: string | null
+  activityKinds: string[]
+  companiesScanned: number
+  total: number
+  overdue: number
+  dueToday: number
+  upcoming: number
+  rows: FollowUp[]
 }
 
 export interface CrmSummary {
   today: string
+  owner: string | null
+  ownerId: string | null
+  /** True when these numbers are one rep's, not the whole company's. */
+  scoped: boolean
   counts: {
     companies: number; leads: number; clients: number
     prospecting: number; neverWorked: number
     openDeals: number; wonDeals: number; lostDeals: number
+    /** Hygiene rather than value — is the pipeline being worked. */
+    staleDeals: number; neverTouchedDeals: number; stuckDeals: number; dueToday: number
   }
   value: {
     openMrr: number; weightedMrr: number; openAnnualValue: number; wonMrr: number
@@ -1119,40 +1271,112 @@ export interface CrmSummary {
   losses: { reason: string; count: number }[]
   hot: Deal[]
   followUps: {
-    companyId: string; companyName: string; owner: string; contactName: string
-    leadStatus: string; nextFollowUp: string; lastTouch: string
+    kind: 'deal' | 'company'
+    companyId: string; companyName: string; entryId: string; title: string; phase: string
+    owner: string; ownerId: string; contactName: string
+    leadStatus: string; nextFollowUp: string; nextStep: string; lastTouch: string
     overdue: boolean; hasOpenDeal: boolean
   }[]
   overdueFollowUps: number
   vocabularies: {
     phases: string[]; openPhases: string[]; statuses: string[]; sources: string[]
-    confidences: string[]; lossReasons: string[]
+    confidences: string[]; lossReasons: string[]; activityKinds: string[]
     probability: Record<string, number>
+    staleTouchDays: number; stalePhaseDays: number
   }
 }
 
 /**
  * The deal fields a client may write; the rest are server-owned.
  *
- * `products` and `nextStep` are gone — neither was being answered honestly, so both
- * were noise dressed as data. `anticipatedDate` is replaced by `firstBillingMonth`.
- * All three still exist on the platform form, relabelled "(retired)", because a
- * BlueStep field can never be deleted.
+ * `owner` is NOT here — it is written as `ownerId`, and the server resolves the name.
+ * `nextStep` is back, having been retired in the first pass for not being filled in
+ * honestly: that was true while it stood alone, and it earns its place now that a
+ * follow-up queue reads it. `products` stays retired, and `anticipatedDate` is still
+ * replaced by `firstBillingMonth`. All of them still exist on the platform form,
+ * relabelled, because a BlueStep field can never be deleted.
  */
 export type DealFieldKey =
-  'title' | 'phase' | 'owner' | 'leadSource' | 'mrr' | 'fees'
+  'title' | 'phase' | 'ownerId' | 'leadSource' | 'mrr' | 'fees'
   | 'confidence' | 'firstBillingMonth' | 'demoDate' | 'notes' | 'lossReason'
+  | 'nextStep' | 'nextFollowUp'
 
-export const getCrmSummary = (): Promise<CrmSummary> => maestroGet('crmSummary')
+/**
+ * The owner/search parameters every CRM list understands.
+ *
+ * One shape for all of them so a screen can hold a single piece of state and hand it
+ * to whichever call it makes — and so adding a filter does not mean editing five
+ * signatures. Blank values are dropped by `maestroGet`, so an unset filter is absent
+ * rather than an empty string the server has to interpret.
+ */
+export interface CrmScope {
+  ownerId?: string
+  search?: string
+}
 
-export const getPipeline = (owner?: string): Promise<Pipeline> =>
-  maestroGet('pipeline', owner ? { owner } : {})
+const scopeParams = (scope: CrmScope): Record<string, string> => {
+  const out: Record<string, string> = {}
+  if (scope.ownerId) out.ownerId = scope.ownerId
+  if (scope.search) out.search = scope.search
+  return out
+}
 
-export const getLeads = (params: { status?: string; source?: string; owner?: string; category?: string } = {}): Promise<LeadList> =>
-  maestroGet('leads', params as Record<string, string>)
+export const getCrmSummary = (scope: CrmScope = {}): Promise<CrmSummary> =>
+  maestroGet('crmSummary', scopeParams(scope))
 
-export const getDeals = (params: { companyId?: string; phase?: string; owner?: string; openOnly?: string } = {}): Promise<{ total: number; rows: Deal[] }> =>
+export const getPipeline = (scope: CrmScope = {}): Promise<Pipeline> =>
+  maestroGet('pipeline', scopeParams(scope))
+
+export const getClosedDeals = (
+  params: CrmScope & { outcome?: string; companyId?: string } = {},
+): Promise<ClosedDeals> => {
+  const q = scopeParams(params)
+  if (params.outcome) q.outcome = params.outcome
+  if (params.companyId) q.companyId = params.companyId
+  return maestroGet('closedDeals', q)
+}
+
+export const getFollowUps = (scope: CrmScope = {}): Promise<FollowUpQueue> =>
+  maestroGet('followUps', scopeParams(scope))
+
+export const getLeads = (
+  params: CrmScope & { status?: string; source?: string; category?: string } = {},
+): Promise<LeadList> => maestroGet('leads', params as Record<string, string>)
+
+export const getDeals = (
+  params: CrmScope & { companyId?: string; phase?: string; openOnly?: string } = {},
+): Promise<{ total: number; rows: Deal[] } & Pick<Pipeline, 'lossReasons' | 'sources' | 'activityKinds'>> =>
   maestroGet('deals', params as Record<string, string>)
+
+export const getDeal = (companyId: string, entryId: string): Promise<DealDetail> =>
+  maestroGet('deal', { companyId, entryId })
+
+/**
+ * Log activity on a deal. Also stamps the touch, which is what makes the staleness
+ * signal trustworthy — it is a by-product of doing the work, not a field to maintain.
+ */
+export const addDealNote = (
+  companyId: string,
+  entryId: string,
+  body: { text: string; kind?: string; nextFollowUp?: string; nextStep?: string },
+): Promise<DealDetail> => maestroPost('addDealNote', { companyId, entryId, ...body })
+
+/** Set, move or clear a follow-up. An empty date clears the step with it. */
+export const setDealFollowUp = (
+  companyId: string,
+  entryId: string,
+  body: { nextFollowUp: string; nextStep?: string },
+): Promise<DealDetail> => maestroPost('setDealFollowUp', { companyId, entryId, ...body })
+
+/**
+ * Record that a follow-up HAPPENED — as opposed to just clearing the date, which
+ * would leave no evidence anyone did the thing they said they would.
+ */
+export const completeFollowUp = (
+  companyId: string,
+  entryId: string,
+  body: { text?: string; kind?: string; nextFollowUp?: string; nextStep?: string } = {},
+): Promise<DealDetail> => maestroPost('completeFollowUp', { companyId, entryId, ...body })
 
 export const createDeal = (companyId: string, fields: Partial<Record<DealFieldKey, string>>): Promise<Deal> =>
   maestroPost('createDeal', { companyId, fields })

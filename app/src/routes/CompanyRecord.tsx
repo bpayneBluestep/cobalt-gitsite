@@ -4,7 +4,6 @@ import {
   ApiError, getCompany, setCategory,
   COMPANY_CATEGORIES, type Company,
 } from '../api'
-import AccountOwnerCard from '../components/AccountOwnerCard'
 import RecordTabs from '../components/RecordTabs'
 
 /*
@@ -191,7 +190,7 @@ export default function CompanyRecord() {
             </div>
           </div>
 
-          <RecordTabs companyId={company.id} />
+          <RecordTabs companyId={company.id} categories={company.categories} />
 
           <Outlet context={{
             company,
@@ -202,10 +201,4 @@ export default function CompanyRecord() {
       )}
     </section>
   )
-}
-
-/** The account owner belongs to the record, but only the Info tab has room for it. */
-export function RecordOwnerCard() {
-  const { company, reload } = useRecord()
-  return <AccountOwnerCard companyId={company.id} onChanged={reload} />
 }

@@ -6,6 +6,8 @@ import {
 } from '../api'
 import CrmNav from '../components/CrmNav'
 import DealEditor from '../components/DealEditor'
+import OwnerScope, { ScopeNote, useScope } from '../components/OwnerScope'
+import UserPicker from '../components/UserPicker'
 import { useSession } from '../session'
 import { htmlToText } from '../lib/html'
 import { todayISO } from '../lib/time'
@@ -34,8 +36,13 @@ type State =
 const LOGIN_URL = '/shared/login/login.jsp?desturl=' +
   encodeURIComponent(window.location.pathname + window.location.search)
 
-/** Only the lead fields this page edits inline. */
-type TouchKey = Extract<CrmFieldKey, 'leadStatus' | 'owner' | 'lastTouch' | 'nextFollowUp'>
+/**
+ * Only the lead fields this page edits inline.
+ *
+ * `ownerId`, not `owner`: the name is a cache the server writes from the id. Editing the
+ * name directly is what made "Brandon Payne" and "Payne, Brandon" two different owners.
+ */
+type TouchKey = Extract<CrmFieldKey, 'leadStatus' | 'ownerId' | 'lastTouch' | 'nextFollowUp'>
 
 export default function CrmProspecting() {
   // Sales and Leadership move deals; Accounting and Client Success only watch. Reading
@@ -46,16 +53,19 @@ export default function CrmProspecting() {
   const [search, setSearch] = useState('')
   const [fStatus, setFStatus] = useState('')
   const [fSource, setFSource] = useState('')
-  const [fOwner, setFOwner] = useState('')
   const [onlyNew, setOnlyNew] = useState(false)
   const [startFor, setStartFor] = useState<Lead | null>(null)
   const [busy, setBusy] = useState('')
   const [notice, setNotice] = useState('')
   const [failure, setFailure] = useState('')
 
-  const load = useCallback(() => {
+  // Whose leads. Shared with every other CRM screen, and Mine by default — see
+  // `lib/scope.ts` for why the default is not Everyone.
+  const [, , ownerId] = useScope()
+
+  const load = useCallback((who: string) => {
     setState({ phase: 'loading' })
-    getLeads({ category: 'Lead' })
+    getLeads({ category: 'Lead', ...(who ? { ownerId: who } : {}) })
       .then(data => setState({ phase: 'ready', data }))
       .catch(err => setState({
         phase: 'error',
@@ -63,17 +73,10 @@ export default function CrmProspecting() {
       }))
   }, [])
 
-  useEffect(load, [load])
+  useEffect(() => { load(ownerId) }, [load, ownerId])
 
   const d = state.phase === 'ready' ? state.data : null
   const today = todayISO()
-
-  const owners = useMemo(() => {
-    if (!d) return []
-    const seen: Record<string, true> = {}
-    for (const r of d.rows) if (r.owner) seen[r.owner] = true
-    return Object.keys(seen).sort()
-  }, [d])
 
   const rows = useMemo(() => {
     if (!d) return []
@@ -84,7 +87,6 @@ export default function CrmProspecting() {
         if (onlyNew && !r.neverWorked) return false
         if (fStatus && r.leadStatus !== fStatus) return false
         if (fSource && r.leadSource !== fSource) return false
-        if (fOwner && r.owner !== fOwner) return false
         if (!q) return true
         return [r.name, r.contactName, r.city, r.state, r.leadSource, htmlToText(r.crmNotes)]
           .some(v => (v || '').toLowerCase().includes(q))
@@ -97,9 +99,9 @@ export default function CrmProspecting() {
         if (da !== db) return da < db ? -1 : 1
         return a.name.localeCompare(b.name)
       })
-  }, [d, search, fStatus, fSource, fOwner, onlyNew])
+  }, [d, search, fStatus, fSource, onlyNew])
 
-  const activeFilters = [fStatus, fSource, fOwner].filter(Boolean).length + (onlyNew ? 1 : 0)
+  const activeFilters = [fStatus, fSource].filter(Boolean).length + (onlyNew ? 1 : 0)
 
   /** Write one field on a lead, straight from its row. */
   function touch(lead: Lead, key: TouchKey, value: string, said: string) {
@@ -107,7 +109,7 @@ export default function CrmProspecting() {
     if (busy) return
     setBusy(lead.id); setFailure(''); setNotice('')
     updateCompany(lead.id, { [key]: value })
-      .then(() => { setNotice(`${lead.name}: ${said}`); load() })
+      .then(() => { setNotice(`${lead.name}: ${said}`); load(ownerId) })
       .catch(err => setFailure(err instanceof ApiError ? err.message : String(err)))
       .finally(() => setBusy(''))
   }
@@ -139,7 +141,7 @@ export default function CrmProspecting() {
           <p className="callout__actions">
             {state.error.needsLogin
               ? <a className="btn" href={LOGIN_URL}>Sign in to BlueStep</a>
-              : <button type="button" className="btn" onClick={load}>Try again</button>}
+              : <button type="button" className="btn" onClick={() => load(ownerId)}>Try again</button>}
           </p>
         </div>
       )}
@@ -185,23 +187,19 @@ export default function CrmProspecting() {
                 {d.sources.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
-            <div className="ef">
-              <label htmlFor="l-owner">Owner</label>
-              <select id="l-owner" value={fOwner} onChange={e => setFOwner(e.target.value)}>
-                <option value="">Anyone</option>
-                {owners.map(o => <option key={o} value={o}>{o}</option>)}
-              </select>
-            </div>
             {activeFilters > 0 && (
               <div className="ef">
                 <label>&nbsp;</label>
                 <button type="button" className="btn btn--ghost"
-                  onClick={() => { setFStatus(''); setFSource(''); setFOwner(''); setOnlyNew(false) }}>
+                  onClick={() => { setFStatus(''); setFSource(''); setOnlyNew(false) }}>
                   Clear filters
                 </button>
               </div>
             )}
+            <OwnerScope />
           </div>
+
+          <ScopeNote ownerName={d.filters?.owner ?? null} />
 
           {notice && <p className="board2__notice" role="status">{notice}</p>}
           {failure && <p className="editcard__err" role="alert">{failure}</p>}
@@ -216,7 +214,7 @@ export default function CrmProspecting() {
               onSaved={deal => {
                 setStartFor(null)
                 setNotice(`${deal.title} opened — it is on the pipeline board now.`)
-                load()
+                load(ownerId)
               }}
               onDeleted={() => setStartFor(null)}
               onClose={() => setStartFor(null)}
@@ -243,6 +241,7 @@ export default function CrmProspecting() {
                     <th scope="col">Contact</th>
                     <th scope="col">Source</th>
                     <th scope="col">Status</th>
+                    <th scope="col">Owner</th>
                     <th scope="col">Beds</th>
                     <th scope="col">Last touch</th>
                     <th scope="col">Follow-up</th>
@@ -288,6 +287,26 @@ export default function CrmProspecting() {
                             <option value="">—</option>
                             {LEAD_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
                           </select>
+                        </td>
+                        <td>
+                          {/*
+                            Assigned here because this is where leads get triaged, and a
+                            lead nobody owns appears in nobody's "Mine" — which is exactly
+                            the lead that gets forgotten. Picked, never typed: the whole
+                            reason `ownerId` exists.
+                          */}
+                          <UserPicker
+                            value={r.ownerId || ''}
+                            placeholder="Nobody"
+                            ariaLabel={`Owner for ${r.name}`}
+                            disabled={busy === r.id || !mayEdit}
+                            onChange={id => touch(r, 'ownerId', id, id ? 'owner set.' : 'owner cleared.')}
+                          />
+                          {!r.ownerId && r.owner && (
+                            <span className="muted" title="Imported as a name with no matching staff record">
+                              {r.owner}
+                            </span>
+                          )}
                         </td>
                         <td className="num">{r.beds === null ? <span className="muted">—</span> : r.beds}</td>
                         <td className="nowrap">{r.lastTouch || <span className="muted">—</span>}</td>

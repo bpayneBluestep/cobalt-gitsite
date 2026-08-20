@@ -3744,3 +3744,329 @@ a.subcrumb:hover { color: var(--cobalt); }
   color: var(--text);
   font-weight: 600;
 }
+
+/* ---------------------------------------------------------------------------
+ * CRM: scope, deal age, activity, follow-ups
+ *
+ * Added 2026-08-20 with the business-development pass. Colours follow this file's
+ * existing habit — semantic hues written literally (#ce4a5b bad, #5AA33C good) and
+ * var(--warn) for caution — rather than new tokens nothing else would use.
+ * ------------------------------------------------------------------------- */
+
+.pipebar__tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.85rem;
+}
+
+/* Hygiene counters. Links where they can be, because each one is a thing to go and do. */
+.pipebar__flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: -0.4rem 0 0.9rem;
+}
+
+.flag {
+  display: inline-block;
+  padding: 0.14rem 0.45rem;
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  text-decoration: none;
+  background: var(--bg-sunk);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+a.flag:hover { border-color: var(--line-strong); color: var(--text); }
+.flag--bad   { color: #ce4a5b; border-color: #ce4a5b; }
+.flag--warn  { color: var(--warn); border-color: var(--warn); }
+.flag--quiet { color: var(--text-mute); }
+
+/* ── whose work ─────────────────────────────────────────────────────────── */
+
+.scope {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+.scope__label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-mute);
+  margin-right: 0.15rem;
+}
+.scope__who { max-width: 11rem; }
+
+.scope__note {
+  margin: -0.5rem 0 0.9rem;
+  font-size: 0.76rem;
+  color: var(--text-mute);
+}
+
+/* ── deal age on a card ─────────────────────────────────────────────────── */
+
+.dcard__age {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin: 0.35rem 0 0;
+}
+
+.dchip {
+  padding: 0.08rem 0.35rem;
+  font-family: var(--font-display);
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  background: var(--bg-sunk);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  white-space: nowrap;
+}
+.dchip[data-stuck] { color: var(--warn); border-color: var(--warn); }
+.dchip--bad   { color: #ce4a5b; border-color: #ce4a5b; }
+.dchip--warn  { color: var(--warn); border-color: var(--warn); }
+.dchip--ok    { color: #5AA33C; border-color: #5AA33C; }
+.dchip--quiet { color: var(--text-mute); border-color: var(--line); }
+
+/* The same facts, in prose, at the top of an open deal. */
+.dage {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.3rem;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  color: var(--text-mute);
+}
+.dage__ph[data-stuck] { color: var(--warn); }
+.dage__cold { color: #ce4a5b; }
+
+/* ── dragging ───────────────────────────────────────────────────────────── */
+
+.dcard[draggable="true"] { cursor: grab; }
+.dcard[data-drag] { opacity: 0.45; cursor: grabbing; }
+/* Busy rather than disabled: the card is still readable, it just cannot move yet. */
+.dcard[data-busy] { opacity: 0.6; }
+
+.pipe__col[data-over] {
+  background: color-mix(in srgb, var(--cobalt) 10%, transparent);
+  outline: 2px dashed var(--cobalt);
+  outline-offset: -2px;
+}
+
+/* ── a deal's history ───────────────────────────────────────────────────── */
+
+.dealcard__hist {
+  margin: 1.2rem 0 0.6rem;
+  font-size: 0.9rem;
+}
+
+.dact { display: flex; flex-direction: column; gap: 0.9rem; }
+
+.dact__next {
+  padding: 0.7rem 0.85rem;
+  background: var(--bg-raise);
+  border: 1px solid var(--line);
+  border-left-width: 3px;
+  border-radius: var(--r);
+}
+.dact__next[data-tone="bad"]  { border-left-color: #ce4a5b; }
+.dact__next[data-tone="warn"] { border-left-color: var(--warn); }
+.dact__next[data-tone="ok"]   { border-left-color: #5AA33C; }
+.dact__next[data-tone="none"] { border-left-color: var(--line-strong); }
+
+.dact__nexthead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+.dact__nexthead h3 {
+  margin: 0;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-mute);
+}
+.dact__due { font-family: var(--font-display); font-size: 0.78rem; color: var(--text); }
+.dact__step { margin: 0.3rem 0 0; font-size: 0.85rem; }
+.dact__on { font-family: var(--font-display); font-size: 0.72rem; color: var(--text-mute); }
+
+.dact__acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+}
+.dact__count { margin-right: auto; font-size: 0.72rem; color: var(--text-mute); }
+
+.dact__fuform {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.6rem;
+}
+.dact__fuform .ef--wide { flex: 1 1 16rem; }
+
+.dact__log {
+  padding: 0.7rem 0.85rem;
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.dact__logrow { display: flex; gap: 0.6rem; }
+.dact__box {
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.45rem 0.55rem;
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--text);
+  background: var(--bg-raise);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  resize: vertical;
+}
+.dact__box:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 1px; }
+
+.dact__also {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.actlist { list-style: none; margin: 0; padding: 0; }
+
+.act {
+  padding: 0.55rem 0 0.55rem 0.7rem;
+  border-left: 2px solid var(--line);
+}
+/* A person's note is the substance; a server event is scaffolding around it. */
+.act[data-type="event"] { border-left-color: var(--line); color: var(--text-mute); }
+.act[data-type="comment"] { border-left-color: var(--cobalt); }
+
+.act__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  color: var(--text-mute);
+}
+.act__who { font-weight: 600; color: var(--text-dim); }
+.act__when { font-family: var(--font-display); }
+.act__kind {
+  padding: 0.05rem 0.3rem;
+  font-family: var(--font-display);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--cobalt);
+  border: 1px solid var(--cobalt);
+  border-radius: var(--r);
+}
+.act__text {
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
+  /* Notes are typed as prose with newlines and no markup — honour the line breaks. */
+  white-space: pre-wrap;
+}
+.act[data-type="event"] .act__text { font-size: 0.8rem; }
+
+/* ── the follow-up queue ────────────────────────────────────────────────── */
+
+.fulist { list-style: none; margin: 0; padding: 0; }
+
+.fu {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 0.7rem 0 0.7rem 0.6rem;
+  border-bottom: 1px solid var(--line);
+  border-left: 3px solid transparent;
+}
+.fu:last-child { border-bottom: none; }
+.fu[data-state="overdue"] { border-left-color: #ce4a5b; }
+.fu[data-state="today"]   { border-left-color: var(--warn); }
+
+.fu__main { flex: 1 1 20rem; min-width: 0; }
+.fu__title { margin: 0; font-size: 0.9rem; }
+.fu__step { margin: 0.2rem 0 0; font-size: 0.85rem; color: var(--text-dim); }
+.fu__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  margin: 0.3rem 0 0;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+.fu__due { font-family: var(--font-display); }
+.fu__due[data-state="overdue"] { color: #ce4a5b; }
+.fu__due[data-state="today"]   { color: var(--warn); }
+
+.fu__acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+.fu__note {
+  min-width: 12rem;
+  padding: 0.3rem 0.45rem;
+  font: inherit;
+  font-size: 0.8rem;
+  color: var(--text);
+  background: var(--bg-raise);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+
+/* ── a company's own deals ──────────────────────────────────────────────── */
+
+.cdeals { list-style: none; margin: 0; padding: 0; }
+
+.cdeal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.7rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.cdeal:last-child { border-bottom: none; }
+/* A decided deal is history sitting under the live work — present, not competing. */
+.cdeal:not([data-open]) { opacity: 0.78; }
+
+.cdeal__main { flex: 1 1 18rem; min-width: 0; }
+.cdeal__title { display: flex; align-items: center; gap: 0.4rem; margin: 0; font-size: 0.9rem; }
+.cdeal__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  margin: 0.25rem 0 0;
+  font-size: 0.76rem;
+  color: var(--text-dim);
+}
+.cdeal__side { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+
+/* ── odds and ends ──────────────────────────────────────────────────────── */
+
+.pill[data-out="won"]  { color: #5AA33C; border-color: #5AA33C; }
+.pill[data-out="lost"] { color: #ce4a5b; border-color: #ce4a5b; }
+.pill--quiet { color: var(--text-mute); }
+
+.bad { color: #ce4a5b; }
+.bad strong { color: #ce4a5b; }

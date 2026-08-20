@@ -5,6 +5,7 @@ import {
   type CrmSummary,
 } from '../api'
 import CrmNav from '../components/CrmNav'
+import OwnerScope, { ScopeNote, useScope } from '../components/OwnerScope'
 
 /*
  * The CRM dashboard — the sixty-second read.
@@ -43,10 +44,14 @@ function Kpi({ label, value, note, tone }: {
 
 export default function CrmDashboard() {
   const [state, setState] = useState<State>({ phase: 'loading' })
+  // Mine by default, like every other CRM screen. A dashboard that opens on the whole
+  // company is right for exactly one person and wrong for everyone who has to find their
+  // own numbers inside it first.
+  const [, , ownerId] = useScope()
 
-  const load = useCallback(() => {
+  const load = useCallback((who: string) => {
     setState({ phase: 'loading' })
-    getCrmSummary()
+    getCrmSummary(who ? { ownerId: who } : {})
       .then(data => setState({ phase: 'ready', data }))
       .catch(err => setState({
         phase: 'error',
@@ -54,7 +59,7 @@ export default function CrmDashboard() {
       }))
   }, [])
 
-  useEffect(load, [load])
+  useEffect(() => { load(ownerId) }, [load, ownerId])
 
   const d = state.phase === 'ready' ? state.data : null
   // The widest open-phase bar sets the scale, so the funnel is readable whatever
@@ -86,13 +91,26 @@ export default function CrmDashboard() {
           <p className="callout__actions">
             {state.error.needsLogin
               ? <a className="btn" href={LOGIN_URL}>Sign in to BlueStep</a>
-              : <button type="button" className="btn" onClick={load}>Try again</button>}
+              : <button type="button" className="btn" onClick={() => load(ownerId)}>Try again</button>}
           </p>
         </div>
       )}
 
       {d && (
         <>
+          <div className="pipebar">
+            <div className="pipebar__totals">
+              <span><strong>{d.counts.openDeals}</strong> open</span>
+              <span><strong>{d.counts.clients}</strong> clients</span>
+              <span className="muted"><strong>{d.counts.leads}</strong> leads</span>
+            </div>
+            <div className="pipebar__tools">
+              <OwnerScope />
+            </div>
+          </div>
+
+          <ScopeNote ownerName={d.owner} />
+
           <div className="kpis">
             <Kpi
               label="Open pipeline"
@@ -128,7 +146,45 @@ export default function CrmDashboard() {
               note={`${d.counts.neverWorked} never worked`}
               tone={d.counts.prospecting ? 'warn' : undefined}
             />
+            {/*
+              The only figure here about what to DO rather than what things are worth,
+              which is why it earns a slot next to the money. Overdue leads the note
+              because a follow-up you are already late on is the more urgent fact.
+            */}
+            <Kpi
+              label="Owed today"
+              value={String(d.counts.dueToday + d.overdueFollowUps)}
+              note={d.overdueFollowUps
+                ? `${d.overdueFollowUps} overdue · ${d.counts.dueToday} due today`
+                : `${d.counts.dueToday} due today`}
+              tone={d.overdueFollowUps ? 'bad' : d.counts.dueToday ? 'warn' : undefined}
+            />
           </div>
+
+          {/*
+            Pipeline hygiene, separate from the KPIs on purpose: these are not
+            achievements or forecasts, they are things that need a person. Hidden entirely
+            when there is nothing to say, rather than showing a row of reassuring zeroes.
+          */}
+          {(d.counts.stuckDeals > 0 || d.counts.staleDeals > 0 || d.counts.neverTouchedDeals > 0) && (
+            <p className="pipebar__flags" role="status">
+              {d.counts.stuckDeals > 0 && (
+                <Link className="flag" to="/crm/pipeline">
+                  {d.counts.stuckDeals} sat still {'>'}{d.vocabularies.stalePhaseDays}d
+                </Link>
+              )}
+              {d.counts.staleDeals > 0 && (
+                <Link className="flag flag--warn" to="/crm/pipeline">
+                  {d.counts.staleDeals} untouched {'>'}{d.vocabularies.staleTouchDays}d
+                </Link>
+              )}
+              {d.counts.neverTouchedDeals > 0 && (
+                <Link className="flag flag--quiet" to="/crm/pipeline">
+                  {d.counts.neverTouchedDeals} with nothing logged
+                </Link>
+              )}
+            </p>
+          )}
 
           <div className="crmgrid">
             <section className="panel">
@@ -177,20 +233,31 @@ export default function CrmDashboard() {
                     <thead>
                       <tr>
                         <th scope="col">Due</th>
-                        <th scope="col">Company</th>
+                        <th scope="col">What</th>
                         <th scope="col">Owner</th>
                       </tr>
                     </thead>
                     <tbody>
+                      {/*
+                        Keyed on kind + company + entry, not company alone: one company can
+                        now raise several follow-ups (a deal each) and a duplicate React key
+                        drops all but the first, which reads as missing data.
+                      */}
                       {d.followUps.slice(0, 8).map(f => (
-                        <tr key={f.companyId} data-overdue={f.overdue ? '' : undefined}>
+                        <tr key={`${f.kind}:${f.companyId}:${f.entryId}`}
+                          data-overdue={f.overdue ? '' : undefined}>
                           <td className="nowrap">
                             {f.nextFollowUp}
                             {f.overdue && <span className="tag tag--warn">overdue</span>}
                           </td>
                           <th scope="row">
-                            <Link className="inlink" to={`/clients/${f.companyId}`}>{f.companyName}</Link>
-                            {!f.hasOpenDeal && <span className="mark">no deal</span>}
+                            <Link className="inlink"
+                              to={f.kind === 'deal' ? `/clients/${f.companyId}/deals` : `/clients/${f.companyId}`}>
+                              {f.kind === 'deal' ? f.title : f.companyName}
+                            </Link>
+                            {f.kind === 'deal'
+                              ? <div className="muted">{f.nextStep || f.companyName}</div>
+                              : <span className="mark">no deal</span>}
                           </th>
                           <td>{f.owner || <span className="muted">—</span>}</td>
                         </tr>
@@ -199,12 +266,10 @@ export default function CrmDashboard() {
                   </table>
                 </div>
               )}
-              {d.followUps.length > 8 && (
-                <p className="panel__foot">
-                  {d.followUps.length - 8} more scheduled.{' '}
-                  <Link className="inlink" to="/crm/prospecting">See prospecting</Link>
-                </p>
-              )}
+              <p className="panel__foot">
+                {d.followUps.length > 8 && <>{d.followUps.length - 8} more scheduled. </>}
+                <Link className="inlink" to="/crm/follow-ups">Work the whole queue</Link>
+              </p>
             </section>
 
             <section className="panel panel--wide">
