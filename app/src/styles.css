@@ -4560,6 +4560,16 @@ a.flag:hover { border-color: var(--line-strong); color: var(--text); }
     align-items: stretch;
     gap: var(--s-s);
   }
+
+  /*
+   * And their main column loses its flex-basis, which is the trap: `flex: 1 1 20rem` in
+   * a ROW means "at least 20rem wide", and the moment the container becomes a column the
+   * same declaration means "at least 20rem TALL". It opened a 200px hole between a
+   * follow-up's text and its buttons — `flex-basis` follows the main axis, and the main
+   * axis just rotated.
+   */
+  .fu__main,
+  .cdeal__main { flex: 0 1 auto; }
   .fu__acts { flex-wrap: wrap; }
   .fu__note { min-width: 0; flex: 1 1 100%; }
 
