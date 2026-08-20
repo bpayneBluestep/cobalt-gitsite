@@ -12,6 +12,49 @@
 
 const MAESTRO_URL = '/b/maestro'
 
+/*
+ * Where the platform's own sign-in lives. These are the real, verified paths on this
+ * host — not guesses:
+ *
+ *   login.jsp   accepts a form POST as `myassn.user.UserLoginWebView` (see `login`)
+ *   logout.jsp  303s to whatever `desturl` names. The `.jsp` matters: the extensionless
+ *               `/shared/login/logout` 404s, here and on every other GitSite host
+ *               checked, so anything copied from a sibling site using it never worked.
+ */
+const LOGIN_URL = '/shared/login/login.jsp'
+const LOGOUT_URL = '/shared/login/logout.jsp'
+
+/*
+ * The OAuth2 broker is a separate, fixed host — the org host is passed to it as a
+ * parameter rather than being where the request goes.
+ */
+const OAUTH2_HOST = 'oauth2.bluestep.net'
+
+/*
+ * Session loss, broadcast rather than returned.
+ *
+ * Any of ~40 calls can be the one that discovers the session died, and each is made from
+ * a route with its own error state. Rather than teach all of them to raise the login gate,
+ * `handle` — the single funnel every response passes through — announces it, and the
+ * session context listens. One place knows, one place reacts.
+ */
+type SessionLostListener = () => void
+const sessionLostListeners: SessionLostListener[] = []
+
+export function onSessionLost(listener: SessionLostListener): () => void {
+  sessionLostListeners.push(listener)
+  return () => {
+    const i = sessionLostListeners.indexOf(listener)
+    if (i >= 0) sessionLostListeners.splice(i, 1)
+  }
+}
+
+function noteSessionLost(): void {
+  for (const listener of sessionLostListeners.slice()) {
+    try { listener() } catch { /* a listener must never break the request path */ }
+  }
+}
+
 export class ApiError extends Error {
   code: string
   status: number
@@ -39,6 +82,7 @@ async function handle(res: Response): Promise<any> {
     // A 5xx is NOT a login problem, even though it also arrives as HTML.
     const bouncedToLogin = res.status === 401 || (res.redirected && res.status < 400)
     if (bouncedToLogin) {
+      noteSessionLost()
       throw new ApiError('Sign in to BlueStep to load this data.', {
         code: 'AUTH_REQUIRED', status: res.status, needsLogin: true,
       })
@@ -60,6 +104,7 @@ async function handle(res: Response): Promise<any> {
   if (!json || json.ok !== true) {
     const code = json?.error || 'REQUEST_FAILED'
     const detail = json?.detail || `Request failed (HTTP ${res.status}).`
+    if (code === 'AUTH_REQUIRED') noteSessionLost()
     throw new ApiError(detail, { code, status: res.status, needsLogin: code === 'AUTH_REQUIRED' })
   }
   return json.data
@@ -143,6 +188,145 @@ export interface Session {
 }
 
 export const getSession = (): Promise<Session> => maestroGet('session')
+
+// ------------------------------------------------------------------------ sign-in
+
+/*
+ * Signing in, four ways, because the platform offers four and hiding any of them just
+ * sends people to a different page to do the same thing.
+ *
+ * BlueStep login is not a JSON API — it is a form POST against a WebView class. Posting
+ * it same-origin authenticates the cookie on THIS host, which is the host the Maestro is
+ * on, so the session the SPA then uses is the one that was just created. A password typed
+ * here goes to this BlueStep host and nowhere else; it is never sent to the Maestro, never
+ * logged, and never held after the request.
+ */
+
+function loginFormBody(username: string, password: string): URLSearchParams {
+  const body = new URLSearchParams()
+  body.set('_postEvent', 'commit')
+  body.set('_postFormClass', 'myassn.user.UserLoginWebView')
+  // Anything other than "one" makes the handler run doLogin() now, rather than serving
+  // step one and waiting for a second round trip.
+  body.set('step', 'two')
+  body.set('myUserName', username)
+  body.set('myPassword', password)
+  body.set('rememberMe', 'false')
+  return body
+}
+
+export type LoginResult =
+  | { ok: true }
+  /** A global account with e-mail 2FA. The caller must hand off — see `nativeLoginSubmit`. */
+  | { ok: false; twoFactor: true }
+  | { ok: false; twoFactor?: false; error: string }
+
+/**
+ * Try a username/password sign-in without leaving the page.
+ *
+ * The response is NOT the answer. A failed login returns the login page again with HTTP
+ * 200, so believing the status code would report every bad password as a success. The
+ * authoritative test is whether the session actually became authenticated, which is why
+ * this re-probes `session` and trusts that instead.
+ */
+export async function login(username: string, password: string): Promise<LoginResult> {
+  let res: Response
+  try {
+    res = await fetch(LOGIN_URL, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: loginFormBody(username, password).toString(),
+    })
+  } catch {
+    return { ok: false, error: 'Could not reach the sign-in service. Check your connection.' }
+  }
+
+  // A global account is bounced to e-mail verification, which an in-page fetch cannot
+  // finish — the user has to see the platform's own page.
+  if (res.redirected && /\/oauth2\/v1\/login\/verify/.test(res.url)) {
+    return { ok: false, twoFactor: true }
+  }
+
+  try {
+    const session = await getSession()
+    if (session && session.loggedIn) return { ok: true }
+  } catch {
+    /* fall through — an unreadable session here means we are still signed out */
+  }
+  return { ok: false, error: 'That username and password did not match.' }
+}
+
+/**
+ * Where to come back to after a full-page round trip through the platform.
+ *
+ * A path, not an absolute URL: the platform's own login page passes a path and resolves
+ * it against the host it was given, so matching that is the behaviour actually known to
+ * work. Verified — `?desturl=/spa/` 303s to `/spa/` on this host.
+ */
+function returnPath(): string {
+  return window.location.pathname + window.location.search + window.location.hash
+}
+
+/**
+ * Hand the browser to the platform's login page as a real page load, carrying the
+ * credentials already typed, so it can run the e-mail 2FA step and send us back.
+ *
+ * A hidden form rather than a redirect because this has to be a POST — a password does
+ * not belong in a URL.
+ */
+export function nativeLoginSubmit(username: string, password: string): void {
+  const form = document.createElement('form')
+  form.method = 'POST'
+  form.action = `${LOGIN_URL}?desturl=${encodeURIComponent(returnPath())}`
+  form.style.display = 'none'
+  const add = (name: string, value: string) => {
+    const input = document.createElement('input')
+    input.type = 'hidden'
+    input.name = name
+    input.value = value
+    form.appendChild(input)
+  }
+  add('_postEvent', 'commit')
+  add('_postFormClass', 'myassn.user.UserLoginWebView')
+  add('step', 'two')
+  add('myUserName', username)
+  add('myPassword', password)
+  add('rememberMe', 'false')
+  document.body.appendChild(form)
+  form.submit()
+}
+
+export type SsoProvider = 'microsoft' | 'google'
+
+/**
+ * Where to send someone signing in with Microsoft or Google.
+ *
+ * The broker is a fixed separate host and the org is a parameter, so `host` must be the
+ * hostname the user is actually on — read from the page, never hard-coded. Cobalt answers
+ * on two hostnames (`cobalt` and `cobaltorg`) and only the one being used will have a
+ * session afterwards, so guessing would sign people in to the wrong place.
+ */
+export function ssoLoginUrl(provider: SsoProvider): string {
+  const host = encodeURIComponent(window.location.hostname)
+  const dest = encodeURIComponent(returnPath())
+  return `https://${OAUTH2_HOST}/v1/login/initiate/${provider}?host=${host}&destUrl=${dest}`
+}
+
+/**
+ * The platform's own login page, in global-account mode.
+ *
+ * Kept as an escape hatch: it is the page that handles every case this gate does not,
+ * so a person who cannot get in here is never stuck.
+ */
+export function globalLoginUrl(): string {
+  return `${LOGIN_URL}?step=two&_globalLogin=true&desturl=${encodeURIComponent(returnPath())}`
+}
+
+/** Sign out on the platform and come back to the gate. */
+export function logoutUrl(): string {
+  return `${LOGOUT_URL}?desturl=${encodeURIComponent(returnPath())}`
+}
 
 /**
  * A company as `companyRow` returns it — the whole Company Info catalog, including

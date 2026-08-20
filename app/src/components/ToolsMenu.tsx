@@ -23,8 +23,11 @@ import { Link } from 'react-router-dom'
  * the SPA, and opens in a new tab so the explorer isn't lost. Access is enforced
  * by BlueStep, not here: an unauthorised visitor gets the login page.
  *
- * TODO once the login gate lands (branch schema-behind-login): render this only
- * for supers, matching eccrm, by gating on the session probe's isSuper.
+ * The menu as a whole is rendered only for `viewSchema` (Leadership and the two
+ * engineer roles) — see App.tsx. That resolves the old TODO here, which wanted
+ * super-only gating once a login existed: the login landed, and roles turned out
+ * to be the better boundary than isSuper, since an engineer needs these tools and
+ * is not a super. The `schema-behind-login` branch that TODO pointed at is dead.
  */
 
 interface Tool {

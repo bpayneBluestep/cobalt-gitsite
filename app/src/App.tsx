@@ -10,6 +10,7 @@ import Tickets from './routes/Tickets'
 import Explorer from './routes/Explorer'
 import UnderConstruction from './routes/UnderConstruction'
 import NoAccess from './routes/NoAccess'
+import LoginGate from './routes/LoginGate'
 import CrmDashboard from './routes/CrmDashboard'
 import CrmPipeline from './routes/CrmPipeline'
 import CrmProspecting from './routes/CrmProspecting'
@@ -18,7 +19,7 @@ import Settings from './routes/Settings'
 import TicketPage from './routes/TicketPage'
 import Intake from './routes/Intake'
 import { SECTIONS } from './sections'
-import type { Capability } from './api'
+import { logoutUrl, type Capability } from './api'
 import { SessionProvider, useSession } from './session'
 import ThemeToggle from './components/ThemeToggle'
 import ToolsMenu from './components/ToolsMenu'
@@ -43,9 +44,9 @@ function Guarded({
   what: string
   children: ReactElement
 }) {
-  const { can, loading } = useSession()
-  // Say nothing while the session is in flight rather than flashing either answer.
-  if (loading) return <p className="page__loading">Checking your access…</p>
+  // No loading branch: Shell does not render any route until the session has landed, so
+  // `can` is always answering from a real session by the time this runs.
+  const { can } = useSession()
   if (!can(needs)) return <NoAccess what={what} needs={CAPABILITY_LABELS[needs]} />
   return children
 }
@@ -80,7 +81,38 @@ const CAPABILITY_LABELS: Record<Capability, string> = {
 }
 
 function Shell() {
-  const { loading, error, needsLogin, can, roles, session } = useSession()
+  const { loading, error, signedOut, can, roles, session, reload } = useSession()
+
+  /*
+   * Three whole-screen states, ahead of the frame rather than inside it.
+   *
+   * The gate has to replace the app, not sit in its content area: "gated behind login"
+   * means a signed-out visitor sees no nav, no brand chrome to click, and no shell that
+   * implies there is something behind it. Checking `loading` first is what stops an
+   * authenticated user seeing the sign-in form flash before their session arrives.
+   */
+  if (loading) {
+    return (
+      <div className="boot">
+        <span className="brand__mark" aria-hidden="true" />
+        <p>Signing you in…</p>
+      </div>
+    )
+  }
+
+  if (signedOut) return <LoginGate onAuthenticated={reload} />
+
+  if (error) {
+    return (
+      <div className="boot boot--bad">
+        <h1>Cobalt could not read your session</h1>
+        <p>{error}</p>
+        {/* Signing out is the one useful action here: a half-valid session is the most
+            likely cause, and starting over clears it. */}
+        <p><a className="btn" href={logoutUrl()}>Sign out and start again</a></p>
+      </div>
+    )
+  }
 
   // A section is in the nav only if its capability is held. `needs` lives on the section
   // itself, so the nav and the route below read the same declaration.
@@ -105,34 +137,25 @@ function Shell() {
         <div className="topbar__end">
           {can('viewSchema') && <ToolsMenu />}
           <ThemeToggle />
+          {/* Now that there is a login there has to be a visible way out of it, and a
+              visible answer to "who am I signed in as" — which matters more than usual
+              here, because what the app shows depends on the answer. */}
+          <div className="whoami">
+            <span className="whoami__name" title={session?.fullName || ''}>
+              {session?.fullName || 'Signed in'}
+            </span>
+            <a className="whoami__out" href={logoutUrl()}>Sign out</a>
+          </div>
         </div>
       </header>
 
       <main>
         {/*
-          Three states before any route renders, because they need different answers and
-          conflating them is what makes a permission problem look like an outage:
-            * not signed in       -> sign in
-            * session unreadable  -> the app is broken, say so
-            * signed in, no roles -> nothing is wrong, you just have no access yet
+          Signed in but holding no roles is not an error and not a login problem — it is a
+          real, correct state with its own answer, and the only one left to handle here now
+          that the gate and the boot states are above.
         */}
-        {needsLogin ? (
-          <section className="page">
-            <header className="page__head">
-              <h1>Sign in to Cobalt</h1>
-              <p className="page__sub-text">
-                Cobalt reads live BlueStep data, so it needs your session. Sign in and reload.
-              </p>
-            </header>
-          </section>
-        ) : error ? (
-          <section className="page">
-            <header className="page__head">
-              <h1>Cobalt could not read your session</h1>
-              <p className="page__sub-text">{error}</p>
-            </header>
-          </section>
-        ) : !loading && session && roles.length === 0 ? (
+        {roles.length === 0 ? (
           <NoAccess what="Cobalt" />
         ) : (
           <Routes>

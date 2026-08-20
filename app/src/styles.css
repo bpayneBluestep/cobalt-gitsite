@@ -3204,44 +3204,45 @@ a.subcrumb:hover { color: var(--cobalt); }
    fieldset reset that lets one `disabled` cover a whole form. */
 
 .page__loading {
-  padding: var(--sp-6) var(--sp-5);
+  padding: 1.5rem 1.25rem;
   color: var(--text-mute);
   font-size: 0.9375rem;
 }
 
 .noaccess {
   max-width: 46rem;
-  padding: var(--sp-5);
+  padding: 1.15rem 1.25rem 1.25rem;
+  background: var(--bg-panel);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--surface);
+  border-radius: var(--r);
 }
 
 .noaccess__facts {
   display: grid;
-  gap: var(--sp-3);
-  margin: 0 0 var(--sp-4);
+  gap: 0.6rem;
+  margin: 0 0 1rem;
 }
 
 .noaccess__facts > div {
   display: grid;
   grid-template-columns: 7rem 1fr;
-  gap: var(--sp-3);
+  gap: 0.75rem;
   align-items: baseline;
 }
 
 .noaccess__facts dt {
   color: var(--text-mute);
-  font-size: 0.8125rem;
+  font-family: var(--font-display);
+  font-size: 0.65rem;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
 }
 
 .noaccess__facts dd {
   margin: 0;
   display: flex;
   flex-wrap: wrap;
-  gap: var(--sp-2);
+  gap: 0.35rem;
   align-items: center;
 }
 
@@ -3249,7 +3250,7 @@ a.subcrumb:hover { color: var(--cobalt); }
 .noaccess__none { color: var(--text-mute); font-style: italic; }
 
 .noaccess__fix {
-  margin: 0 0 var(--sp-4);
+  margin: 0 0 1rem;
   color: var(--text-dim);
   line-height: 1.55;
 }
@@ -3274,4 +3275,245 @@ a.subcrumb:hover { color: var(--cobalt); }
 .efgrid--fs:disabled textarea {
   opacity: 0.7;
   cursor: default;
+}
+
+/* ---------------------------------------------------------------------- sign-in
+
+   The whole app sits behind this, so it renders on its own with no shell around it.
+   One centred card rather than the reference site's two-panel split: Cobalt is an
+   internal tool for five people, and a marketing panel selling it to its own staff
+   would be theatre. */
+
+.boot {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9rem;
+  background: var(--bg);
+  color: var(--text-mute);
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.boot p { margin: 0; }
+
+.boot--bad {
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 0.9375rem;
+  letter-spacing: normal;
+  text-transform: none;
+  text-align: center;
+  padding: 2rem 1.25rem;
+}
+
+.boot--bad h1 { font-size: 1.15rem; margin: 0; }
+.boot--bad p { max-width: 40rem; color: var(--text-dim); line-height: 1.55; }
+
+.login {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem 1.25rem 3rem;
+  background: var(--bg);
+}
+
+/* Top-right, out of the card: it is a preference, not part of signing in. */
+.login__toggle {
+  position: absolute;
+  top: 0.9rem;
+  right: 0.9rem;
+}
+
+.login__card {
+  width: 100%;
+  max-width: 23rem;
+  padding: 1.5rem 1.5rem 1.35rem;
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  box-shadow: 0 1px 2px rgb(15 25 48 / 0.06), 0 18px 40px -22px rgb(15 25 48 / 0.35);
+}
+
+.login__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 1.35rem;
+}
+
+.login__name { font-size: 1rem; font-weight: 700; letter-spacing: -0.02em; }
+
+.login__sub {
+  font-family: var(--font-display);
+  font-size: 0.6rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+
+.login__title { font-size: 1.35rem; margin: 0 0 0.3rem; letter-spacing: -0.02em; }
+
+.login__lede {
+  margin: 0 0 1.15rem;
+  color: var(--text-dim);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.login__err {
+  margin: 0 0 0.9rem;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.875rem;
+  color: var(--text);
+  background: color-mix(in srgb, var(--warn) 10%, var(--bg-panel));
+  border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent);
+  border-left: 2px solid var(--warn);
+  border-radius: var(--r);
+}
+
+.login__form { display: grid; gap: 0.75rem; }
+
+.login__field { display: grid; gap: 0.3rem; }
+
+.login__field > span {
+  font-family: var(--font-display);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+
+.login__field input {
+  font: inherit;
+  font-size: 0.9375rem;
+  padding: 0.45rem 0.55rem;
+  color: var(--text);
+  background: var(--bg-raise);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+
+.login__field input:focus-visible {
+  outline: 2px solid var(--cobalt);
+  outline-offset: -1px;
+  background: var(--bg-panel);
+}
+
+.login__field input:disabled { opacity: 0.6; }
+
+.login__go {
+  margin-top: 0.2rem;
+  padding: 0.5rem 0.7rem;
+  text-align: center;
+}
+
+.login__go:disabled { opacity: 0.65; cursor: default; }
+
+/* A rule with the word sitting in it, so the two routes read as alternatives rather
+   than as a sequence to work through. */
+.login__or {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 1.15rem 0;
+  color: var(--text-mute);
+  font-family: var(--font-display);
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.login__or::before,
+.login__or::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+.login__sso { display: grid; gap: 0.5rem; }
+
+.login__provider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.7rem;
+  font-size: 0.875rem;
+  text-decoration: none;
+  color: var(--text);
+  background: var(--bg-panel);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+}
+
+.login__provider:hover { background: var(--bg-raise); }
+
+.login__provider:focus-visible {
+  outline: 2px solid var(--cobalt);
+  outline-offset: 1px;
+}
+
+/* The provider marks are supplied as favicons by the platform's own login page. Keep a
+   fixed box so a slow or blocked icon does not shift the button's text. */
+.login__provider img {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.login__alt { margin: 0.9rem 0 0; text-align: center; font-size: 0.875rem; }
+.login__alt a { color: var(--cobalt); }
+
+.login__legal {
+  margin: 1.15rem 0 0;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--line);
+  color: var(--text-mute);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+/* ---- who is signed in, in the topbar ---- */
+
+.whoami {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-left: 0.6rem;
+  margin-left: 0.15rem;
+  border-left: 1px solid var(--line);
+  min-width: 0;
+}
+
+.whoami__name {
+  max-width: 12ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8125rem;
+  color: var(--text-dim);
+}
+
+.whoami__out {
+  font-family: var(--font-display);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--text-mute);
+  white-space: nowrap;
+}
+
+.whoami__out:hover { color: var(--cobalt); }
+
+/* On a narrow screen the name is the first thing worth losing — the sign-out link is
+   the part that has to stay reachable. */
+@media (max-width: 720px) {
+  .whoami__name { display: none; }
 }
