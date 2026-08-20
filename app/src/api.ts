@@ -257,11 +257,15 @@ function looksSignedIn(html: string): boolean {
  * authoritative test is whether the session actually became authenticated, which is why
  * this re-probes `session` and trusts that instead.
  *
- * But a failed probe does not mean the password was wrong. The Maestro endpoint requires a
- * **Relate licence** — an unlicensed account signs in to the platform perfectly well and
- * still gets bounced from `/b/maestro`, which is indistinguishable from being signed out
- * if you only look at the probe. Reporting that as "wrong username or password" is what
- * this used to do, and it sent a real person hunting for a typo in a correct password.
+ * But a failed probe does not mean the password was wrong. **The endpoint has its own
+ * permission list**, separate from every form ACL: an account the endpoint refuses signs in
+ * to the platform perfectly well and is still bounced from `/b/maestro`, which is
+ * indistinguishable from being signed out if the probe is all you look at. Reporting that
+ * as "wrong username or password" is what this used to do, and it sent a real person
+ * hunting for a typo in a password that was correct.
+ *
+ * Check the endpoint's own permissions before believing a "bad credentials" report — on
+ * Cobalt this was `Registered Users: No Access` on the script itself.
  */
 export async function login(username: string, password: string): Promise<LoginResult> {
   let res: Response
@@ -304,9 +308,9 @@ export async function login(username: string, password: string): Promise<LoginRe
       reason: 'noAccess',
       error:
         'Your username and password were accepted — you are signed in to BlueStep. But ' +
-        'this account cannot open Cobalt: the endpoint it reads needs a Relate licence, ' +
-        'and this account does not have one. An administrator has to grant it; signing in ' +
-        'again will not help.',
+        'this account has no access to the endpoint Cobalt reads its data from, so there ' +
+        'is nothing to show you. An administrator needs to grant this account access to ' +
+        'the Cobalt Maestro endpoint; signing in again will not help.',
     }
   }
 
