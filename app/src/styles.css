@@ -1,24 +1,115 @@
 /* ---------------------------------------------------------------------------
- * Cobalt — schema explorer
+ * Cobalt — design tokens
  *
- * Palette is drawn from the cobalt pigment family (see pigments.ts): the org is
- * named after the mineral, so the interface is built in its blues and the field
- * types are its pigments. Type is monospace-forward because nearly everything on
- * this page is an identifier someone is about to paste into code.
+ * Reskinned to Fluent 2 (Microsoft's design language) on 2026-08-20. Cobalt is dense
+ * desktop productivity software, which is the one thing Fluent is actually designed for,
+ * and it is the visual language these users already spend all day in via Microsoft 365.
+ *
+ * Implemented as tokens over the existing stylesheet rather than by installing
+ * @fluentui/react-components: that would mean rewriting ~40 components and roughly
+ * doubling a 425KB bundle to reach an aesthetic that is mostly type, radius, elevation
+ * and motion. It also means these tokens can be lifted into the sibling GitSites (eccrm,
+ * program-directory) without installing anything three times.
+ *
+ * What was making it feel "blocky and robotic", and what changed:
+ *
+ *   * a MONOSPACE face on 101 rules — every heading, label, button and badge. Now
+ *     `--font-display` is Fluent's own Segoe UI Variable stack, and `--font-mono`
+ *     survives for the handful of places showing a real identifier.
+ *   * UPPERCASE + letter-spacing on all interactive chrome. Fluent is sentence case.
+ *   * 3px radii — nearly square. Fluent's ramp is 2/4/6/8.
+ *   * flat rectangles outlined in 1px, ~200 times over. Fluent separates surfaces with
+ *     ELEVATION and reserves strokes for the ones that genuinely need an edge.
+ *   * no motion at all. Fluent has a defined ramp of durations and curves.
+ *   * 11px type on labels — below Fluent's smallest ramp step, and simply hard to read.
+ *
+ * The palette keeps its cobalt wash: the org is named after the mineral. What changed is
+ * that it is now a structured ramp rather than nine hand-picked values, so elevation has
+ * somewhere to go.
  * ------------------------------------------------------------------------- */
 
 :root {
-  --font-display: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
-  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  /*
+   * Fluent's own stack. "Segoe UI Variable" is the Fluent 2 face and is present on
+   * Windows 11 — which is what these users are on — with graceful fallback everywhere
+   * else. `Text` is the optical size tuned for body copy; `Display` for large headings.
+   */
+  --font-ui: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", -apple-system,
+    BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: "Segoe UI Variable Display", "Segoe UI Variable", "Segoe UI",
+    -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif;
+  /*
+   * Kept for things that are genuinely an identifier someone is about to paste into
+   * code — record ids, C-column names, the schema explorer. Everything else that used
+   * to be monospace was a heading or a label wearing a costume.
+   */
+  --font-mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
 
+  /* ── Fluent type ramp ──────────────────────────────────────────────────── */
+  --t-caption2: 10px;
+  --t-caption1: 12px;
+  --t-body1: 14px;
+  --t-body2: 16px;
+  --t-subtitle2: 16px;
+  --t-subtitle1: 20px;
+  --t-title3: 24px;
+  --t-title2: 28px;
+  --t-title1: 32px;
+
+  /* ── Fluent radii ─────────────────────────────────────────────────────── */
+  --r-sm: 2px;
+  --r: 4px;
+  --r-lg: 6px;
+  --r-xl: 8px;
+  --r-pill: 9999px;
+
+  /* ── Fluent spacing (4px base) ────────────────────────────────────────── */
+  --s-xxs: 2px;
+  --s-xs: 4px;
+  --s-snudge: 6px;
+  --s-s: 8px;
+  --s-mnudge: 10px;
+  --s-m: 12px;
+  --s-l: 16px;
+  --s-xl: 20px;
+  --s-xxl: 24px;
+  --s-xxxl: 32px;
+
+  --pane-pad: 16px;
+
+  /* ── Fluent motion ────────────────────────────────────────────────────── */
+  --d-ultrafast: 50ms;
+  --d-faster: 100ms;
+  --d-fast: 150ms;
+  --d-normal: 200ms;
+  --d-gentle: 250ms;
+  --d-slow: 300ms;
+  /* Decelerate: fast in, settles out. Fluent's default for something arriving. */
+  --curve-decel: cubic-bezier(0.1, 0.9, 0.2, 1);
+  /* Accelerate: eases in, leaves fast. For something departing. */
+  --curve-accel: cubic-bezier(0.9, 0.1, 1, 0.2);
+  --curve-ease: cubic-bezier(0.33, 0, 0.67, 1);
+  --curve-max: cubic-bezier(0.8, 0, 0.2, 1);
+
+  /* ── Brand ────────────────────────────────────────────────────────────── */
   --cobalt: #3b72e8;
   --cobalt-bright: #6d9bff;
+  --cobalt-hover: #2f5fce;
+  --cobalt-press: #2650ad;
+  /* A tint for selected rows and hovered drop targets, at Fluent's low opacities. */
+  --cobalt-wash: color-mix(in srgb, var(--cobalt) 8%, transparent);
+  --cobalt-wash-strong: color-mix(in srgb, var(--cobalt) 16%, transparent);
+
+  /* ── Status ───────────────────────────────────────────────────────────── */
   --warn: #d6a521;
+  --danger: #ce4a5b;
+  --good: #4a9d7c;
 
-  --r: 3px;
-  --pane-pad: 1.125rem;
-
-  /* Light: blueprint negative — pale cobalt-washed paper */
+  /*
+   * Light surfaces, lightest on top. `--bg` is the canvas the app sits on and is a shade
+   * DARKER than a panel on purpose: in Fluent a raised surface is lighter than its
+   * ground, which is what lets a card read as raised without needing an outline.
+   */
   --bg: #eaeef7;
   --bg-panel: #ffffff;
   --bg-raise: #f4f7fd;
@@ -29,33 +120,71 @@
   --text-dim: #4c5b78;
   --text-mute: #7b89a4;
 
+  /*
+   * Fluent's elevation ramp. Two shadows each: a soft offset one for the drop, and a
+   * tight ambient one so an edge is still visible against a same-tone background.
+   */
+  --el-2: 0 1px 2px rgb(15 25 48 / 0.10), 0 0 2px rgb(15 25 48 / 0.07);
+  --el-4: 0 2px 4px rgb(15 25 48 / 0.12), 0 0 2px rgb(15 25 48 / 0.07);
+  --el-8: 0 4px 8px rgb(15 25 48 / 0.13), 0 0 2px rgb(15 25 48 / 0.08);
+  --el-16: 0 8px 16px rgb(15 25 48 / 0.14), 0 0 2px rgb(15 25 48 / 0.08);
+  --el-28: 0 14px 28px rgb(15 25 48 / 0.20), 0 0 8px rgb(15 25 48 / 0.12);
+
   color-scheme: light dark;
 }
 
+/*
+ * Dark is not the light palette inverted — Fluent darkens the ground and lifts surfaces
+ * toward it, and shadows carry MORE alpha because there is less contrast to work with.
+ * Declared three times (media query, and both explicit data-theme values) so an explicit
+ * choice always beats the system in either direction.
+ */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #070c17;
-    --bg-panel: #0c1424;
-    --bg-raise: #111b2e;
-    --bg-sunk: #060a13;
-    --line: #1d2b45;
-    --line-strong: #2c3e60;
-    --text: #dbe4f4;
-    --text-dim: #8b9bb9;
-    --text-mute: #5e6d89;
+    --bg-panel: #0f1928;
+    --bg-raise: #16223a;
+    --bg-sunk: #0a1120;
+    --line: #22314d;
+    --line-strong: #33466b;
+    --text: #e4ebf8;
+    --text-dim: #9aabc7;
+    --text-mute: #6b7b98;
+
+    --cobalt-hover: #5a86ee;
+    --cobalt-press: #7ba5ff;
+    --cobalt-wash: color-mix(in srgb, var(--cobalt) 16%, transparent);
+    --cobalt-wash-strong: color-mix(in srgb, var(--cobalt) 26%, transparent);
+
+    --el-2: 0 1px 2px rgb(0 0 0 / 0.28), 0 0 2px rgb(0 0 0 / 0.22);
+    --el-4: 0 2px 4px rgb(0 0 0 / 0.32), 0 0 2px rgb(0 0 0 / 0.24);
+    --el-8: 0 4px 8px rgb(0 0 0 / 0.36), 0 0 2px rgb(0 0 0 / 0.26);
+    --el-16: 0 8px 16px rgb(0 0 0 / 0.40), 0 0 2px rgb(0 0 0 / 0.28);
+    --el-28: 0 14px 28px rgb(0 0 0 / 0.48), 0 0 8px rgb(0 0 0 / 0.32);
   }
 }
 
 :root[data-theme="dark"] {
   --bg: #070c17;
-  --bg-panel: #0c1424;
-  --bg-raise: #111b2e;
-  --bg-sunk: #060a13;
-  --line: #1d2b45;
-  --line-strong: #2c3e60;
-  --text: #dbe4f4;
-  --text-dim: #8b9bb9;
-  --text-mute: #5e6d89;
+  --bg-panel: #0f1928;
+  --bg-raise: #16223a;
+  --bg-sunk: #0a1120;
+  --line: #22314d;
+  --line-strong: #33466b;
+  --text: #e4ebf8;
+  --text-dim: #9aabc7;
+  --text-mute: #6b7b98;
+
+  --cobalt-hover: #5a86ee;
+  --cobalt-press: #7ba5ff;
+  --cobalt-wash: color-mix(in srgb, var(--cobalt) 16%, transparent);
+  --cobalt-wash-strong: color-mix(in srgb, var(--cobalt) 26%, transparent);
+
+  --el-2: 0 1px 2px rgb(0 0 0 / 0.28), 0 0 2px rgb(0 0 0 / 0.22);
+  --el-4: 0 2px 4px rgb(0 0 0 / 0.32), 0 0 2px rgb(0 0 0 / 0.24);
+  --el-8: 0 4px 8px rgb(0 0 0 / 0.36), 0 0 2px rgb(0 0 0 / 0.26);
+  --el-16: 0 8px 16px rgb(0 0 0 / 0.40), 0 0 2px rgb(0 0 0 / 0.28);
+  --el-28: 0 14px 28px rgb(0 0 0 / 0.48), 0 0 8px rgb(0 0 0 / 0.32);
 }
 
 :root[data-theme="light"] {
@@ -77,12 +206,40 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-ui);
-  font-size: 14px;
-  line-height: 1.5;
+  font-size: var(--t-body1);
+  line-height: 1.4286; /* Fluent Body1: 20px on 14px */
   -webkit-font-smoothing: antialiased;
+  /* A stray wide child must scroll inside its own container, never bounce the page. */
+  overflow-x: hidden;
 }
 
-code { font-family: var(--font-display); font-size: 0.9em; }
+/*
+ * Numbers line up in columns. Fluent leans on this hard, and it is most of why a data
+ * table stops looking like arbitrary text — without it, "1,250" and "$59" wander.
+ */
+.fields td,
+.fields th,
+.num,
+.tnum,
+.kpi__v,
+.pipe__sum,
+.pipebar__totals,
+.stats dd,
+.dchip,
+.dage,
+.fu__due,
+.act__when { font-variant-numeric: tabular-nums; }
+
+/* A real identifier, not a heading wearing a monospace costume. */
+code,
+.db,
+.copyid,
+.callout__pre,
+.rte__body code,
+.hit__col,
+.widest__row { font-family: var(--font-mono); }
+
+code { font-size: 0.9em; }
 .muted { color: var(--text-mute); }
 
 .visually-hidden {
@@ -90,10 +247,16 @@ code { font-family: var(--font-display); font-size: 0.9em; }
   clip-path: inset(50%); white-space: nowrap;
 }
 
+/*
+ * Fluent's focus indicator is a two-tone stroke: a light inner ring so it reads against
+ * a dark control, and a dark outer one so it reads against a light page. One colour
+ * disappears against something, and which something depends on the theme.
+ */
 :focus-visible {
-  outline: 2px solid var(--cobalt-bright);
-  outline-offset: 2px;
+  outline: 2px solid var(--cobalt);
+  outline-offset: 1px;
   border-radius: var(--r);
+  box-shadow: 0 0 0 1px var(--bg-panel);
 }
 
 /* ---------------------------------------------------------------- shell */
@@ -106,11 +269,24 @@ code { font-family: var(--font-display); font-size: 0.9em; }
   z-index: 10;
   display: flex;
   align-items: center;
-  gap: 1.5rem;
-  flex-wrap: wrap;
-  padding: 0.75rem 1.25rem;
+  gap: var(--s-xxl);
+  padding: var(--s-mnudge) var(--s-xl);
+  /*
+   * Translucent with a blur — Fluent's "acrylic". It is not decoration here: content
+   * scrolling under a sticky bar needs to be visibly BEHIND it, and a solid bar makes
+   * the page look like it ends at the header. The solid background is the fallback
+   * wherever backdrop-filter is unsupported.
+   */
   background: var(--bg-panel);
   border-bottom: 1px solid var(--line);
+  box-shadow: var(--el-2);
+}
+
+@supports (backdrop-filter: blur(20px)) {
+  .topbar {
+    background: color-mix(in srgb, var(--bg-panel) 80%, transparent);
+    backdrop-filter: saturate(150%) blur(20px);
+  }
 }
 
 .brand {
@@ -181,7 +357,7 @@ code { font-family: var(--font-display); font-size: 0.9em; }
   font-family: var(--font-display);
   font-size: 0.7rem;
   letter-spacing: 0.06em;
-  text-transform: uppercase;
+  text-transform: none;
   color: var(--text-dim);
   background: var(--bg-raise);
   border: 1px solid var(--line);
@@ -208,15 +384,18 @@ code { font-family: var(--font-display); font-size: 0.9em; }
 
 .tools__menu {
   position: absolute;
-  top: calc(100% + 0.35rem);
+  top: calc(100% + var(--s-snudge));
   right: 0;
   z-index: 20;
   min-width: 15rem;
-  padding: 0.35rem;
+  padding: var(--s-xs);
   background: var(--bg-panel);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r);
-  box-shadow: 0 8px 24px rgb(6 10 19 / 0.28);
+  border: 1px solid var(--line);
+  border-radius: var(--r-xl);
+  /* Fluent puts a flyout at elevation 16 — high enough to read as floating over the
+     page rather than pasted onto it. */
+  box-shadow: var(--el-16);
+  animation: flyout var(--d-fast) var(--curve-decel);
 }
 
 .tools__group + .tools__group {
@@ -230,7 +409,7 @@ code { font-family: var(--font-display); font-size: 0.9em; }
   font-family: var(--font-display);
   font-size: 0.6rem;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-mute);
 }
@@ -269,7 +448,7 @@ code { font-family: var(--font-display); font-size: 0.9em; }
   font-family: var(--font-display);
   font-size: 0.7rem;
   letter-spacing: 0.06em;
-  text-transform: uppercase;
+  text-transform: none;
   color: var(--text-dim);
   background: var(--bg-raise);
   border: 1px solid var(--line);
@@ -287,14 +466,20 @@ main { flex: 1; min-height: 0; display: flex; }
 .mainnav { display: flex; flex-wrap: wrap; gap: 0.25rem; }
 
 .mainnav a {
-  font-family: var(--font-display);
-  font-size: 0.72rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-ui);
+  font-size: var(--t-body1);
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
   text-decoration: none;
-  color: var(--text-mute);
-  padding: 0.3rem 0.5rem;
+  white-space: nowrap;
+  color: var(--text-dim);
+  padding: var(--s-snudge) var(--s-mnudge);
   border-radius: var(--r);
+  transition: background var(--d-faster) var(--curve-ease),
+              color var(--d-faster) var(--curve-ease);
 }
 
 .mainnav a:hover { color: var(--text); background: var(--bg-raise); }
@@ -316,11 +501,14 @@ main { flex: 1; min-height: 0; display: flex; }
 .page__head { margin-bottom: 1.25rem; }
 
 .page__head h1 {
-  margin: 0 0 0.3rem;
+  margin: 0 0 var(--s-xs);
   font-family: var(--font-display);
-  font-size: 1.5rem;
-  font-weight: 700;
-  letter-spacing: -0.03em;
+  font-size: var(--t-title2);
+  font-weight: 600;
+  line-height: 1.2857;
+  /* Fluent's Display optical size is already tightened; -0.03em on top of it closed the
+     counters up and made a heading read as a logo. */
+  letter-spacing: -0.01em;
 }
 
 .page__sub-text { margin: 0; max-width: 62ch; font-size: 0.85rem; color: var(--text-dim); }
@@ -330,23 +518,52 @@ main { flex: 1; min-height: 0; display: flex; }
   font-family: var(--font-display);
   font-size: 0.7rem;
   letter-spacing: 0.06em;
-  text-transform: uppercase;
+  text-transform: none;
   color: var(--text-mute);
 }
 
+/*
+ * Fluent button: sentence case, semibold, 4px radius, 32px tall.
+ *
+ * Uppercase + letterspacing + monospace at 11px was most of the "robotic" — three
+ * separate signals that this is a machine part rather than something to press.
+ */
 .btn {
-  display: inline-block;
-  font-family: var(--font-display);
-  font-size: 0.7rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-s);
+  min-height: 32px;
+  font-family: var(--font-ui);
+  font-size: var(--t-body1);
+  font-weight: 600;
+  line-height: 1.2857;
+  letter-spacing: normal;
+  text-transform: none;
   text-decoration: none;
+  white-space: nowrap;
   color: #fff;
   background: var(--cobalt);
   border: 1px solid var(--cobalt);
   border-radius: var(--r);
-  padding: 0.35rem 0.7rem;
+  padding: var(--s-xs) var(--s-m);
   cursor: pointer;
+  transition: background var(--d-faster) var(--curve-ease),
+              border-color var(--d-faster) var(--curve-ease),
+              color var(--d-faster) var(--curve-ease);
+}
+
+.btn:hover { background: var(--cobalt-hover); border-color: var(--cobalt-hover); }
+.btn:active { background: var(--cobalt-press); border-color: var(--cobalt-press); }
+
+/* Fluent disables by flattening to the neutral ramp, not by lowering opacity — a
+   translucent control over a busy table is harder to read than a flat grey one. */
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  color: var(--text-mute);
+  background: var(--bg-sunk);
+  border-color: var(--line);
+  cursor: default;
 }
 
 .btn:hover { filter: brightness(1.08); }
@@ -377,7 +594,7 @@ main { flex: 1; min-height: 0; display: flex; }
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.1em;
-  text-transform: uppercase;
+  text-transform: none;
   color: var(--text-dim);
 }
 
@@ -442,7 +659,7 @@ main { flex: 1; min-height: 0; display: flex; }
   font-family: var(--font-display);
   font-size: 0.68rem;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--cobalt);
 }
@@ -519,7 +736,7 @@ main { flex: 1; min-height: 0; display: flex; }
 .search__clear {
   font-family: var(--font-display);
   font-size: 0.68rem;
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.06em;
   color: var(--text-dim);
   background: none;
@@ -534,23 +751,41 @@ main { flex: 1; min-height: 0; display: flex; }
 .filter {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  font-family: var(--font-display);
-  font-size: 0.68rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  gap: var(--s-snudge);
+  min-height: 28px;
+  font-family: var(--font-ui);
+  font-size: var(--t-caption1);
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
   text-decoration: none;
   color: var(--text-dim);
-  background: var(--bg-raise);
-  border: 1px solid var(--line);
+  background: var(--bg-panel);
+  border: 1px solid var(--line-strong);
   border-radius: var(--r);
-  padding: 0.28rem 0.5rem;
+  padding: var(--s-xs) var(--s-mnudge);
   cursor: pointer;
+  transition: background var(--d-faster) var(--curve-ease),
+              color var(--d-faster) var(--curve-ease),
+              border-color var(--d-faster) var(--curve-ease);
 }
+
+.filter:hover { background: var(--bg-raise); color: var(--text); }
+.filter:disabled { color: var(--text-mute); background: var(--bg-sunk); cursor: default; }
 
 .filter:hover { color: var(--text); border-color: var(--line-strong); }
 
 .filter[data-on] { color: #fff; background: var(--cobalt); border-color: var(--cobalt); }
+.filter[data-on]:hover { background: var(--cobalt-hover); border-color: var(--cobalt-hover); color: #fff; }
+
+/*
+ * A flyout arrives from slightly above and settles — Fluent's decelerate curve. 150ms,
+ * which is long enough to read as movement and short enough not to be waited on.
+ */
+@keyframes flyout {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
 .filter__n { opacity: 0.7; }
 
 /* ---------------------------------------------------------------- form list */
@@ -652,20 +887,22 @@ main { flex: 1; min-height: 0; display: flex; }
 
 /* ---------------------------------------------------------------- tags */
 
+/* Fluent Badge: 12px, semibold, sentence case, 4px radius. */
 .tag {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
-  font-family: var(--font-display);
-  font-size: 0.62rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  padding: 0.1rem 0.3rem;
-  border-radius: 2px;
-  color: var(--text-mute);
+  gap: var(--s-xs);
+  font-family: var(--font-ui);
+  font-size: var(--t-caption1);
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+  padding: var(--s-xxs) var(--s-snudge);
+  border-radius: var(--r);
+  color: var(--text-dim);
   background: var(--bg-sunk);
   box-shadow: inset 0 0 0 1px var(--line);
+  white-space: nowrap;
 }
 
 .tag[data-req="required"] {
@@ -700,11 +937,12 @@ main { flex: 1; min-height: 0; display: flex; }
 .detail__head { margin-bottom: 1.25rem; }
 
 .detail__head h2 {
-  margin: 0 0 0.3rem;
+  margin: 0 0 var(--s-xs);
   font-family: var(--font-display);
-  font-size: 1.35rem;
-  font-weight: 700;
-  letter-spacing: -0.03em;
+  font-size: var(--t-title3);
+  font-weight: 600;
+  line-height: 1.3333;
+  letter-spacing: -0.01em;
 }
 
 .detail__desc { margin: 0 0 0.75rem; max-width: 60ch; font-size: 0.82rem; color: var(--text-dim); }
@@ -770,7 +1008,7 @@ main { flex: 1; min-height: 0; display: flex; }
   font-family: var(--font-display);
   font-size: 0.58rem;
   letter-spacing: 0.08em;
-  text-transform: uppercase;
+  text-transform: none;
   color: var(--text-mute);
   opacity: 0;
   transition: opacity 120ms ease;
@@ -892,13 +1130,14 @@ main { flex: 1; min-height: 0; display: flex; }
 
 /* ---------------------------------------------------------------- callout */
 
+/* Fluent MessageBar: a tinted surface with a 3px accent edge. */
 .callout {
-  margin: 1.25rem 0;
-  padding: 0.75rem 0.9rem;
+  margin: var(--s-xl) 0;
+  padding: var(--s-m) var(--s-l);
   background: color-mix(in srgb, var(--warn) 7%, var(--bg-panel));
   border: 1px solid color-mix(in srgb, var(--warn) 30%, transparent);
-  border-left: 2px solid var(--warn);
-  border-radius: var(--r);
+  border-left: 3px solid var(--warn);
+  border-radius: var(--r-lg);
 }
 
 .callout p { margin: 0 0 0.4rem; font-size: 0.78rem; color: var(--text-dim); max-width: 70ch; }
@@ -909,7 +1148,7 @@ main { flex: 1; min-height: 0; display: flex; }
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.04em;
-  text-transform: uppercase;
+  text-transform: none;
   color: var(--warn);
 }
 
@@ -992,7 +1231,7 @@ main { flex: 1; min-height: 0; display: flex; }
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.1em;
-  text-transform: uppercase;
+  text-transform: none;
   color: var(--text-dim);
 }
 
@@ -1053,11 +1292,15 @@ main { flex: 1; min-height: 0; display: flex; }
 .tk__pri[data-p="normal"] { background: var(--cobalt); }
 .tk__pri[data-p="low"]    { background: var(--line-strong); }
 
+/* Fluent "secondary": a real surface with a stroke, not a transparent hole. */
 .btn--ghost {
-  color: var(--text-dim);
-  background: transparent;
+  color: var(--text);
+  background: var(--bg-panel);
   border-color: var(--line-strong);
 }
+.btn--ghost:hover { background: var(--bg-raise); border-color: var(--line-strong); color: var(--text); }
+.btn--ghost:active { background: var(--bg-sunk); border-color: var(--line-strong); }
+.btn--ghost:disabled { background: var(--bg-sunk); border-color: var(--line); }
 
 .btn--ghost:hover { color: var(--text); filter: none; }
 
@@ -1088,12 +1331,13 @@ main { flex: 1; min-height: 0; display: flex; }
 .crumb {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  margin-bottom: 0.9rem;
-  font-family: var(--font-display);
-  font-size: 0.7rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  flex-wrap: wrap;
+  gap: var(--s-snudge);
+  margin-bottom: var(--s-m);
+  font-family: var(--font-ui);
+  font-size: var(--t-caption1);
+  letter-spacing: normal;
+  text-transform: none;
   color: var(--text-mute);
 }
 .crumb a { color: var(--text-dim); text-decoration: none; }
@@ -1103,14 +1347,15 @@ main { flex: 1; min-height: 0; display: flex; }
 .reccard {
   display: flex;
   flex-wrap: wrap;
-  gap: 1.25rem;
+  gap: var(--s-xl);
   align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 1.25rem;
+  margin-bottom: var(--s-xl);
   padding: var(--pane-pad);
   background: var(--bg-panel);
   border: 1px solid var(--line);
-  border-radius: var(--r);
+  border-radius: var(--r-xl);
+  box-shadow: var(--el-4);
 }
 .reccard .facts { margin: 0; min-width: 0; flex: 1 1 22rem; }
 
@@ -1123,16 +1368,17 @@ main { flex: 1; min-height: 0; display: flex; }
   padding: var(--pane-pad);
   background: var(--bg-panel);
   border: 1px solid var(--line);
-  border-radius: var(--r);
+  border-radius: var(--r-xl);
+  box-shadow: var(--el-4);
 }
 .editcard__head { margin-bottom: 1rem; }
 .editcard__head h2 {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 0.82rem;
+  font-size: var(--t-subtitle2);
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  letter-spacing: normal;
+  text-transform: none;
 }
 .editcard__head .note { margin: 0.3rem 0 0; }
 
@@ -1152,12 +1398,20 @@ main { flex: 1; min-height: 0; display: flex; }
   gap: 0.85rem;
 }
 .ef { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
+/*
+ * Sentence case at 12px, not 11px uppercase.
+ *
+ * Uppercase costs legibility twice over: it removes the word shapes people read by, and
+ * it needs letterspacing to stay readable, which spreads a form label across space the
+ * value needs. Fluent labels are sentence case for exactly this reason.
+ */
 .ef label {
-  font-family: var(--font-display);
-  font-size: 0.68rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-mute);
+  font-family: var(--font-ui);
+  font-size: var(--t-caption1);
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--text-dim);
 }
 .ef__req { margin-left: 0.2rem; color: var(--warn); }
 
@@ -1175,7 +1429,43 @@ main { flex: 1; min-height: 0; display: flex; }
   border-radius: var(--r);
 }
 .ef input::placeholder { color: var(--text-mute); }
-.ef input:focus { border-color: var(--cobalt); outline: none; }
+/*
+ * Fluent's field focus: the bottom stroke thickens to 2px in the brand colour while the
+ * other three sides stay put. Done with an inset shadow rather than a border-width
+ * change so nothing reflows by a pixel when a field is focused — which, in a form of
+ * twenty fields, is a visible jump.
+ */
+.ef input:focus,
+.ef select:focus,
+.ef textarea:focus,
+input[type="text"]:focus,
+input[type="search"]:focus,
+input[type="date"]:focus,
+input[type="month"]:focus,
+input[type="number"]:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--line-strong);
+  box-shadow: inset 0 -2px 0 0 var(--cobalt);
+  outline: none;
+}
+
+/* Keyboard users still get the ring — the bottom stroke alone is too quiet to find. */
+.ef input:focus-visible,
+.ef select:focus-visible,
+.ef textarea:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--cobalt);
+  outline-offset: 1px;
+}
+
+.ef input:hover:not(:focus),
+.ef select:hover:not(:focus),
+.ef textarea:hover:not(:focus),
+input[type="text"]:hover:not(:focus),
+select:hover:not(:focus) { border-color: var(--text-mute); }
 
 .editcard__foot {
   display: flex;
@@ -1238,18 +1528,24 @@ main { flex: 1; min-height: 0; display: flex; }
 .tab {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.4rem 0.7rem;
-  font-family: var(--font-display);
-  font-size: 0.72rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  gap: var(--s-snudge);
+  min-height: 32px;
+  padding: var(--s-xs) var(--s-m);
+  font-family: var(--font-ui);
+  font-size: var(--t-body1);
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: nowrap;
   color: var(--text-dim);
   background: transparent;
   border: 1px solid transparent;
   border-radius: var(--r);
   cursor: pointer;
+  transition: background var(--d-faster) var(--curve-ease),
+              color var(--d-faster) var(--curve-ease);
 }
+.tab:hover { background: var(--bg-raise); color: var(--text); }
 .tab:hover { color: var(--text); background: var(--bg-raise); }
 .tab[data-on] {
   color: var(--text);
@@ -1325,13 +1621,16 @@ main { flex: 1; min-height: 0; display: flex; }
 
 .pill {
   display: inline-block;
-  padding: 0.1rem 0.45rem;
-  font-family: var(--font-display);
-  font-size: 0.68rem;
-  letter-spacing: 0.04em;
-  border-radius: 999px;
+  padding: var(--s-xxs) var(--s-s);
+  font-family: var(--font-ui);
+  font-size: var(--t-caption1);
+  font-weight: 600;
+  letter-spacing: normal;
+  line-height: 1.3333;
+  border-radius: var(--r-pill);
   border: 1px solid var(--line-strong);
   color: var(--text-dim);
+  white-space: nowrap;
 }
 .pill[data-status="Open"]       { color: var(--text-dim); }
 .pill[data-status="UpNext"]     { color: #7a6bd8; border-color: #7a6bd8; }
@@ -1364,13 +1663,16 @@ main { flex: 1; min-height: 0; display: flex; }
 .rowlink__btn:hover { color: var(--cobalt); border-bottom-color: var(--cobalt); }
 
 .tickets__move select {
-  padding: 0.2rem 0.3rem;
+  min-height: 28px;
+  padding: var(--s-xs) var(--s-snudge);
   font-family: inherit;
-  font-size: 0.72rem;
-  color: var(--text-dim);
-  background: var(--bg-raise);
-  border: 1px solid var(--line);
+  font-size: var(--t-caption1);
+  color: var(--text);
+  background: var(--bg-panel);
+  border: 1px solid var(--line-strong);
   border-radius: var(--r);
+  transition: border-color var(--d-faster) var(--curve-ease),
+              box-shadow var(--d-fast) var(--curve-decel);
 }
 .tickets__move select:focus { border-color: var(--cobalt); outline: none; }
 
@@ -1378,18 +1680,23 @@ main { flex: 1; min-height: 0; display: flex; }
 .ef select,
 .ef textarea {
   width: 100%;
-  padding: 0.45rem 0.55rem;
+  min-height: 32px;
+  padding: var(--s-snudge) var(--s-s);
   font-family: inherit;
-  font-size: 0.82rem;
+  font-size: var(--t-body1);
   color: var(--text);
-  background: var(--bg-raise);
-  border: 1px solid var(--line);
+  background: var(--bg-panel);
+  border: 1px solid var(--line-strong);
   border-radius: var(--r);
+  transition: border-color var(--d-faster) var(--curve-ease),
+              box-shadow var(--d-fast) var(--curve-decel);
 }
 .ef textarea { resize: vertical; }
 .ef select:focus, .ef textarea:focus { border-color: var(--cobalt); outline: none; }
 
-.btn--danger { background: #ce4a5b; }
+.btn--danger { background: var(--danger); border-color: var(--danger); }
+.btn--danger:hover { background: #b83f4f; border-color: #b83f4f; }
+.btn--danger:active { background: #a13544; border-color: #a13544; }
 
 .checkline {
   display: flex;
@@ -1578,13 +1885,16 @@ main { flex: 1; min-height: 0; display: flex; }
 .tpage__ask input[type="text"] {
   flex: 1 1 18rem;
   min-width: 0;
-  padding: 0.4rem 0.5rem;
+  min-height: 32px;
+  padding: var(--s-snudge) var(--s-s);
   font-family: inherit;
-  font-size: 0.82rem;
+  font-size: var(--t-body1);
   color: var(--text);
   background: var(--bg-panel);
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
   border-radius: var(--r);
+  transition: border-color var(--d-faster) var(--curve-ease),
+              box-shadow var(--d-fast) var(--curve-decel);
 }
 .tpage__ask input[type="text"]:focus { border-color: var(--cobalt); outline: none; }
 .tpage__ask--danger { border-color: #ce4a5b; }
@@ -1628,7 +1938,7 @@ main { flex: 1; min-height: 0; display: flex; }
   font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0.08em;
-  text-transform: uppercase;
+  text-transform: none;
   color: var(--text-mute);
 }
 .tsec__n {
@@ -1641,7 +1951,13 @@ main { flex: 1; min-height: 0; display: flex; }
 }
 .tsec__empty { margin: 0.5rem 0 0; font-size: 0.8rem; }
 
-.btn--sm { padding: 0.3rem 0.6rem; font-size: 0.72rem; }
+/* Fluent "small": 24px tall, Caption1. Still a 32px hit area on touch — see the
+   pointer:coarse block at the end of this file. */
+.btn--sm {
+  min-height: 24px;
+  padding: var(--s-xxs) var(--s-s);
+  font-size: var(--t-caption1);
+}
 
 /* --- roadblock ----------------------------------------------------------- */
 
@@ -1662,7 +1978,7 @@ main { flex: 1; min-height: 0; display: flex; }
   font-family: var(--font-display);
   font-size: 0.7rem;
   letter-spacing: 0.08em;
-  text-transform: uppercase;
+  text-transform: none;
   color: #ce4a5b;
 }
 .block__why { margin: 0.45rem 0 0.25rem; font-size: 0.86rem; color: var(--text); }
@@ -1674,7 +1990,7 @@ main { flex: 1; min-height: 0; display: flex; }
   font-family: var(--font-display);
   font-size: 0.68rem;
   letter-spacing: 0.06em;
-  text-transform: uppercase;
+  text-transform: none;
   color: var(--text-mute);
 }
 .block input[type="text"] {
@@ -1907,7 +2223,7 @@ main { flex: 1; min-height: 0; display: flex; }
   font-size: 0.68rem;
   font-weight: 600;
   letter-spacing: 0.1em;
-  text-transform: uppercase;
+  text-transform: none;
   color: var(--cobalt);
 }
 
@@ -1929,7 +2245,7 @@ main { flex: 1; min-height: 0; display: flex; }
   font-size: 0.7rem;
   font-weight: 600;
   letter-spacing: 0.08em;
-  text-transform: uppercase;
+  text-transform: none;
   color: var(--text-mute);
 }
 
@@ -2006,15 +2322,18 @@ main { flex: 1; min-height: 0; display: flex; }
 .subnav a {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.4rem 0.7rem;
-  font-family: var(--font-display);
-  font-size: 0.74rem;
-  letter-spacing: 0.04em;
+  gap: var(--s-snudge);
+  padding: var(--s-s) var(--s-m);
+  font-family: var(--font-ui);
+  font-size: var(--t-body1);
+  letter-spacing: normal;
   text-decoration: none;
-  color: var(--text-mute);
+  white-space: nowrap;
+  color: var(--text-dim);
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
+  transition: color var(--d-faster) var(--curve-ease),
+              border-color var(--d-fast) var(--curve-decel);
 }
 .subnav a:hover { color: var(--text); }
 .subnav a.active { color: var(--text); border-bottom-color: var(--cobalt); }
@@ -2038,11 +2357,12 @@ main { flex: 1; min-height: 0; display: flex; }
 }
 
 .kpi {
-  padding: 0.75rem 0.85rem;
+  padding: var(--s-m) var(--s-l);
   background: var(--bg-panel);
   border: 1px solid var(--line);
-  border-left: 2px solid var(--line-strong);
-  border-radius: var(--r);
+  border-left: 3px solid var(--line-strong);
+  border-radius: var(--r-lg);
+  box-shadow: var(--el-2);
 }
 .kpi[data-tone="good"] { border-left-color: #5AA33C; }
 .kpi[data-tone="warn"] { border-left-color: var(--warn); }
@@ -2077,10 +2397,11 @@ main { flex: 1; min-height: 0; display: flex; }
 
 .panel {
   min-width: 0;
-  padding: 0.9rem 1rem 1rem;
+  padding: var(--s-m) var(--s-l) var(--s-l);
   background: var(--bg-panel);
   border: 1px solid var(--line);
-  border-radius: var(--r);
+  border-radius: var(--r-xl);
+  box-shadow: var(--el-2);
 }
 @media (min-width: 1200px) {
   .panel--wide { grid-column: 1 / -1; }
@@ -2096,9 +2417,9 @@ main { flex: 1; min-height: 0; display: flex; }
 .panel__head h2 {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 0.8rem;
+  font-size: var(--t-subtitle2);
   font-weight: 600;
-  letter-spacing: 0.03em;
+  letter-spacing: normal;
   color: var(--text);
 }
 .panel__note { font-size: 0.72rem; color: var(--text-mute); margin-left: auto; }
@@ -2183,12 +2504,16 @@ main { flex: 1; min-height: 0; display: flex; }
   padding-bottom: 0.5rem;
 }
 
+/* The column is the GROUND the cards sit on, so it is sunk and gets no shadow —
+   elevation only means something if not everything has it. */
 .pipe__col {
   min-width: 0;
-  padding: 0.7rem;
+  padding: var(--s-m);
   background: var(--bg-sunk);
   border: 1px solid var(--line);
-  border-radius: var(--r);
+  border-radius: var(--r-xl);
+  transition: background var(--d-fast) var(--curve-ease),
+              outline-color var(--d-fast) var(--curve-ease);
 }
 
 .pipe__head { display: flex; align-items: baseline; gap: 0.4rem; }
@@ -2219,13 +2544,20 @@ main { flex: 1; min-height: 0; display: flex; }
 
 /* --- a deal card --------------------------------------------------------- */
 
+/* A board card lifts on hover and presses in while dragged — the two bits of motion
+   that make a board feel like objects rather than a list of divs. */
 .dcard {
-  margin-bottom: 0.55rem;
-  padding: 0.6rem 0.65rem;
+  margin-bottom: var(--s-s);
+  padding: var(--s-mnudge) var(--s-m);
   background: var(--bg-panel);
   border: 1px solid var(--line);
-  border-radius: var(--r);
+  border-radius: var(--r-lg);
+  box-shadow: var(--el-2);
+  transition: box-shadow var(--d-fast) var(--curve-decel),
+              transform var(--d-fast) var(--curve-decel);
 }
+.dcard:hover { box-shadow: var(--el-8); }
+.dcard[data-drag] { box-shadow: var(--el-16); transform: scale(0.98); }
 .dcard:last-child { margin-bottom: 0; }
 .dcard[data-on] { border-color: var(--cobalt); box-shadow: inset 2px 0 0 var(--cobalt); }
 
@@ -2563,7 +2895,7 @@ main { flex: 1; min-height: 0; display: flex; }
   margin: 0.4rem 0 0.6rem;
   font-size: 0.68rem;
   letter-spacing: 0.05em;
-  text-transform: uppercase;
+  text-transform: none;
   color: var(--text-mute);
 }
 
@@ -2856,7 +3188,7 @@ main { flex: 1; min-height: 0; display: flex; }
   gap: 0.5rem;
   cursor: pointer;
 }
-.wes-history-h { font-family: var(--font-display); font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; }
+text-transform: none;
 .wes-history-list {
   margin: 0.9rem 0 0;
   padding: 0;
@@ -2951,7 +3283,7 @@ a.subcrumb:hover { color: var(--cobalt); }
   font-family: var(--font-display);
   font-size: 0.68rem;
   letter-spacing: 0.06em;
-  text-transform: uppercase;
+  text-transform: none;
   color: var(--text-mute);
 }
 .tpage__parent--orphan .tpage__parentlab { color: var(--warn); }
@@ -3296,7 +3628,7 @@ a.subcrumb:hover { color: var(--cobalt); }
   font-family: var(--font-display);
   font-size: 0.75rem;
   letter-spacing: 0.08em;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .boot p { margin: 0; }
@@ -3357,7 +3689,7 @@ a.subcrumb:hover { color: var(--cobalt); }
   font-family: var(--font-display);
   font-size: 0.6rem;
   letter-spacing: 0.14em;
-  text-transform: uppercase;
+  text-transform: none;
   color: var(--text-mute);
 }
 
@@ -3389,7 +3721,7 @@ a.subcrumb:hover { color: var(--cobalt); }
   font-family: var(--font-display);
   font-size: 0.62rem;
   letter-spacing: 0.08em;
-  text-transform: uppercase;
+  text-transform: none;
   color: var(--text-mute);
 }
 
@@ -3430,7 +3762,7 @@ a.subcrumb:hover { color: var(--cobalt); }
   font-family: var(--font-display);
   font-size: 0.62rem;
   letter-spacing: 0.1em;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .login__or::before,
@@ -3534,15 +3866,18 @@ a.subcrumb:hover { color: var(--cobalt); }
 
 .usermenu__menu {
   position: absolute;
-  top: calc(100% + 0.35rem);
+  top: calc(100% + var(--s-snudge));
   right: 0;
   z-index: 20;
   min-width: 15rem;
-  padding: 0.35rem;
+  padding: var(--s-xs);
   background: var(--bg-panel);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r);
-  box-shadow: 0 8px 24px rgb(6 10 19 / 0.28);
+  border: 1px solid var(--line);
+  border-radius: var(--r-xl);
+  /* Fluent puts a flyout at elevation 16 — high enough to read as floating over the
+     page rather than pasted onto it. */
+  box-shadow: var(--el-16);
+  animation: flyout var(--d-fast) var(--curve-decel);
 }
 
 .usermenu__id {
@@ -3567,7 +3902,7 @@ a.subcrumb:hover { color: var(--cobalt); }
   font-family: var(--font-display);
   font-size: 0.55rem;
   letter-spacing: 0.1em;
-  text-transform: uppercase;
+  text-transform: none;
   color: #fff;
   background: var(--warn);
   border-radius: var(--r);
@@ -3597,7 +3932,7 @@ a.subcrumb:hover { color: var(--cobalt); }
   font-family: var(--font-display);
   font-size: 0.6rem;
   letter-spacing: 0.06em;
-  text-transform: uppercase;
+  text-transform: none;
   color: var(--text-mute);
   background: none;
   border: 0;
@@ -3967,7 +4302,7 @@ a.flag:hover { border-color: var(--line-strong); color: var(--text); }
   padding: 0.05rem 0.3rem;
   font-family: var(--font-display);
   font-size: 0.62rem;
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.04em;
   color: var(--cobalt);
   border: 1px solid var(--cobalt);
@@ -4070,3 +4405,279 @@ a.flag:hover { border-color: var(--line-strong); color: var(--text); }
 
 .bad { color: #ce4a5b; }
 .bad strong { color: #ce4a5b; }
+
+/* ---------------------------------------------------------------------------
+ * Responsive — Fluent 2 pass, 2026-08-20
+ *
+ * Cobalt was built desktop-only: a seven-item nav on one row, tables of eight columns,
+ * a five-column board. None of that collapses by itself, and a rep checking a follow-up
+ * from a car is a real case now that there is a follow-up queue to check.
+ *
+ * The approach is per-pattern rather than one global breakpoint, because the patterns
+ * fail at different widths — the nav runs out at ~900px, a form grid is fine to ~640px,
+ * and the board is happier swiping than shrinking at any width.
+ *
+ * Three rules held throughout:
+ *
+ *   * Nothing shrinks below legibility. Dense data gets a scroll container, not 9px type.
+ *   * A horizontal scroller keeps `overscroll-behavior-x: contain`, or swiping a table
+ *     triggers the browser's back gesture — which loses the page you were reading.
+ *   * Form controls reach 16px on small screens. Below that iOS Safari zooms the whole
+ *     viewport on focus and does not zoom back out, which strands people mid-form.
+ * ------------------------------------------------------------------------- */
+
+/* A scroll strip: used by the nav rows, which must never wrap into a tall stack. */
+.mainnav,
+.subnav {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.mainnav::-webkit-scrollbar,
+.subnav::-webkit-scrollbar { display: none; }
+
+/*
+ * Tabs and nav items scroll rather than wrap at every width. A wrapped tab strip reads
+ * as broken — the second row looks like a different control — and the underline that
+ * marks the current page lands in mid-air.
+ */
+.subnav {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.tablewrap {
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.pipe { overscroll-behavior-x: contain; }
+
+/* ── the nav runs out of room ───────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  .topbar {
+    flex-wrap: wrap;
+    gap: var(--s-m);
+    padding: var(--s-s) var(--s-m);
+  }
+
+  /* Brand and account stay on the first row; the account menu is pushed to the far
+     edge so its flyout still opens against the right margin. */
+  .topbar__end { margin-left: auto; }
+
+  /*
+     The sections take a row of their own and scroll. A hamburger would be the other
+     answer, but it hides seven destinations behind a tap to save a row that is already
+     there — and this way the current section stays visible.
+  */
+  .mainnav {
+    order: 3;
+    flex: 1 0 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    margin: 0 calc(var(--s-m) * -1);
+    padding: 0 var(--s-m);
+  }
+
+  .mainnav a { padding: var(--s-s) var(--s-m); }
+}
+
+/* ── tablet ─────────────────────────────────────────────────────────────── */
+
+@media (max-width: 780px) {
+  .page { padding: var(--s-l) var(--s-l) var(--s-xxxl); }
+
+  .page__head h1 { font-size: var(--t-title3); }
+
+  .reccard,
+  .editcard { padding: var(--s-m); }
+
+  .crmgrid { grid-template-columns: 1fr; }
+
+  /* A wide panel has nothing to be wide relative to once there is one column. */
+  .panel--wide { grid-column: auto; }
+
+  /* Toolbars stop trying to sit on one line and stack, each part full width, so the
+     search field gets the room it needs instead of a 4rem stub. */
+  .pipebar,
+  .pipebar__tools {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--s-m);
+  }
+  .pipebar__totals { gap: var(--s-l); }
+  .scope { flex-wrap: wrap; }
+  .scope__who { flex: 1 1 100%; max-width: none; }
+}
+
+/* ── phone ──────────────────────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .page { padding: var(--s-m) var(--s-m) var(--s-xxxl); }
+
+  /* One field per row. Two 13rem columns in a 360px viewport is one column with the
+     labels clipped. */
+  .efgrid,
+  .board2__filters { grid-template-columns: 1fr; }
+
+  .ef--narrow,
+  .ef--wide { grid-column: auto; }
+
+  /* Two KPIs abreast rather than one: they are short, and a column of six single
+     figures makes the reader scroll to compare things that belong side by side. */
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-s); }
+  .kpi { padding: var(--s-s) var(--s-mnudge); }
+  .kpi__v { font-size: var(--t-subtitle1); }
+
+  /*
+   * iOS Safari zooms the viewport when a focused control is under 16px and does not
+   * zoom back, which leaves someone stranded at 1.3× halfway down a form. 16px is the
+   * price of not doing that.
+   */
+  .ef input,
+  .ef select,
+  .ef textarea,
+  input[type="text"],
+  input[type="search"],
+  input[type="date"],
+  input[type="month"],
+  input[type="number"],
+  input[type="password"],
+  select,
+  textarea { font-size: var(--t-body2); }
+
+  /* Denser cells, because the alternative is scrolling a table sideways for longer. */
+  .fields thead th,
+  .fields tbody th,
+  .fields tbody td { padding: var(--s-snudge) var(--s-s); }
+
+  /* Rows of actions and metadata stack instead of squeezing. */
+  .fu,
+  .cdeal {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--s-s);
+  }
+  .fu__acts { flex-wrap: wrap; }
+  .fu__note { min-width: 0; flex: 1 1 100%; }
+
+  .dact__fuform { flex-direction: column; }
+  .dact__fuform .ef { flex: 1 1 auto; }
+
+  .editcard__foot {
+    flex-wrap: wrap;
+    gap: var(--s-s);
+  }
+
+  .page__headrow { flex-wrap: wrap; gap: var(--s-s); }
+}
+
+/* ── the board: swipe a column at a time ────────────────────────────────── */
+
+@media (max-width: 720px) {
+  /*
+   * Shrinking five columns to fit a phone gives five unreadable ones. A board is a
+   * horizontal thing; let it be horizontal, and snap so a swipe lands on a column
+   * rather than halfway between two.
+   */
+  .pipe {
+    grid-auto-columns: 82vw;
+    scroll-snap-type: x mandatory;
+    gap: var(--s-m);
+  }
+  .pipe__col { scroll-snap-align: start; }
+}
+
+/* ── touch ──────────────────────────────────────────────────────────────── */
+
+/*
+ * Keyed on the POINTER, not the width. A touch laptop needs the bigger targets at
+ * 1400px, and a phone in landscape is wide — width is the wrong question.
+ *
+ * 40px rather than Apple's 44: these are dense data rows where 44 would push a table
+ * row past two lines, and 40 clears the measured miss-rate threshold.
+ */
+@media (pointer: coarse) {
+  .btn,
+  .btn--sm,
+  .filter,
+  .tab,
+  select,
+  .minisel,
+  input[type="text"],
+  input[type="search"],
+  input[type="date"],
+  input[type="month"],
+  input[type="number"],
+  input[type="password"] { min-height: 40px; }
+
+  .linkbtn,
+  .rowlink__btn {
+    min-height: 32px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .mainnav a,
+  .subnav a { min-height: 40px; }
+
+  /* Hover styling that sticks after a tap reads as a stuck selection, so it is only
+     applied where a pointer can actually leave again. */
+  .dcard:hover { box-shadow: var(--el-2); }
+}
+
+/* ── motion ─────────────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  /*
+   * Everything, not just the animations added in the Fluent pass — a partial honouring
+   * of this preference is the same as ignoring it for anyone who set it because motion
+   * makes them ill.
+   */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .dcard[data-drag] { transform: none; }
+}
+
+/* ---------------------------------------------------------------------------
+ * Identifiers stay monospace
+ *
+ * Declared last on purpose. The Fluent pass retargeted `--font-display` from a
+ * monospace stack to Segoe UI Variable, which was right for the 90-odd headings, labels
+ * and badges that had been wearing monospace as a costume — and wrong for the handful of
+ * places showing something a person is about to select and paste into code.
+ *
+ * A record id, a C-column name and a stack trace all need the things monospace actually
+ * buys: an unambiguous 1/l/I and 0/O, and characters that line up when you compare two
+ * of them. That is a real requirement, not a mood.
+ *
+ * These sit at the end rather than beside the tokens because several of the selectors
+ * carry their own `font-family` further down the file, and one (`.copyid`) uses
+ * `font: inherit`, which resets the family wholesale — either would have quietly won
+ * against an earlier declaration.
+ * ------------------------------------------------------------------------- */
+
+code,
+.db,
+.copyid,
+.copyid code,
+.callout__pre,
+.rte__body code,
+.stamp,
+.hit__form,
+.formcard__meta,
+.widest__row,
+.typerow__name { font-family: var(--font-mono); }
+
+/* The explorer's own furniture is not an identifier — those are headings about
+   identifiers, and they read better in the UI face. */
+.pane__title,
+.schemabar__title { font-family: var(--font-display); }
