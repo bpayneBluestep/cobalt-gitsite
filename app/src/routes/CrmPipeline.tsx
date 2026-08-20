@@ -36,6 +36,10 @@ export default function CrmPipeline() {
   // the pipeline without being able to nudge it is a legitimate position to be in.
   const { can } = useSession()
   const mayEdit = can('editDeals')
+  // Revenue is stripped server-side for anyone without this, so every figure on the page
+  // arrives null and renders as a dash. Say why once, rather than leaving a board of
+  // dashes that reads like broken data.
+  const maySeeMoney = can('viewMoney')
   const [state, setState] = useState<State>({ phase: 'loading' })
   const [owner, setOwner] = useState('')
   const [openDeal, setOpenDeal] = useState<{ companyId: string; companyName: string; entryId: string } | null>(null)
@@ -143,6 +147,13 @@ export default function CrmPipeline() {
               </select>
             </div>
           </div>
+
+          {!maySeeMoney && (
+            <p className="board2__notice" role="status">
+              Deal values are hidden — showing revenue needs Sales or Accounting. Everything
+              else on this board is what you would normally see.
+            </p>
+          )}
 
           {notice && <p className="board2__notice" role="status">{notice}</p>}
           {failure && <p className="editcard__err" role="alert">{failure}</p>}

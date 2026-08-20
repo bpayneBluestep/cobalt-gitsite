@@ -63,6 +63,7 @@ const CAPABILITY_LABELS: Record<Capability, string> = {
   editClients: 'Leadership, Sales or Client Success',
   viewDeals: 'Leadership, Accounting, Sales or Client Success',
   editDeals: 'Leadership or Sales',
+  viewMoney: 'Sales or Accounting',
   viewContacts: 'any role',
   editContacts: 'Leadership, Sales or Client Success',
   viewFiles: 'any role',

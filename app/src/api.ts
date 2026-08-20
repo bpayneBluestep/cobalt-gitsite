@@ -152,6 +152,8 @@ export async function maestroPost(action: string, payload: Record<string, unknow
 export type Capability =
   | 'viewClients' | 'editClients'
   | 'viewDeals' | 'editDeals'
+  /** Seeing the revenue on a deal, as opposed to seeing that the deal exists. */
+  | 'viewMoney'
   | 'viewContacts' | 'editContacts'
   | 'viewFiles' | 'editFiles'
   | 'viewOwner' | 'editOwner'
