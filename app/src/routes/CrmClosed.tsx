@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  ApiError, getClosedDeals, formatMoney, formatCompactMoney,
+  ApiError, getClosedDeals, updateDeal, formatMoney, formatCompactMoney,
   type ClosedDeals, type Deal,
 } from '../api'
 import CrmNav from '../components/CrmNav'
@@ -48,6 +48,9 @@ export default function CrmClosed() {
   const [state, setState] = useState<State>({ phase: 'loading' })
   const [openDeal, setOpenDeal] = useState<{ companyId: string; companyName: string; entryId: string } | null>(null)
   const [notice, setNotice] = useState('')
+  const [failure, setFailure] = useState('')
+  const [busy, setBusy] = useState('')
+  const mayEdit = can('editDeals')
 
   const load = useCallback((who: string, outcome: Tab) => {
     setState({ phase: 'loading' })
@@ -84,6 +87,23 @@ export default function CrmClosed() {
     if (!d || !openDeal) return null
     return d.rows.find(deal => deal.entryId === openDeal.entryId) || null
   }, [d, openDeal])
+
+  /**
+   * Tick the box the phase already implies.
+   *
+   * The phase is left exactly as it is — that is the whole point of keeping phase and
+   * closed separate: a deal lost at Negotiating should still say Negotiating. All this
+   * does is record that it is over, which stamps the close date and takes it out of the
+   * forecast.
+   */
+  function markClosed(deal: Deal) {
+    if (busy || !mayEdit) return
+    setBusy(deal.entryId); setFailure(''); setNotice('')
+    updateDeal(deal.companyId, deal.entryId, { closed: 'true' })
+      .then(() => { setNotice(`${deal.title} marked closed.`); load(ownerId, tab) })
+      .catch(err => setFailure(err instanceof ApiError ? err.message : String(err)))
+      .finally(() => setBusy(''))
+  }
 
   return (
     <section className="page">
@@ -158,6 +178,23 @@ export default function CrmClosed() {
           </div>
 
           {notice && <p className="board2__notice" role="status">{notice}</p>}
+          {failure && <p className="editcard__err" role="alert">{failure}</p>}
+
+          {/*
+            The strays the pipeline sends people here to fix. Named at the top rather than
+            left to be noticed row by row, because the reason they matter is collective:
+            twenty deals that are over are still being forecast.
+          */}
+          {d.needsClosingCount > 0 && (
+            <p className="board2__notice" role="status">
+              {d.needsClosingCount} deal{d.needsClosingCount === 1 ? '' : 's'} below reached an
+              outcome but {d.needsClosingCount === 1 ? 'was' : 'were'} never marked closed, so
+              {d.needsClosingCount === 1 ? ' it is' : ' they are'} still counted in the pipeline
+              forecast and {d.needsClosingCount === 1 ? 'does' : 'do'} not appear on the board.
+              {mayEdit ? ' Tick the outcome to take them out.' : ''} They are left out of the win
+              rate above, because a phase is not a recorded outcome.
+            </p>
+          )}
 
           {selected && openDeal && (
             <DealEditor
@@ -209,6 +246,9 @@ export default function CrmClosed() {
                     <th scope="col">MRR</th>
                     <th scope="col">Owner</th>
                     <th scope="col">Took</th>
+                    {mayEdit && d.needsClosingCount > 0 && (
+                      <th scope="col"><span className="visually-hidden">Fix</span></th>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -226,9 +266,13 @@ export default function CrmClosed() {
                         <Link className="inlink" to={`/clients/${deal.companyId}`}>{deal.companyName}</Link>
                       </td>
                       <td>
-                        <span className="pill" data-out={deal.isWon ? 'won' : 'lost'}>
-                          {deal.isWon ? 'Won' : 'Lost'}
+                        <span className="pill"
+                          data-out={(deal.isWon || deal.impliedOutcome === 'Won') ? 'won' : 'lost'}>
+                          {deal.isWon ? 'Won' : deal.isLost ? 'Lost' : deal.impliedOutcome}
                         </span>
+                        {deal.needsClosing && (
+                          <span className="tag tag--warn">not marked closed</span>
+                        )}
                         {/*
                           The phase a lost deal reached is the interesting part — losing at
                           Agreements is a very different story from losing at Contact Made,
@@ -249,6 +293,17 @@ export default function CrmClosed() {
                           ? <span className="muted">—</span>
                           : `${deal.ageDays}d`}
                       </td>
+                      {mayEdit && d.needsClosingCount > 0 && (
+                        <td className="nowrap">
+                          {deal.needsClosing && (
+                            <button type="button" className="linkbtn" disabled={busy === deal.entryId}
+                              onClick={() => markClosed(deal)}
+                              title="Record that this deal is over. The phase it reached is left alone.">
+                              {busy === deal.entryId ? 'Saving…' : 'Mark closed'}
+                            </button>
+                          )}
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

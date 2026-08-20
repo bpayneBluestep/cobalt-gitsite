@@ -1082,6 +1082,14 @@ export interface Deal {
   /** How many history entries there are. The entries themselves come from `getDeal`. */
   activityCount: number
 
+  /**
+   * Set only by `closedDeals`: this deal reached a Won or Lost phase but its `closed`
+   * box was never ticked, so it is invisible on the board and still in the forecast.
+   * `impliedOutcome` is what the phase says, offered as the fix — never stored.
+   */
+  needsClosing?: boolean
+  impliedOutcome?: string
+
   companyId: string
   companyName: string
   companyCity: string
@@ -1207,6 +1215,11 @@ export interface ClosedDeals {
   total: number
   wonCount: number
   lostCount: number
+  /**
+   * Reached an outcome phase, never closed. Excluded from the counts and the win rate
+   * above, because their outcome is inferred from a phase rather than recorded.
+   */
+  needsClosingCount: number
   wonMrr: number
   lostMrr: number
   /** Null when nothing has been decided — a 0% win rate is a claim, that is not it. */
@@ -1308,6 +1321,11 @@ export type DealFieldKey =
   'title' | 'phase' | 'ownerId' | 'leadSource' | 'mrr' | 'fees'
   | 'confidence' | 'firstBillingMonth' | 'demoDate' | 'notes' | 'lossReason'
   | 'nextStep' | 'nextFollowUp'
+  /**
+   * Whether the deal is OVER, which is separate from the phase it reached. Sent as
+   * 'true'/'false'; the server stamps or clears the close date to match.
+   */
+  | 'closed'
 
 /**
  * The owner/search parameters every CRM list understands.

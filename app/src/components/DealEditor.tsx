@@ -29,13 +29,20 @@ import { useSession } from '../session'
  */
 
 /**
- * The fields this card edits.
- *
- * A narrower list than `DealFieldKey` on purpose: `nextStep` and `nextFollowUp` are
- * writable, but they belong to the follow-up control below, and two controls for one
- * value drift the moment both are on screen.
+ * What the outcome buttons may send. Wider than the form below.
  */
-type EditableKey = Exclude<DealFieldKey, 'nextStep' | 'nextFollowUp'>
+type WriteKey = DealFieldKey
+
+/**
+ * The fields the FORM edits — narrower than `DealFieldKey` on purpose:
+ *
+ *   * `nextStep` / `nextFollowUp` belong to the follow-up control below. Two controls
+ *     for one value drift the moment both are on screen.
+ *   * `closed` is owned by the Won / Lost / Reopen buttons. Not a checkbox, because
+ *     closing a deal is not the same kind of act as editing one — a loss needs its
+ *     reason, and it is the change people want to be sure about before it lands.
+ */
+type EditableKey = Exclude<DealFieldKey, 'nextStep' | 'nextFollowUp' | 'closed'>
 
 type Draft = Record<EditableKey, string>
 
@@ -175,16 +182,46 @@ export default function DealEditor({
     run('save', updateDeal(companyId, deal!.entryId, pending), () => onClose())
   }
 
-  /** Close the deal. A loss needs its reason, which is why this is its own step. */
+  /**
+   * Close the deal. A loss needs its reason, which is why this is its own step.
+   *
+   * `closed: 'true'` matters as much as the phase, and its absence was a real bug: phase
+   * and `closed` are separate fields on purpose — the phase records how far a deal got,
+   * the boolean records that it is over — and setting only the first left twenty deals
+   * that were plainly finished still sitting in the forecast, on no board column, and
+   * absent from the won/lost log. Both, together, always.
+   *
+   * A lost deal keeps the phase it reached rather than being moved to "Lost": losing at
+   * Agreements is a completely different story from losing at Contact Made, and that is
+   * exactly what a single terminal phase would erase. Only a WIN moves the phase, because
+   * Won is a real stage a deal arrives at.
+   */
   function closeDeal(outcome: 'Won' | 'Lost') {
     if (!deal || busy) return
     if (outcome === 'Lost' && !draft.lossReason) {
       setFailure('Pick a loss reason — a lost deal with no reason teaches nobody anything.')
       return
     }
-    const fields: Partial<Record<EditableKey, string>> = { phase: outcome }
-    if (outcome === 'Lost') fields.lossReason = draft.lossReason
+    const fields: Partial<Record<WriteKey, string>> = { closed: 'true' }
+    if (outcome === 'Won') fields.phase = 'Won'
+    else fields.lossReason = draft.lossReason
     run('close', updateDeal(companyId, deal.entryId, fields), () => { setClosing(''); onClose() })
+  }
+
+  /**
+   * Put a decided deal back on the board.
+   *
+   * Clearing `closed` is enough for a LOST deal: it kept the phase it reached, so it
+   * reappears exactly where it stopped. A WON deal has no such phase to return to — Won
+   * is not a board column — so it also needs one, and Agreements is the honest answer
+   * rather than a guess: it is by definition the stage a deal is at immediately before
+   * being won.
+   */
+  function reopen() {
+    if (!deal || busy) return
+    const fields: Partial<Record<WriteKey, string>> = { closed: 'false' }
+    if (deal.phase === 'Won') fields.phase = 'Agreements'
+    run('reopen', updateDeal(companyId, deal.entryId, fields), () => onClose())
   }
 
   function remove() {
@@ -212,11 +249,43 @@ export default function DealEditor({
       {failure && <p className="editcard__err" role="alert">{failure}</p>}
 
       {!isNew && (deal!.isWon || deal!.isLost) && (
-        <p className="callout callout--plain dealcard__decided">
-          <strong>{deal!.phase}</strong>
-          {deal!.isLost && deal!.lossReason ? ` — ${deal!.lossReason}` : ''}
-          {'. '}Move it back to an open phase to reopen it; the close date clears itself.
-        </p>
+        <div className="callout callout--plain dealcard__decided">
+          <p>
+            <strong>{deal!.isWon ? 'Won' : `Lost at ${deal!.phase}`}</strong>
+            {deal!.isLost && deal!.lossReason ? ` — ${deal!.lossReason}` : ''}
+            {deal!.closedAt ? ` · ${deal!.closedAt}` : ''}
+            {'. '}It is out of the forecast and off the board.
+          </p>
+          {mayEdit && (
+            <p className="callout__actions">
+              <button type="button" className="btn btn--ghost btn--sm" disabled={!!busy} onClick={reopen}>
+                {busy === 'reopen' ? 'Reopening…' : 'Reopen'}
+              </button>
+            </p>
+          )}
+        </div>
+      )}
+
+      {/*
+        Not closed, but sitting at a phase no board column holds. The pipeline counts it
+        and cannot show it, so the fix belongs wherever the deal is open — here included.
+      */}
+      {!isNew && deal!.isOpen && deal!.phase === 'Won' && (
+        <div className="callout callout--warn">
+          <p className="callout__title">Marked Won, but not closed</p>
+          <p>
+            This deal is still counted as open, so it is in the forecast, and no pipeline
+            column can hold it. {mayEdit ? 'Record that it is over:' : 'Only Leadership or Sales can fix this.'}
+          </p>
+          {mayEdit && (
+            <p className="callout__actions">
+              <button type="button" className="btn btn--sm" disabled={!!busy}
+                onClick={() => run('close', updateDeal(companyId, deal!.entryId, { closed: 'true' }))}>
+                {busy === 'close' ? 'Saving…' : 'Mark it closed'}
+              </button>
+            </p>
+          )}
+        </div>
       )}
 
       {!mayEdit && (
