@@ -11,10 +11,20 @@
  * with it — this list is the single source for both.
  */
 
+import type { Capability } from './api'
+
 export interface Section {
   key: string
   path: string
   label: string
+  /**
+   * The capability required to see this section at all.
+   *
+   * Declared here rather than checked in the router, so a section's nav item and its
+   * route can never disagree about who may reach it — the same reason this list drives
+   * both in the first place. Omit for the sections everyone signed in can see.
+   */
+  needs?: Capability
   /** One line: what this section is for. */
   purpose: string
   /** What will live here, once it does. */
@@ -52,6 +62,7 @@ export const SECTIONS: Section[] = [
     path: '/clients',
     label: 'Clients',
     built: true,
+    needs: 'viewClients',
     purpose: 'Every company we work with, and everything hanging off its record.',
     planned: [
       'A single view of a client across tickets, hours and files',
@@ -66,6 +77,7 @@ export const SECTIONS: Section[] = [
     path: '/sprints',
     label: 'Sprints',
     built: true,
+    needs: 'viewSprints',
     purpose: 'The weekly cycle: what was committed to, what shipped, and what rolled over.',
     planned: [
       'Rollover, so an unfinished ticket is carried rather than lost',
@@ -82,6 +94,7 @@ export const SECTIONS: Section[] = [
     path: '/crm',
     label: 'CRM',
     built: true,
+    needs: 'viewDeals',
     purpose: 'The sales side: who we are talking to, what stage they are at, and what happens next.',
     planned: [
       'A call and note timeline against each company',
@@ -112,6 +125,7 @@ export const SECTIONS: Section[] = [
     key: 'reports',
     path: '/reports',
     label: 'Reports',
+    needs: 'viewReports',
     purpose: 'The numbers the company runs on, pulled from the records rather than a spreadsheet.',
     planned: [
       'Hours by client, by person, by week — billable and not',
@@ -128,6 +142,7 @@ export const SECTIONS: Section[] = [
     path: '/settings',
     label: 'Settings',
     built: true,
+    needs: 'viewStaff',
     purpose: 'How Cobalt is set up: who works here, and the lists everything else picks from.',
     planned: [
       'Option lists — departments, deal phases, ticket statuses — editable rather than in code',

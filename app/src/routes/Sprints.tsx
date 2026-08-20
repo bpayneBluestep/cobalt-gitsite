@@ -8,6 +8,7 @@ import {
   type SprintBoard, type Team, type Ticket, type EngineerFieldKey, type User,
 } from '../api'
 import { loadUsers } from '../components/UserPicker'
+import { useSession } from '../session'
 
 /*
  * The sprint board — beh's Sprint Organizer, ported.
@@ -62,6 +63,18 @@ function CapacityBar({ est, capacity, over }: { est: number; capacity: number; o
 }
 
 export default function Sprints() {
+  /*
+   * Two different rights on one page, and conflating them would be wrong in both
+   * directions:
+   *
+   *   planning  — putting a ticket into a sprint, or taking it out — is a Tickets write,
+   *               so engineers and Client Success do it. That is the daily work.
+   *   the roster — who is on the team, their capacity, starting a sprint — is an Engineers
+   *               write, and belongs to Leadership. Capacity is a management decision.
+   */
+  const { can } = useSession()
+  const mayPlan = can('editTickets')
+  const mayRoster = can('editSprints')
   const [params, setParams] = useSearchParams()
   const urlSprint = params.get('sprint') || ''
 
@@ -148,6 +161,7 @@ export default function Sprints() {
 
   /** Pull a backlog ticket into this sprint for someone, or move it between columns. */
   function plan(t: Ticket, userId: string, who: string) {
+    if (!mayPlan) return
     if (!userId) {
       setFailure(`${who} is on the roster but has no matching user record, so work cannot be assigned to them.`)
       return
@@ -157,12 +171,13 @@ export default function Sprints() {
   }
 
   function unplan(t: Ticket) {
+    if (!mayPlan) return
     run('plan', assignSprint(t.listId, t.entryId, '', ''),
       `${t.ticketNumber !== null ? `#${t.ticketNumber}` : t.title} taken out of the sprint.`)
   }
 
   function saveEngineer() {
-    if (busy) return
+    if (busy || !mayRoster) return
     if (!engDraft.name.trim()) { setFailure('An engineer needs a name.'); return }
     const fields: Partial<Record<EngineerFieldKey, string>> = {
       name: engDraft.name.trim(), email: engDraft.email.trim(),
@@ -180,6 +195,7 @@ export default function Sprints() {
 
   /** Start this sprint for real, by copying the previous roster forward. */
   function startSprint() {
+    if (!mayRoster) return
     run('start', createSprint(sprint).then(t => { setTeam(t); return t }),
       `${sprintLabel(sprint)} started — the previous roster was copied forward.`)
   }
@@ -266,9 +282,13 @@ export default function Sprints() {
             affects this sprint only.
           </p>
           <p className="callout__actions">
-            <button type="button" className="btn" onClick={startSprint} disabled={!!busy}>
-              {busy === 'start' ? 'Starting…' : `Start ${sprintLabel(sprint)}`}
-            </button>
+            {mayRoster ? (
+              <button type="button" className="btn" onClick={startSprint} disabled={!!busy}>
+                {busy === 'start' ? 'Starting…' : `Start ${sprintLabel(sprint)}`}
+              </button>
+            ) : (
+              <span className="muted">Leadership starts a sprint.</span>
+            )}
           </p>
         </div>
       )}
@@ -300,11 +320,13 @@ export default function Sprints() {
                 {team.isTemplate ? ' · the default roster' : ` · ${sprintLabel(sprint)} only`}
               </span>
             )}
-            <button type="button" className="btn btn--sm"
-              onClick={() => { setEngEditing('new'); setEngDraft(emptyEng(team?.isTemplate ? '' : sprint)) }}
-              disabled={!!busy}>
-              <span aria-hidden="true">+</span> Add engineer
-            </button>
+            {mayRoster && (
+              <button type="button" className="btn btn--sm"
+                onClick={() => { setEngEditing('new'); setEngDraft(emptyEng(team?.isTemplate ? '' : sprint)) }}
+                disabled={!!busy}>
+                <span aria-hidden="true">+</span> Add engineer
+              </button>
+            )}
           </div>
 
           {engEditing && (
@@ -397,22 +419,26 @@ export default function Sprints() {
                       <td className="num">{formatHours(e.capacity)}</td>
                       <td>{e.active ? 'Yes' : <span className="muted">No</span>}</td>
                       <td className="leads__act">
-                        <button type="button" className="linkbtn" disabled={!!busy}
-                          onClick={() => {
-                            setEngEditing(e.entryId)
-                            setEngDraft({
-                              name: e.name, email: e.email, role: e.role || 'Engineer',
-                              capacity: String(e.capacity), active: e.active ? 'true' : 'false',
-                              sprint: e.sprint || '',
-                            })
-                          }}>
-                          Edit
-                        </button>
-                        <button type="button" className="linkbtn linkbtn--danger" disabled={!!busy}
-                          onClick={() => run('eng', deleteEngineer(e.entryId).then(t => { setTeam(t); return t }),
-                            `${e.name} removed from the roster.`)}>
-                          Remove
-                        </button>
+                        {mayRoster ? (
+                          <>
+                            <button type="button" className="linkbtn" disabled={!!busy}
+                              onClick={() => {
+                                setEngEditing(e.entryId)
+                                setEngDraft({
+                                  name: e.name, email: e.email, role: e.role || 'Engineer',
+                                  capacity: String(e.capacity), active: e.active ? 'true' : 'false',
+                                  sprint: e.sprint || '',
+                                })
+                              }}>
+                              Edit
+                            </button>
+                            <button type="button" className="linkbtn linkbtn--danger" disabled={!!busy}
+                              onClick={() => run('eng', deleteEngineer(e.entryId).then(t => { setTeam(t); return t }),
+                                `${e.name} removed from the roster.`)}>
+                              Remove
+                            </button>
+                          </>
+                        ) : dash}
                       </td>
                     </tr>
                   ))}
@@ -444,10 +470,14 @@ export default function Sprints() {
           <p className="callout__title">No engineers on the roster yet</p>
           <p>
             A sprint is engineers and their capacity, so that comes first.{' '}
-            <button type="button" className="linkbtn"
-              onClick={() => { setShowRoster(true); setEngEditing('new'); setEngDraft(emptyEng('')) }}>
-              Add the first one
-            </button>.
+            {mayRoster ? (
+              <>
+                <button type="button" className="linkbtn"
+                  onClick={() => { setShowRoster(true); setEngEditing('new'); setEngDraft(emptyEng('')) }}>
+                  Add the first one
+                </button>.
+              </>
+            ) : 'Leadership sets the roster.'}
           </p>
         </div>
       ) : board && (

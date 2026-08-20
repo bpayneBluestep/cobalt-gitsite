@@ -6,6 +6,7 @@ import {
 } from '../api'
 import CrmNav from '../components/CrmNav'
 import DealEditor from '../components/DealEditor'
+import { useSession } from '../session'
 import { htmlToText } from '../lib/html'
 import { todayISO } from '../lib/time'
 
@@ -37,6 +38,10 @@ const LOGIN_URL = '/shared/login/login.jsp?desturl=' +
 type TouchKey = Extract<CrmFieldKey, 'leadStatus' | 'owner' | 'lastTouch' | 'nextFollowUp'>
 
 export default function CrmProspecting() {
+  // Sales and Leadership move deals; Accounting and Client Success only watch. Reading
+  // the pipeline without being able to nudge it is a legitimate position to be in.
+  const { can } = useSession()
+  const mayEdit = can('editDeals')
   const [state, setState] = useState<State>({ phase: 'loading' })
   const [search, setSearch] = useState('')
   const [fStatus, setFStatus] = useState('')
@@ -98,6 +103,7 @@ export default function CrmProspecting() {
 
   /** Write one field on a lead, straight from its row. */
   function touch(lead: Lead, key: TouchKey, value: string, said: string) {
+    if (!mayEdit) return
     if (busy) return
     setBusy(lead.id); setFailure(''); setNotice('')
     updateCompany(lead.id, { [key]: value })
@@ -276,7 +282,7 @@ export default function CrmProspecting() {
                             className="minisel"
                             aria-label={`Lead status for ${r.name}`}
                             value={r.leadStatus || ''}
-                            disabled={busy === r.id}
+                            disabled={busy === r.id || !mayEdit}
                             onChange={e => touch(r, 'leadStatus', e.target.value, `status → ${e.target.value}.`)}
                           >
                             <option value="">—</option>
@@ -290,14 +296,20 @@ export default function CrmProspecting() {
                           {overdue && <span className="tag tag--warn">overdue</span>}
                         </td>
                         <td className="leads__act">
-                          <button type="button" className="linkbtn" disabled={busy === r.id}
-                            onClick={() => touch(r, 'lastTouch', today, 'marked touched today.')}>
-                            Touched
-                          </button>
-                          <button type="button" className="linkbtn" disabled={busy === r.id}
-                            onClick={() => setStartFor(r)}>
-                            Start a deal
-                          </button>
+                          {mayEdit ? (
+                            <>
+                              <button type="button" className="linkbtn" disabled={busy === r.id}
+                                onClick={() => touch(r, 'lastTouch', today, 'marked touched today.')}>
+                                Touched
+                              </button>
+                              <button type="button" className="linkbtn" disabled={busy === r.id}
+                                onClick={() => setStartFor(r)}>
+                                Start a deal
+                              </button>
+                            </>
+                          ) : (
+                            <span className="muted">—</span>
+                          )}
                         </td>
                       </tr>
                     )

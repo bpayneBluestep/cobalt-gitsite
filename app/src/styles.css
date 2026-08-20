@@ -3196,3 +3196,82 @@ a.subcrumb:hover { color: var(--cobalt); }
   text-decoration: line-through;
   opacity: 0.75;
 }
+
+/* ---------------------------------------------------------------- permissions
+
+   Three small pieces that only exist because access is now gated: the wait while
+   the session is in flight, the page you get when something is not yours, and the
+   fieldset reset that lets one `disabled` cover a whole form. */
+
+.page__loading {
+  padding: var(--sp-6) var(--sp-5);
+  color: var(--text-mute);
+  font-size: 0.9375rem;
+}
+
+.noaccess {
+  max-width: 46rem;
+  padding: var(--sp-5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.noaccess__facts {
+  display: grid;
+  gap: var(--sp-3);
+  margin: 0 0 var(--sp-4);
+}
+
+.noaccess__facts > div {
+  display: grid;
+  grid-template-columns: 7rem 1fr;
+  gap: var(--sp-3);
+  align-items: baseline;
+}
+
+.noaccess__facts dt {
+  color: var(--text-mute);
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.noaccess__facts dd {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  align-items: center;
+}
+
+.noaccess__needs { color: var(--text-dim); font-weight: 600; }
+.noaccess__none { color: var(--text-mute); font-style: italic; }
+
+.noaccess__fix {
+  margin: 0 0 var(--sp-4);
+  color: var(--text-dim);
+  line-height: 1.55;
+}
+
+.noaccess__go { margin: 0; }
+
+/* A fieldset is the one element that disables every control inside it, which is why
+   read-only forms use one. These four lines undo everything else it brings: the default
+   border and padding, and the intrinsic min-width that would otherwise stop a grid or
+   flex child from shrinking. */
+.efgrid--fs {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-inline-size: 0;
+}
+
+/* Disabled controls inside a read-only form should read as "not for you", not as
+   "temporarily busy" — so they keep their shape and only lose contrast. */
+.efgrid--fs:disabled input,
+.efgrid--fs:disabled select,
+.efgrid--fs:disabled textarea {
+  opacity: 0.7;
+  cursor: default;
+}

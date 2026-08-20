@@ -6,6 +6,7 @@ import {
 } from '../api'
 import CrmNav from '../components/CrmNav'
 import DealEditor from '../components/DealEditor'
+import { useSession } from '../session'
 
 /*
  * The pipeline board — one column per open phase.
@@ -31,6 +32,10 @@ const LOGIN_URL = '/shared/login/login.jsp?desturl=' +
   encodeURIComponent(window.location.pathname + window.location.search)
 
 export default function CrmPipeline() {
+  // Sales and Leadership move deals; Accounting and Client Success only watch. Reading
+  // the pipeline without being able to nudge it is a legitimate position to be in.
+  const { can } = useSession()
+  const mayEdit = can('editDeals')
   const [state, setState] = useState<State>({ phase: 'loading' })
   const [owner, setOwner] = useState('')
   const [openDeal, setOpenDeal] = useState<{ companyId: string; companyName: string; entryId: string } | null>(null)
@@ -79,7 +84,7 @@ export default function CrmPipeline() {
 
   /** Move a deal's phase straight from its card. */
   function movePhase(deal: Deal, phase: string) {
-    if (busy) return
+    if (busy || !mayEdit) return
     setBusy(deal.entryId); setFailure(''); setNotice('')
     updateDeal(deal.companyId, deal.entryId, { phase })
       .then(() => {
@@ -216,7 +221,7 @@ export default function CrmPipeline() {
                         <select
                           aria-label={`Move "${deal.title}" to another phase`}
                           value={deal.phase}
-                          disabled={busy === deal.entryId}
+                          disabled={busy === deal.entryId || !mayEdit}
                           onChange={e => movePhase(deal, e.target.value)}
                         >
                           {OPEN_PHASES.map(p => <option key={p} value={p}>{p}</option>)}

@@ -6,6 +6,7 @@ import {
 } from '../api'
 import { sanitizeHtml } from '../lib/html'
 import RichTextEditor from './RichTextEditor'
+import { useSession } from '../session'
 
 /*
  * Create or edit one deal.
@@ -82,6 +83,15 @@ export default function DealEditor({
     setDraft(deal ? draftOf(deal) : { ...EMPTY, title: `${companyName} — ` })
     setFailure(''); setClosing(''); setConfirmDelete(false)
   }, [deal ? deal.entryId : 'new', companyId])
+
+  /*
+   * Accounting and Client Success can SEE deals — they need to know what a client bought
+   * and what it bills — but only Leadership and Sales may change one. Rather than a second
+   * read-only component, the same card goes inert: the fields disable together and the
+   * buttons that write are not rendered at all.
+   */
+  const { can } = useSession()
+  const mayEdit = can('editDeals')
 
   const pending = deal ? changedFields(draft, deal) : {}
   const dirty = isNew || Object.keys(pending).length > 0
@@ -160,7 +170,17 @@ export default function DealEditor({
         </p>
       )}
 
-      <div className="efgrid">
+      {!mayEdit && (
+        <p className="callout callout--plain">
+          Read-only — deals are visible to your role but only Leadership or Sales can change
+          them.
+        </p>
+      )}
+
+      {/* A fieldset so one `disabled` covers every control inside, including the rich-text
+          editor, rather than threading a flag through each. `efgrid--fs` only undoes the
+          element's default border, padding and intrinsic min-width. */}
+      <fieldset className="efgrid efgrid--fs" disabled={!mayEdit}>
         <div className="ef ef--wide">
           <label htmlFor="d-title">Deal<span className="ef__req" aria-hidden="true">*</span></label>
           <input id="d-title" type="text" value={draft.title} autoComplete="off"
@@ -225,9 +245,9 @@ export default function DealEditor({
             onChange={html => edit('notes', html)}
           />
         </div>
-      </div>
+      </fieldset>
 
-      {!isNew && (
+      {mayEdit && !isNew && (
         <div className="dealcard__close">
           {closing === 'Lost' ? (
             <>
@@ -284,7 +304,7 @@ export default function DealEditor({
               ? `${Object.keys(pending).length} unsaved change${Object.keys(pending).length === 1 ? '' : 's'}`
               : ''}
         </span>
-        {!isNew && (
+        {mayEdit && !isNew && (
           confirmDelete ? (
             <>
               <span className="board2__confirm">Delete this deal?</span>
@@ -303,10 +323,14 @@ export default function DealEditor({
         )}
         {!confirmDelete && (
           <>
-            <button type="button" className="btn btn--ghost" onClick={onClose} disabled={!!busy}>Cancel</button>
-            <button type="button" className="btn" onClick={save} disabled={!!busy || !dirty || !draft.title.trim()}>
-              {isNew ? 'Create deal' : 'Save changes'}
+            <button type="button" className="btn btn--ghost" onClick={onClose} disabled={!!busy}>
+              {mayEdit ? 'Cancel' : 'Close'}
             </button>
+            {mayEdit && (
+              <button type="button" className="btn" onClick={save} disabled={!!busy || !dirty || !draft.title.trim()}>
+                {isNew ? 'Create deal' : 'Save changes'}
+              </button>
+            )}
           </>
         )}
       </div>

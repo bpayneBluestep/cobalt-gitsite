@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ApiError, updateCompany, COMPANY_FIELDS, type Company, type CompanyFieldKey } from '../api'
+import { useSession } from '../session'
 import AccountOwnerCard from '../components/AccountOwnerCard'
 import { useRecord } from './CompanyRecord'
 
@@ -31,6 +32,10 @@ function changedKeys(draft: Draft, saved: Company): Partial<Record<CompanyFieldK
 }
 
 export default function CompanyInfo() {
+  // Company Info is Editor for Leadership, Sales and Client Success; Reader for the
+  // engineers and Accounting, who need the client's context but do not own the record.
+  const { can } = useSession()
+  const mayEdit = can('editClients')
   const { company, reload, setCompany } = useRecord()
   const [draft, setDraft] = useState<Draft>(() => draftOf(company))
   const [saving, setSaving] = useState(false)
@@ -74,7 +79,16 @@ export default function CompanyInfo() {
 
         {failure && <p className="editcard__err" role="alert">{failure}</p>}
 
-        <div className="efgrid">
+        {!mayEdit && (
+          <p className="callout callout--plain">
+            Read-only — engineers and Accounting can see a client's details but not change
+            them. Leadership, Sales and Client Success own this record.
+          </p>
+        )}
+
+        {/* One fieldset, one `disabled` — see DealEditor for why this beats a flag on
+            every input. */}
+        <fieldset className="efgrid efgrid--fs" disabled={!mayEdit}>
           {COMPANY_FIELDS.map(f => (
             <div className="ef" key={f.key}>
               <label htmlFor={`ef-${f.key}`}>
@@ -91,7 +105,7 @@ export default function CompanyInfo() {
               />
             </div>
           ))}
-        </div>
+        </fieldset>
 
         <div className="editcard__foot">
           <span className="editcard__status">
@@ -99,13 +113,17 @@ export default function CompanyInfo() {
               ? `${Object.keys(pending).length} unsaved change${Object.keys(pending).length === 1 ? '' : 's'}`
               : ''}
           </span>
-          <button type="button" className="btn btn--ghost" disabled={!dirty || saving}
-            onClick={() => { setDraft(draftOf(company)); setNotice(''); setFailure('') }}>
-            Revert
-          </button>
-          <button type="button" className="btn" onClick={save} disabled={!dirty || saving}>
-            Save changes
-          </button>
+          {mayEdit && (
+            <>
+              <button type="button" className="btn btn--ghost" disabled={!dirty || saving}
+                onClick={() => { setDraft(draftOf(company)); setNotice(''); setFailure('') }}>
+                Revert
+              </button>
+              <button type="button" className="btn" onClick={save} disabled={!dirty || saving}>
+                Save changes
+              </button>
+            </>
+          )}
         </div>
       </div>
     </>

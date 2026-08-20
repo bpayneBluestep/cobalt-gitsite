@@ -98,6 +98,53 @@ export async function maestroPost(action: string, payload: Record<string, unknow
 // ---------------------------------------------------------------- typed actions
 
 /**
+ * Every capability the Maestro reports. Names match the server's `CAPABILITIES` map.
+ *
+ * A `view` capability means Reader-or-better on the form behind it, an `edit` capability
+ * means Editor — so these mirror the platform ACL rather than inventing a second, softer
+ * set of rules that could disagree with it.
+ */
+export type Capability =
+  | 'viewClients' | 'editClients'
+  | 'viewDeals' | 'editDeals'
+  | 'viewContacts' | 'editContacts'
+  | 'viewFiles' | 'editFiles'
+  | 'viewOwner' | 'editOwner'
+  | 'viewTickets' | 'editTickets'
+  | 'viewSprints' | 'editSprints'
+  | 'viewStaff' | 'editStaff'
+  | 'grantRoles'
+  | 'viewReports'
+  | 'viewSchema'
+
+/**
+ * Who is signed in and what they may do.
+ *
+ * `can` arrives resolved from the server. That is deliberate: this SPA holds no copy of
+ * the role → capability rules, so the matrix has exactly one home and a change to it
+ * takes effect on the next request without a redeploy of the front end.
+ *
+ * None of this is a security boundary — the bundle is public and anyone can call
+ * `/b/maestro` directly. The boundary is the form ACL on the platform, which the endpoint
+ * runs against as the caller. This is here so the UI tells the truth about what is
+ * reachable, instead of offering buttons that fail.
+ */
+export interface Session {
+  loggedIn: boolean
+  userId: string
+  /** The Individual record behind the login — the id that identifies you in the data. */
+  recordId: string
+  fullName: string
+  isSuper: boolean
+  roles: string[]
+  staffRoles: string[]
+  can: Record<Capability, boolean>
+  org: string
+}
+
+export const getSession = (): Promise<Session> => maestroGet('session')
+
+/**
  * A company as `companyRow` returns it — the whole Company Info catalog, including
  * the CRM half. The four `contact*` fields are a MIRROR of the primary contact, kept
  * in step by the endpoint, so every screen that shows a company gets the contact's

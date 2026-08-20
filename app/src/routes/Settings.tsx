@@ -6,6 +6,7 @@ import {
 } from '../api'
 import PhoneInput from '../components/PhoneInput'
 import { isPhoneOk } from '../lib/phone'
+import { useSession } from '../session'
 
 /*
  * Settings → Users.
@@ -61,6 +62,16 @@ function draftOf(u: User): Draft {
 }
 
 export default function Settings() {
+  /*
+   * Everyone with a role can read the directory — the platform grants Reader on Employee
+   * Info to all six — but only Leadership holds Editor, so only Leadership sees the
+   * controls that write. Anyone else gets the same page without them, rather than buttons
+   * that fail on click.
+   */
+  const { can } = useSession()
+  const mayEdit = can('editStaff')
+  const mayGrant = can('grantRoles')
+
   const [state, setState] = useState<State>({ phase: 'loading' })
   const [includeFormer, setIncludeFormer] = useState(true)
   const [editing, setEditing] = useState<string | 'new' | null>(null)
@@ -178,12 +189,21 @@ export default function Settings() {
                   onChange={e => setIncludeFormer(e.target.checked)} />
                 <span>Include people who have left</span>
               </label>
-              <button type="button" className="btn btn--sm" disabled={!!busy}
-                onClick={() => { setEditing('new'); setDraft(EMPTY) }}>
-                <span aria-hidden="true">+</span> Add person
-              </button>
+              {mayEdit && (
+                <button type="button" className="btn btn--sm" disabled={!!busy}
+                  onClick={() => { setEditing('new'); setDraft(EMPTY) }}>
+                  <span aria-hidden="true">+</span> Add person
+                </button>
+              )}
             </div>
           </div>
+
+          {!mayEdit && (
+            <p className="board2__notice" role="status">
+              Read-only — the staff directory is visible to every role, but changing
+              employment details or roles needs Leadership.
+            </p>
+          )}
 
           {notice && <p className="board2__notice" role="status">{notice}</p>}
           {failure && <p className="editcard__err" role="alert">{failure}</p>}
@@ -262,6 +282,11 @@ export default function Settings() {
                     <span>Currently employed</span>
                   </label>
                 </div>
+                {/* Granting a role IS granting access, so this is the one control gated
+                    on its own capability rather than on editStaff. They coincide today
+                    (both Leadership); naming them separately keeps it that way on purpose
+                    rather than by accident. */}
+                {mayGrant && (
                 <fieldset className="ef ef--wide rolebox">
                   <legend className="rolebox__legend">Roles</legend>
                   <p className="rolebox__hint">
@@ -285,6 +310,7 @@ export default function Settings() {
                     </p>
                   )}
                 </fieldset>
+                )}
               </div>
               <div className="editcard__foot">
                 <span className="editcard__status">{busy === 'save' ? 'Saving…' : ''}</span>
@@ -355,7 +381,7 @@ export default function Settings() {
                         className="minisel"
                         aria-label={`Supervisor for ${u.name}`}
                         value={u.supervisorId || ''}
-                        disabled={!!busy}
+                        disabled={!!busy || !mayEdit}
                         onChange={e => run('sup', setSupervisor(u.id, e.target.value),
                           e.target.value
                             ? `${u.name} now reports to ${rows.find(r => r.id === e.target.value)?.name || 'them'}.`
@@ -371,10 +397,14 @@ export default function Settings() {
                       )}
                     </td>
                     <td className="leads__act">
-                      <button type="button" className="linkbtn" disabled={!!busy}
-                        onClick={() => { setEditing(u.id); setDraft(draftOf(u)) }}>
-                        Edit
-                      </button>
+                      {mayEdit ? (
+                        <button type="button" className="linkbtn" disabled={!!busy}
+                          onClick={() => { setEditing(u.id); setDraft(draftOf(u)) }}>
+                          Edit
+                        </button>
+                      ) : (
+                        <span className="muted">{dash}</span>
+                      )}
                     </td>
                   </tr>
                 ))}

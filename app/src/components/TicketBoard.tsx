@@ -7,6 +7,7 @@ import {
 } from '../api'
 import { htmlToText } from '../lib/html'
 import UserPicker from './UserPicker'
+import { useSession } from '../session'
 
 /** Where a ticket lives. The number is the shareable form; the entry id is the fallback. */
 export const ticketPath = (t: Ticket): string =>
@@ -64,6 +65,14 @@ export default function TicketBoard({
   /** Replace one ticket in the caller's copy, from an action's fresh reply. */
   onTicket: (t: Ticket) => void
 }) {
+  /*
+   * Engineers, Client Success and Leadership work tickets. Sales and Accounting read them
+   * — Sales for context before a call, Accounting for the hours behind a bill — and must
+   * not be able to move somebody else's work. The board is the same board either way; it
+   * just loses the controls that write.
+   */
+  const { can } = useSession()
+  const mayEdit = can('editTickets')
   const navigate = useNavigate()
   const [tab, setTab] = useState('open')
   const [search, setSearch] = useState('')
@@ -201,7 +210,7 @@ export default function TicketBoard({
 
   /** Move a ticket's status straight from its row, without opening it. */
   function quickStatus(t: Ticket, status: string) {
-    if (busy) return
+    if (busy || !mayEdit) return
     setBusy(true); setFailure(''); setNotice('')
     updateTicket(list.id, t.entryId, { status })
       .then(fresh => { onTicket(fresh); setNotice(`Moved to ${status}.`) })
@@ -299,7 +308,7 @@ export default function TicketBoard({
           <select
             aria-label={`Move "${t.title}" to another status`}
             value={t.status || 'Open'}
-            disabled={busy}
+            disabled={busy || !mayEdit}
             onChange={e => quickStatus(t, e.target.value)}
           >
             {TICKET_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
@@ -344,9 +353,11 @@ export default function TicketBoard({
               <span aria-hidden="true">✦</span> Ask Wesley
             </Link>
           )}
-          <button type="button" className={wesleyAvailable ? 'btn btn--ghost' : 'btn'} onClick={openNew}>
-            <span aria-hidden="true">+</span> New ticket
-          </button>
+          {mayEdit && (
+            <button type="button" className={wesleyAvailable ? 'btn btn--ghost' : 'btn'} onClick={openNew}>
+              <span aria-hidden="true">+</span> New ticket
+            </button>
+          )}
         </div>
       </div>
 
