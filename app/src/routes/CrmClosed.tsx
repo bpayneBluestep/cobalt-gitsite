@@ -298,9 +298,14 @@ export default function CrmClosed() {
                       <td className="num">{formatMoney(deal.mrr)}</td>
                       <td>{deal.owner || <span className="muted">unowned</span>}</td>
                       <td className="nowrap">
-                        {deal.ageDays === null
-                          ? <span className="muted">—</span>
-                          : `${deal.ageDays}d`}
+                        {/*
+                          Creation to CLOSE, not to today. `ageDays` would keep climbing
+                          after the deal was over, so a deal closed in March would report
+                          a longer and longer sales cycle every time anyone looked.
+                        */}
+                        {deal.cycleDays === null
+                          ? <span className="muted" title="No close date recorded">—</span>
+                          : `${deal.cycleDays}d`}
                       </td>
                       {mayEdit && d.needsClosingCount > 0 && (
                         <td className="nowrap">

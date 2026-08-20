@@ -1061,6 +1061,14 @@ export interface Deal {
    * moving — a deal can be young and stuck, or old and progressing.
    */
   ageDays: number | null
+  /**
+   * How long the deal actually TOOK — creation to close. Null while it is open.
+   *
+   * Distinct from `ageDays`, which measures against today: a closed deal reported by
+   * `ageDays` keeps ageing for ever, so every sales-cycle figure drifts up with the
+   * calendar rather than with the business.
+   */
+  cycleDays: number | null
   phaseAgeDays: number | null
   touchAgeDays: number | null
   /**
