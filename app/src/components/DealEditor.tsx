@@ -452,7 +452,7 @@ export default function DealEditor({
               </button>
             </>
           ) : (
-            <button type="button" className="btn btn--ghost btn--sm" onClick={() => setConfirmDelete(true)} disabled={!!busy}>
+            <button type="button" className="btn btn--ghost btn--sm btn--del" onClick={() => setConfirmDelete(true)} disabled={!!busy}>
               Delete
             </button>
           )

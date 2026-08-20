@@ -4773,3 +4773,111 @@ input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) opacit
 
 :root,
 :root[data-theme="light"] { --bg-sunk: #dde4f1; }
+
+/* ---------------------------------------------------------------------------
+ * Final pass — ordering corrections and observed fixes
+ *
+ * This block is last for a reason. The control base rules above were appended AFTER the
+ * responsive section, and a media query adds no specificity — so a bare `select` rule at
+ * the end of the file beat `@media (max-width: 640px) { select { … } }` earlier in it,
+ * silently undoing the 16px minimum that stops iOS zooming the viewport on focus.
+ *
+ * Media queries competing with unconditional rules by source order is the sharpest edge
+ * in a hand-written stylesheet this size. Anything conditional has to come after
+ * everything it needs to beat.
+ * ------------------------------------------------------------------------- */
+
+@media (max-width: 640px) {
+  /*
+   * Re-declared after the base control rules. 16px is not a taste decision: below it,
+   * iOS Safari zooms the page on focus and does not zoom back out, which leaves someone
+   * stranded at 1.3× in the middle of a form.
+   */
+  input[type="text"],
+  input[type="search"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="date"],
+  input[type="month"],
+  input[type="time"],
+  input[type="url"],
+  input[type="tel"],
+  select,
+  textarea,
+  .ef input,
+  .ef select,
+  .ef textarea { font-size: var(--t-body2); }
+
+  select { min-height: 40px; }
+
+  /*
+   * A scrolling table beats a wrapping one on a phone. Left to wrap, "Internal Team
+   * Member Referral" becomes four lines and a five-row table becomes a screenful; nowrap
+   * keeps one row to one line and moves the cost to a sideways swipe, which is the
+   * gesture the container already affords.
+   */
+  .fields thead th,
+  .fields tbody th,
+  .fields tbody td { white-space: nowrap; }
+
+  /* Except where a cell is genuinely prose — a wrapped sentence is the point there. */
+  .fields td p,
+  .fields td .muted { white-space: normal; }
+
+  /* A checkbox and its label are one thing; the label must not break away from it. */
+  .checkline { flex-wrap: nowrap; }
+  .checkline span { white-space: nowrap; }
+}
+
+@media (max-width: 720px) {
+  /*
+   * Let each board column be as tall as its own contents. With `grid-auto-flow: column`
+   * every column is in one row and stretches to match the tallest, which on a phone means
+   * an empty "Open Lead" runs a full screen deep before you can swipe past it.
+   */
+  .pipe { align-items: start; }
+}
+
+/* ---------------------------------------------------------------------------
+ * Activity list rhythm
+ *
+ * Events are meant to recede — they are scaffolding around the notes, which is the
+ * substance. But at dark-mode contrast three consecutive events ran together into one
+ * grey block, so "phase A → B" and "follow-up set" read as a single paragraph. A rule
+ * between entries separates them without promoting them.
+ * ------------------------------------------------------------------------- */
+
+.act + .act { border-top: 1px solid var(--line); }
+.act[data-type="event"] + .act[data-type="event"] { border-top-color: transparent; }
+.act[data-type="event"] { padding-top: var(--s-xs); padding-bottom: var(--s-xs); }
+
+/* A comment is the thing worth reading — give it room the events do not get. */
+.act[data-type="comment"] {
+  margin: var(--s-s) 0;
+  padding: var(--s-s) 0 var(--s-s) var(--s-m);
+  background: var(--bg-raise);
+  border-radius: 0 var(--r) var(--r) 0;
+}
+
+/* ---------------------------------------------------------------------------
+ * Destructive actions read as destructive
+ *
+ * Delete and Cancel sat side by side in identical secondary styling, which makes the
+ * more dangerous of the two indistinguishable from the escape hatch.
+ *
+ * Fluent's answer is subtle — the danger colour on the text of a secondary button, not a
+ * red fill. A filled red button beside a filled blue one competes for an eye it should
+ * not win; the destructive path should be findable, not advertised.
+ *
+ * Driven by an explicit `btn--del` class rather than a structural selector. The obvious
+ * shortcut, `.editcard__foot .btn--ghost:first-of-type`, would have painted Company
+ * Info's "Revert" button red — same position, opposite meaning.
+ * ------------------------------------------------------------------------- */
+
+.btn--del { color: var(--danger); }
+.btn--del:hover {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+  border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+}
