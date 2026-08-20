@@ -215,11 +215,39 @@ function loginFormBody(username: string, password: string): URLSearchParams {
   return body
 }
 
+/**
+ * Why a sign-in did not produce a usable session.
+ *
+ * A named reason rather than a set of optional booleans, so the caller has to handle the
+ * cases rather than testing flags that may or may not be present — and so TypeScript
+ * narrows `error` onto exactly the variants that carry one.
+ *
+ *   twoFactor  a global account's e-mail verification; hand off to `nativeLoginSubmit`
+ *   noAccess   credentials were RIGHT and the platform session exists, but this account
+ *              cannot reach the Maestro. Retyping the password will never fix it.
+ *   rejected   the username and password genuinely did not match
+ */
 export type LoginResult =
   | { ok: true }
-  /** A global account with e-mail 2FA. The caller must hand off — see `nativeLoginSubmit`. */
-  | { ok: false; twoFactor: true }
-  | { ok: false; twoFactor?: false; error: string }
+  | { ok: false; reason: 'twoFactor' }
+  | { ok: false; reason: 'noAccess'; error: string }
+  | { ok: false; reason: 'rejected'; error: string }
+
+/**
+ * Detect a signed-in response from the login handler.
+ *
+ * The platform re-serves the login page on success as well as on failure, with HTTP 200
+ * both times — but a successful one is rendered with the signed-in chrome, and that chrome
+ * declares `isLoggedIn = true`. Measured on this host: present on success, absent when the
+ * credentials are rejected.
+ *
+ * This is a HINT, never the authority: `session` decides whether the app is usable. It
+ * exists only to tell the two failure modes apart, because "wrong password" and "right
+ * password, no access to this app" need opposite responses from the person reading it.
+ */
+function looksSignedIn(html: string): boolean {
+  return /isLoggedIn\s*=\s*true/.test(html)
+}
 
 /**
  * Try a username/password sign-in without leaving the page.
@@ -228,6 +256,12 @@ export type LoginResult =
  * 200, so believing the status code would report every bad password as a success. The
  * authoritative test is whether the session actually became authenticated, which is why
  * this re-probes `session` and trusts that instead.
+ *
+ * But a failed probe does not mean the password was wrong. The Maestro endpoint requires a
+ * **Relate licence** — an unlicensed account signs in to the platform perfectly well and
+ * still gets bounced from `/b/maestro`, which is indistinguishable from being signed out
+ * if you only look at the probe. Reporting that as "wrong username or password" is what
+ * this used to do, and it sent a real person hunting for a typo in a correct password.
  */
 export async function login(username: string, password: string): Promise<LoginResult> {
   let res: Response
@@ -239,22 +273,44 @@ export async function login(username: string, password: string): Promise<LoginRe
       body: loginFormBody(username, password).toString(),
     })
   } catch {
-    return { ok: false, error: 'Could not reach the sign-in service. Check your connection.' }
+    return {
+      ok: false,
+      reason: 'rejected',
+      error: 'Could not reach the sign-in service. Check your connection.',
+    }
   }
 
   // A global account is bounced to e-mail verification, which an in-page fetch cannot
   // finish — the user has to see the platform's own page.
   if (res.redirected && /\/oauth2\/v1\/login\/verify/.test(res.url)) {
-    return { ok: false, twoFactor: true }
+    return { ok: false, reason: 'twoFactor' }
   }
+
+  // Read once, before the probe: the body is needed only if the probe fails, but a
+  // Response body can be consumed exactly once so there is no second chance later.
+  let html = ''
+  try { html = await res.text() } catch { /* the marker check just says false */ }
 
   try {
     const session = await getSession()
     if (session && session.loggedIn) return { ok: true }
   } catch {
-    /* fall through — an unreadable session here means we are still signed out */
+    /* fall through and work out WHICH failure this is */
   }
-  return { ok: false, error: 'That username and password did not match.' }
+
+  if (looksSignedIn(html)) {
+    return {
+      ok: false,
+      reason: 'noAccess',
+      error:
+        'Your username and password were accepted — you are signed in to BlueStep. But ' +
+        'this account cannot open Cobalt: the endpoint it reads needs a Relate licence, ' +
+        'and this account does not have one. An administrator has to grant it; signing in ' +
+        'again will not help.',
+    }
+  }
+
+  return { ok: false, reason: 'rejected', error: 'That username and password did not match.' }
 }
 
 /**

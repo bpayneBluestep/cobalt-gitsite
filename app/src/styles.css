@@ -3716,3 +3716,26 @@ a.subcrumb:hover { color: var(--cobalt); }
   color: var(--text-mute);
   font-size: 0.75rem;
 }
+
+/* Signed in, but with no way into this app. Cobalt-blue rather than warning-amber: the
+   credentials were correct and nothing the reader typed is wrong, so this is an
+   explanation, not a correction. */
+.login__blocked {
+  margin: 0 0 0.9rem;
+  padding: 0.6rem 0.7rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--text-dim);
+  background: color-mix(in srgb, var(--cobalt) 8%, var(--bg-panel));
+  border: 1px solid color-mix(in srgb, var(--cobalt) 30%, transparent);
+  border-left: 2px solid var(--cobalt);
+  border-radius: var(--r);
+}
+
+.login__blocked p { margin: 0; }
+
+.login__blockedhead {
+  margin-bottom: 0.2rem !important;
+  color: var(--text);
+  font-weight: 600;
+}

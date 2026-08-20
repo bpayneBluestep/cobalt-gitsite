@@ -32,6 +32,13 @@ export default function LoginGate({ onAuthenticated }: { onAuthenticated: () => 
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  /*
+   * Kept apart from `error` because it is not a form error and retrying cannot clear it:
+   * the credentials were right, and the account simply has no way into this app. Showing
+   * it in the red "check your typing" slot would send someone hunting for a typo that
+   * isn't there — which is exactly what happened before this existed.
+   */
+  const [blocked, setBlocked] = useState('')
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -42,6 +49,7 @@ export default function LoginGate({ onAuthenticated }: { onAuthenticated: () => 
       return
     }
 
+    setBlocked('')
     setBusy(true)
     const result = await login(username.trim(), password)
 
@@ -51,13 +59,16 @@ export default function LoginGate({ onAuthenticated }: { onAuthenticated: () => 
       onAuthenticated()
       return
     }
-    if (result.twoFactor) {
+
+    if (result.reason === 'twoFactor') {
       // A global account needs the platform's e-mail verification step, which cannot be
       // completed inside a fetch. Hand the browser over; it comes back here after.
       nativeLoginSubmit(username.trim(), password)
       return
     }
-    setError(result.error)
+
+    if (result.reason === 'noAccess') setBlocked(result.error)
+    else setError(result.error)
     setBusy(false)
   }
 
@@ -82,6 +93,13 @@ export default function LoginGate({ onAuthenticated }: { onAuthenticated: () => 
         {/* Assertive rather than polite: the user is waiting on this answer and has
             nothing else to attend to. */}
         {error && <p className="login__err" role="alert">{error}</p>}
+
+        {blocked && (
+          <div className="login__blocked" role="alert">
+            <p className="login__blockedhead">Signed in, but not to Cobalt</p>
+            <p>{blocked}</p>
+          </div>
+        )}
 
         <form className="login__form" onSubmit={submit} noValidate>
           <label className="login__field">
