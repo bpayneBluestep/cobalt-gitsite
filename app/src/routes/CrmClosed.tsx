@@ -193,6 +193,15 @@ export default function CrmClosed() {
               forecast and {d.needsClosingCount === 1 ? 'does' : 'do'} not appear on the board.
               {mayEdit ? ' Tick the outcome to take them out.' : ''} They are left out of the win
               rate above, because a phase is not a recorded outcome.
+              {mayEdit && (
+                <>
+                  {' '}
+                  <strong>Note:</strong> that stamps the close date as today, which is right for
+                  a deal closing now and wrong for one that was really won months ago — so it will
+                  skew how long those look like they took. Set the date on the record itself if the
+                  real one matters.
+                </>
+              )}
             </p>
           )}
 
@@ -298,7 +307,7 @@ export default function CrmClosed() {
                           {deal.needsClosing && (
                             <button type="button" className="linkbtn" disabled={busy === deal.entryId}
                               onClick={() => markClosed(deal)}
-                              title="Record that this deal is over. The phase it reached is left alone.">
+                              title="Record that this deal is over. The phase it reached is left alone; the close date is stamped as today.">
                               {busy === deal.entryId ? 'Saving…' : 'Mark closed'}
                             </button>
                           )}
