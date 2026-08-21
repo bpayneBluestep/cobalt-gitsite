@@ -5061,3 +5061,20 @@ input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) opacit
   .htimer__main { flex: 0 1 auto; }
   .htimer__end { justify-content: space-between; }
 }
+
+/*
+ * "Nothing assigned yet" is not the same fact as "nothing owed", so it does not wear the
+ * success colour — an empty page telling a new person they are caught up is worse than
+ * saying nothing.
+ */
+.hclear[data-new] {
+  background: var(--bg-panel);
+  border-color: var(--line);
+  border-left-color: var(--line-strong);
+}
+.hclear__where {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-l);
+  margin: var(--s-m) 0 0 !important;
+}

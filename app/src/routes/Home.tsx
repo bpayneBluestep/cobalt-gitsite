@@ -257,17 +257,42 @@ export default function Home() {
             </section>
           ) : (
             /*
-             * The whole point of the page. Stated plainly, once, and not dressed up as a
-             * congratulation — it is a status, and the value is that it is trustworthy.
+             * Nothing owed — the state the page is built to be able to reach. Stated
+             * plainly and not dressed up as a congratulation: it is a status, and its
+             * value is that it is trustworthy.
+             *
+             * But "you have cleared your work" and "nothing has been assigned to you"
+             * are opposite facts that look identical from here, and getting them
+             * confused matters most for the person it happens to first — someone new,
+             * on their first sign-in, being told they are all caught up. So the two are
+             * distinguished by whether the caller holds ANYTHING at all.
              */
-            <section className="hclear">
-              <p className="hclear__head">Nothing owed</p>
-              <p>
-                No follow-up or ticket is due today or overdue.
-                {d.counts.openTickets > 0 && ` ${d.counts.openTickets} ticket${d.counts.openTickets === 1 ? '' : 's'} open.`}
-                {d.counts.openDeals > 0 && ` ${d.counts.openDeals} deal${d.counts.openDeals === 1 ? '' : 's'} in play.`}
-              </p>
-            </section>
+            (d.counts.openTickets === 0 && d.counts.openDeals === 0 && d.counts.quiet === 0
+              && d.counts.blocked === 0 ? (
+              <section className="hclear" data-new="">
+                <p className="hclear__head">Nothing is assigned to you yet</p>
+                <p>
+                  This page fills in as work becomes yours — tickets where you are the
+                  engineer or the one answerable, deals you own, and the follow-ups on
+                  them. It is empty because there is nothing pointed at you, not because
+                  you are finished.
+                </p>
+                <p className="hclear__where">
+                  {can('viewDeals') && <Link className="inlink" to="/crm/prospecting">Pick up a lead</Link>}
+                  {can('viewTickets') && <Link className="inlink" to="/tickets">Browse the ticket board</Link>}
+                  {can('viewClients') && <Link className="inlink" to="/clients">See the clients</Link>}
+                </p>
+              </section>
+            ) : (
+              <section className="hclear">
+                <p className="hclear__head">Nothing owed</p>
+                <p>
+                  No follow-up or ticket is due today or overdue.
+                  {d.counts.openTickets > 0 && ` ${d.counts.openTickets} ticket${d.counts.openTickets === 1 ? '' : 's'} open.`}
+                  {d.counts.openDeals > 0 && ` ${d.counts.openDeals} deal${d.counts.openDeals === 1 ? '' : 's'} in play.`}
+                </p>
+              </section>
+            ))
           )}
 
           {/* ── blocked ─────────────────────────────────────────────────── */}
