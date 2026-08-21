@@ -12,6 +12,7 @@ import UnderConstruction from './routes/UnderConstruction'
 import NoAccess from './routes/NoAccess'
 import LoginGate from './routes/LoginGate'
 import CrmDashboard from './routes/CrmDashboard'
+import Home from './routes/Home'
 import CrmPipeline from './routes/CrmPipeline'
 import CrmClosed from './routes/CrmClosed'
 import CrmFollowUps from './routes/CrmFollowUps'
@@ -175,6 +176,14 @@ function Shell() {
                 }
               />
             ))}
+
+            {/*
+                Home takes the root. Not guarded by a capability: it shows only what is
+                already yours, so there is nothing on it a signed-in person should not
+                see, and gating the landing page on anything would drop somebody on a
+                "not for you" screen the moment they sign in.
+            */}
+            <Route path="/" element={<Home />} />
 
             <Route path="/crm" element={<Guarded needs="viewDeals" what="CRM"><CrmDashboard /></Guarded>} />
             <Route path="/crm/pipeline" element={<Guarded needs="viewDeals" what="The pipeline"><CrmPipeline /></Guarded>} />

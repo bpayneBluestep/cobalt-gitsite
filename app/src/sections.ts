@@ -56,6 +56,7 @@ export const SECTIONS: Section[] = [
     live: [
       { to: '/clients', label: 'Clients', note: 'the company list, live — open one to reach its tickets' },
     ],
+    built: true,
   },
   {
     key: 'clients',

@@ -1355,6 +1355,128 @@ const scopeParams = (scope: CrmScope): Record<string, string> => {
   return out
 }
 
+/*
+ * Home — the caller's own start-of-day page.
+ *
+ * An inbox, not a dashboard: every field here is something to act on. There is no scope
+ * parameter on purpose — Home is definitionally yours, and a Mine/Everyone switch would
+ * turn it into another CRM page.
+ */
+
+/** One line of the merged urgency list. The `kind` decides where it links. */
+export interface OwedItem {
+  kind: 'deal' | 'prospect' | 'ticket'
+  companyId?: string
+  listId?: string
+  entryId: string
+  title: string
+  /** The company, or the list a ticket lives on. */
+  context: string
+  /** What it is — the next step, the phase, or the ticket's status and priority. */
+  what: string
+  due: string
+  overdue: boolean
+  /** Days since it fell due. Negative would mean the future, which is filtered out. */
+  days: number | null
+}
+
+export interface HomeTimer {
+  listId: string
+  entryId: string
+  ticketNumber: number | null
+  title: string
+  clientName: string
+  startedAt: string
+  elapsedMinutes: number
+  /** Running longer than five hours — almost certainly forgotten, and poisoning totals. */
+  probablyForgotten: boolean
+}
+
+export interface HomeTicket {
+  listId: string
+  entryId: string
+  ticketNumber: number | null
+  title: string
+  status: string
+  priority: string
+  clientId: string
+  clientName: string
+  dueDate: string
+  sprint: string
+  estHours: number | null
+  loggedHours: number | null
+  roadblocked: boolean
+  subtaskCount: number
+  subtaskDone: number
+}
+
+export interface HomeBlocked extends HomeTicket {
+  reason: string
+  since: string
+  by: string
+  days: number | null
+}
+
+export interface HomeDeal {
+  companyId: string
+  companyName: string
+  entryId: string
+  title: string
+  phase: string
+  mrr: number | null
+  confidence: string
+  phaseAgeDays: number | null
+  phaseSinceEstimated: boolean
+  stuck: boolean
+  neverTouched: boolean
+  stale: boolean
+  nextStep: string
+  nextFollowUp: string
+  followUpState: Deal['followUpState']
+  followUpInDays: number | null
+}
+
+export interface HomeQuiet {
+  companyId: string
+  companyName: string
+  lastTouch: string
+  /** Null when nothing was ever recorded, which is worse than a large number. */
+  days: number | null
+  owner: string
+  contactName: string
+}
+
+export interface Home {
+  today: string
+  weekStart: string
+  me: { recordId: string; name: string; roles: string[] }
+  /** Composed server-side so every client says the same thing. May be "Nothing owed". */
+  headline: string
+  counts: {
+    owed: number; overdue: number; dueToday: number
+    openTickets: number; blocked: number; openDeals: number; quiet: number
+  }
+  owed: OwedItem[]
+  timer: HomeTimer | null
+  tickets: { total: number; byStatus: { status: string; count: number; rows: HomeTicket[] }[] }
+  blocked: HomeBlocked[]
+  deals: HomeDeal[]
+  quiet: HomeQuiet[]
+  week: {
+    start: string
+    minutes: number
+    hours: number
+    billableHours: number
+    /** Null when the caller has no row on the sprint roster. */
+    capacityHours: number | null
+  }
+  quietAfterDays: number
+  listsScanned: number
+  companiesScanned: number
+}
+
+export const getHome = (): Promise<Home> => maestroGet('home')
+
 export const getCrmSummary = (scope: CrmScope = {}): Promise<CrmSummary> =>
   maestroGet('crmSummary', scopeParams(scope))
 

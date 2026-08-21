@@ -3188,7 +3188,16 @@ select:hover:not(:focus) { border-color: var(--text-mute); }
   gap: 0.5rem;
   cursor: pointer;
 }
-text-transform: none;
+/* Restored: the sentence-case sweep replaced this whole line, because it was a ONE-LINER
+   rule and the sweep worked line-by-line — it destroyed the rule and left the lone
+   declaration behind, which esbuild caught as a syntax error. */
+.wes-history-h {
+  font-family: var(--font-display);
+  font-size: var(--t-caption1);
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+}
 .wes-history-list {
   margin: 0.9rem 0 0;
   padding: 0;
@@ -4890,4 +4899,165 @@ input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) opacit
   color: var(--danger);
   background: color-mix(in srgb, var(--danger) 8%, transparent);
   border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+}
+
+/* ---------------------------------------------------------------------------
+ * Home — the start-of-day inbox
+ *
+ * A single column, not a grid: a grid invites scanning, a column says work down this.
+ * Urgency at the top, decaying downward. No charts and no company totals — those are the
+ * CRM dashboard's job, and duplicating them here would make this a worse copy of a page
+ * that already exists.
+ * ------------------------------------------------------------------------- */
+
+.home { max-width: 60rem; }
+
+/* The one honest sentence the page leads with. */
+.home__headline {
+  margin: var(--s-s) 0 0;
+  font-family: var(--font-display);
+  font-size: var(--t-subtitle1);
+  font-weight: 600;
+}
+.home__headline[data-tone="bad"]  { color: var(--danger); }
+.home__headline[data-tone="warn"] { color: var(--warn); }
+.home__headline[data-tone="ok"]   { color: var(--good); }
+
+.hpanel { margin-bottom: var(--s-l); }
+.hpanel .panel__note { flex: 1 1 100%; margin: var(--s-xxs) 0 var(--s-s); }
+
+/*
+ * "Nothing owed" — the state the whole page is built to be able to reach. Given a real
+ * surface rather than an empty-state whisper, because it is an answer, not an absence.
+ */
+.hclear {
+  margin-bottom: var(--s-l);
+  padding: var(--s-l);
+  background: color-mix(in srgb, var(--good) 8%, var(--bg-panel));
+  border: 1px solid color-mix(in srgb, var(--good) 28%, transparent);
+  border-left: 3px solid var(--good);
+  border-radius: var(--r-lg);
+}
+.hclear__head {
+  margin: 0 0 var(--s-xs);
+  font-family: var(--font-display);
+  font-size: var(--t-subtitle2);
+  font-weight: 600;
+}
+.hclear p:last-child { margin: 0; color: var(--text-dim); }
+
+/* ── a running timer ────────────────────────────────────────────────────── */
+
+.htimer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-m);
+  margin-bottom: var(--s-l);
+  padding: var(--s-m) var(--s-l);
+  background: color-mix(in srgb, var(--cobalt) 8%, var(--bg-panel));
+  border: 1px solid color-mix(in srgb, var(--cobalt) 30%, transparent);
+  border-left: 3px solid var(--cobalt);
+  border-radius: var(--r-lg);
+}
+/* A timer running past five hours is almost certainly forgotten, and every hours figure
+   downstream is wrong until it is stopped. That earns the warning colour. */
+.htimer[data-warn] {
+  background: color-mix(in srgb, var(--warn) 10%, var(--bg-panel));
+  border-color: color-mix(in srgb, var(--warn) 40%, transparent);
+  border-left-color: var(--warn);
+}
+.htimer__main { min-width: 0; }
+.htimer__label {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--t-caption1);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-mute);
+}
+.htimer__title { margin: var(--s-xxs) 0 0; font-size: var(--t-body2); }
+.htimer__note { margin: var(--s-xs) 0 0; font-size: var(--t-caption1); color: var(--text-dim); }
+.htimer__end { display: flex; align-items: center; gap: var(--s-m); }
+.htimer__clock {
+  font-family: var(--font-display);
+  font-size: var(--t-title3);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── the lists ──────────────────────────────────────────────────────────── */
+
+.hlist { list-style: none; margin: 0; padding: 0; }
+
+.hrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s-s);
+  padding: var(--s-s) 0 var(--s-s) var(--s-mnudge);
+  border-bottom: 1px solid var(--line);
+  border-left: 3px solid transparent;
+}
+.hrow:last-child { border-bottom: none; }
+.hrow[data-late] { border-left-color: var(--danger); }
+
+.hrow__main { flex: 0 1 auto; min-width: 0; }
+.hrow__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-snudge);
+  margin: 0;
+  font-size: var(--t-body1);
+}
+.hrow__num {
+  margin-right: var(--s-snudge);
+  font-family: var(--font-mono);
+  font-size: var(--t-caption1);
+  color: var(--text-mute);
+}
+.hrow__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-xs);
+  margin: var(--s-xxs) 0 0;
+  font-size: var(--t-caption1);
+  color: var(--text-dim);
+}
+.hrow__due { font-family: var(--font-display); font-variant-numeric: tabular-nums; }
+.hrow__due[data-late] { color: var(--danger); font-weight: 600; }
+/* The reason, or the missing next step — the line that says why the row is here. */
+.hrow__why { margin: var(--s-xs) 0 0; font-size: var(--t-caption1); color: var(--text-dim); }
+.hrow__act { display: flex; align-items: center; gap: var(--s-xs); }
+
+.hgroup + .hgroup { margin-top: var(--s-m); }
+.hgroup__h {
+  margin: 0 0 var(--s-xs);
+  font-family: var(--font-display);
+  font-size: var(--t-caption1);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-mute);
+}
+
+.hweek { margin: 0; font-size: var(--t-body2); }
+.hweek strong { font-family: var(--font-display); font-variant-numeric: tabular-nums; }
+
+@media (max-width: 640px) {
+  .hrow,
+  .htimer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  /* Same flex-basis trap as the follow-up rows: a basis set for a row becomes a height
+     floor the moment the container turns into a column. */
+  .hrow__main,
+  .htimer__main { flex: 0 1 auto; }
+  .htimer__end { justify-content: space-between; }
 }
