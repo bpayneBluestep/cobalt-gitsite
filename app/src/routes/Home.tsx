@@ -144,14 +144,25 @@ export default function Home() {
 
   const firstName = (session?.fullName || '').split(/[,\s]+/).filter(Boolean)[0] || ''
 
+  /*
+   * Nothing pointed at this person at all — as opposed to nothing pointed at them TODAY.
+   * The two need different words in both places they appear, or the headline reassures
+   * while the panel below it says the opposite.
+   */
+  const nothingAssigned = !!d && d.counts.openTickets === 0 && d.counts.openDeals === 0
+    && d.counts.quiet === 0 && d.counts.blocked === 0 && d.counts.owed === 0
+
   return (
     <section className="page home">
       <header className="page__head">
         <p className="eyebrow">Cobalt</p>
         <h1>{firstName ? `Morning, ${firstName}` : 'Your day'}</h1>
         {d && (
-          <p className="home__headline" data-tone={d.counts.overdue ? 'bad' : d.counts.owed ? 'warn' : 'ok'}>
-            {d.headline}
+          <p
+            className="home__headline"
+            data-tone={d.counts.overdue ? 'bad' : d.counts.owed ? 'warn' : nothingAssigned ? 'none' : 'ok'}
+          >
+            {nothingAssigned ? 'Nothing assigned yet' : d.headline}
           </p>
         )}
       </header>
@@ -267,8 +278,7 @@ export default function Home() {
              * on their first sign-in, being told they are all caught up. So the two are
              * distinguished by whether the caller holds ANYTHING at all.
              */
-            (d.counts.openTickets === 0 && d.counts.openDeals === 0 && d.counts.quiet === 0
-              && d.counts.blocked === 0 ? (
+            (nothingAssigned ? (
               <section className="hclear" data-new="">
                 <p className="hclear__head">Nothing is assigned to you yet</p>
                 <p>
