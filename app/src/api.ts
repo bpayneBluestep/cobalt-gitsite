@@ -2085,7 +2085,13 @@ export interface CsRow extends CsInfo {
   category: string
   owner: string
   ownerId: string
-  /** Absent — not zero — for a caller without `viewMoney`. */
+  /**
+   * Absent — not zero — for a caller without `viewMoney`.
+   *
+   * The endpoint's redactor deletes the key rather than blanking it, so presence is the
+   * test: `'mrr' in row` separates "you may not see this" from "this client has no won
+   * deals", which `mrr === null` alone cannot.
+   */
   mrr?: number | null
   renewalDate: string
   renewsInDays: number | null
@@ -2118,8 +2124,26 @@ export interface CsQueue {
   rows: CsRow[]
   vocabularies: CsVocabularies
   companiesScanned: number
-  /** True when money was withheld, so the screen can say so rather than imply zero. */
+  /**
+   * Not sent by the endpoint — redaction is expressed by dropping the `mrr` key. Kept
+   * optional so the screen can honour it if it ever arrives, but `moneyWithheld()` below
+   * is what the UI actually reads.
+   */
   moneyHidden?: boolean
+}
+
+/**
+ * Whether revenue was withheld from these rows, so a screen can say so instead of
+ * quietly showing clients with no MRR.
+ *
+ * Inferred from the shape rather than a flag, because the redactor removes the key: if
+ * not one row carries an `mrr` key, it was taken out. A book where every client
+ * genuinely has no won deals still carries the key, so this does not false-positive on
+ * a company that simply has no money against it.
+ */
+export function moneyWithheld(rows: CsRow[], flag?: boolean): boolean {
+  if (flag !== undefined) return flag
+  return rows.length > 0 && !rows.some(r => 'mrr' in r)
 }
 
 /** One logged contact. There is no update path: a wrong reading is corrected by a newer entry. */

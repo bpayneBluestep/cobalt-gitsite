@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ApiError, createSurveyInvite, formatMoney, getContacts, getCsQueue, logTouchpoint,
-  setSupportIntensity, INTENSITY_DEFINITIONS, TEMPERATURES, TOUCHPOINT_TYPES,
+  moneyWithheld, setSupportIntensity, INTENSITY_DEFINITIONS, TEMPERATURES, TOUCHPOINT_TYPES,
   type Contact, type CsInfo, type CsQueue as CsQueueData, type CsRow, type CsVocabularies,
 } from '../api'
 import CsNav from '../components/CsNav'
@@ -280,10 +280,10 @@ export default function CsQueue() {
           {notice && <p className="board2__notice" role="status">{notice}</p>}
           {failure && <p className="editcard__err" role="alert">{failure}</p>}
 
-          {d.moneyHidden && (
+          {moneyWithheld(d.rows, d.moneyHidden) && (
             <p className="note">
               Revenue is hidden for your roles, so these rows carry no MRR. Health does not
-              depend on it.
+              depend on it — nothing on this screen is missing because of it.
             </p>
           )}
 
@@ -351,7 +351,6 @@ export default function CsQueue() {
                         isOpen={isOpen}
                         setOpen={setOpen}
                         vocabularies={d.vocabularies}
-                        moneyHidden={!!d.moneyHidden}
                         run={run}
                         patch={patch}
                       />
@@ -376,7 +375,7 @@ export default function CsQueue() {
 /* ------------------------------------------------------------------ one row */
 
 function QueueRow({
-  row, group, mayEdit, busy, open, isOpen, setOpen, vocabularies, moneyHidden, run, patch,
+  row, group, mayEdit, busy, open, isOpen, setOpen, vocabularies, run, patch,
 }: {
   row: CsRow
   group: GroupKey
@@ -386,7 +385,6 @@ function QueueRow({
   isOpen: (kind: OpenForm['kind'], companyId: string) => boolean
   setOpen: (o: OpenForm) => void
   vocabularies: CsVocabularies
-  moneyHidden: boolean
   run: (id: string, work: Promise<unknown>, done: (result: unknown) => void) => void
   patch: (companyId: string, cs: CsInfo, message: string) => void
 }) {
@@ -429,7 +427,8 @@ function QueueRow({
               <span>{row.temperature} on {row.temperatureDate}</span>
             </>
           )}
-          {!moneyHidden && row.mrr !== null && row.mrr !== undefined && (
+          {/* Presence, not a flag: a redacted row has no `mrr` key at all. */}
+          {row.mrr !== null && row.mrr !== undefined && (
             <>
               <span className="dot" aria-hidden="true">·</span>
               <span>{formatMoney(row.mrr)}<span className="muted">/mo</span></span>
