@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  ApiError, deleteTouchpoint, getSurveys, getTouchpoints, logTouchpoint,
+  ApiError, deleteTouchpoint, getLists, getSurveys, getTouchpoints, logTouchpoint,
   setSupportIntensity, npsTone, INTENSITY_DEFINITIONS, SURVEY_DIMENSIONS, TEMPERATURES,
   TOUCHPOINT_TYPES,
   type CsInfo, type SurveyList, type Touchpoint, type TouchpointList,
@@ -88,9 +88,22 @@ export default function CompanySuccess() {
   const mayEdit = can('editCs')
   const mayAdmin = can('adminCs')
   const maySeeSurveys = can('viewSurveys')
+  const mayRaiseTicket = can('viewTickets')
 
   const [state, setState] = useState<State>({ phase: 'loading' })
   const [surveys, setSurveys] = useState<SurveyList | null>(null)
+  /*
+   * The client's ticket list, if it has one — read-only, and the reason the escalation
+   * button is here rather than on the queue row.
+   *
+   * `lists` is a GET that reports what exists. The tickets TAB uses `clientList`, which
+   * is a POST that creates the list when it is missing, so linking to it unconditionally
+   * would mint a list for the fourteen clients that have none the first time anyone
+   * clicked. Asking first costs one request on a single-company screen and buys an
+   * affordance that is absent when there is nothing behind it — the same rule "Go to Org"
+   * follows for a blank ehrLink.
+   */
+  const [listId, setListId] = useState('')
   const [busy, setBusy] = useState('')
   const [notice, setNotice] = useState('')
   const [failure, setFailure] = useState('')
@@ -122,6 +135,20 @@ export default function CompanySuccess() {
   }, [id])
 
   useEffect(load, [load])
+
+  useEffect(() => {
+    if (!mayRaiseTicket) return
+    let live = true
+    getLists({ clientId: id })
+      .then(data => {
+        if (!live) return
+        const own = (data.rows || []).find(l => !l.archived)
+        if (own) setListId(own.id)
+      })
+      // No list, or no permission to look: the button simply does not appear.
+      .catch(() => {})
+    return () => { live = false }
+  }, [id, mayRaiseTicket])
 
   useEffect(() => {
     if (!maySeeSurveys) return
@@ -189,6 +216,12 @@ export default function CompanySuccess() {
                 <button type="button" className="btn btn--ghost btn--sm" onClick={() => setChanging(true)}>
                   Intensity
                 </button>
+              )}
+              {/* Only when the client actually has a board to raise it on. */}
+              {listId && (
+                <Link className="btn btn--ghost btn--sm" to={`/clients/${id}/tickets`}>
+                  Raise ticket
+                </Link>
               )}
             </header>
             <p className="panel__note">

@@ -499,9 +499,18 @@ function QueueRow({
             onClick={() => setOpen({ kind: 'intensity', companyId: id })}>
             Intensity
           </button>
-          {/* Escalation is one deliberate click, never automatic: a CS save is usually a
-              phone call, and auto-created tickets nobody triaged are noise with a number. */}
-          <Link className="btn btn--ghost btn--sm" to={`/clients/${id}/tickets`}>Raise ticket</Link>
+          {/*
+            Escalation lives on the account's Success tab, not on this row, and it is
+            deliberate rather than automatic — a CS save is usually a phone call, and
+            auto-created tickets nobody triaged are noise with a number.
+
+            It is not here because a queue row cannot tell whether this client HAS a
+            ticket list: `csQueue` carries no list id, and measured against live data in
+            August 2026, 14 of 91 clients had none. The tickets tab resolves-or-CREATES
+            on arrival, so a link from every row would quietly mint a list for those
+            fourteen the first time anyone clicked through. The Success tab knows,
+            because on one company it can afford to ask.
+          */}
         </div>
       )}
     </li>
