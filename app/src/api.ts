@@ -2158,7 +2158,8 @@ export interface Touchpoint {
 }
 
 export interface TouchpointList {
-  company: { id: string; name: string; category: string }
+  /** `isClient` is the server's own membership test, not re-derived here. */
+  company: { id: string; name: string; categories: string[]; isClient: boolean }
   cs: CsInfo
   rows: Touchpoint[]
 }

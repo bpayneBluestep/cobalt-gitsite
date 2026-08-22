@@ -196,10 +196,11 @@ export default function CompanySuccess() {
 
           <HealthCard cs={d.cs} />
 
-          {d.company.category !== 'Client' && (
+          {!d.company.isClient && (
             <p className="note">
-              This company is {d.company.category || 'uncategorised'}, not a Client, so it
-              does not appear in the Client Success queue. Its history is kept either way.
+              This company is {(d.company.categories || []).join(', ') || 'uncategorised'},
+              not a Client, so it does not appear in the Client Success queue. Its history
+              is kept either way.
             </p>
           )}
 
