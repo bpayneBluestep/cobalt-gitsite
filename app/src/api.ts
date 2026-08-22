@@ -2168,7 +2168,6 @@ export interface SurveyInvite {
   sentAt: string
   sentTo: string
   contactName: string
-  token: string
   sentBy: string
   /** Present on the org-wide list, absent when the call named one company. */
   companyId?: string
@@ -2299,13 +2298,22 @@ export const createSurveyInvite = (
 ): Promise<{ invite: SurveyInvite; url: string; subject: string; body: string }> =>
   maestroPost('createSurveyInvite', { companyId, email, contactName })
 
+/*
+ * `invites` is defaulted rather than trusted. Two screens count it before rendering
+ * anything, so a response that omits the key took both of them to a blank page — the
+ * one failure mode worth spending a line to make impossible.
+ */
 export const getSurveys = (
   params: { companyId?: string; quarter?: string } = {},
 ): Promise<SurveyList> => {
   const q: Record<string, string> = {}
   if (params.companyId) q.companyId = params.companyId
   if (params.quarter) q.quarter = params.quarter
-  return maestroGet('surveys', q)
+  return maestroGet('surveys', q).then((d: SurveyList) => ({
+    ...d,
+    rows: d.rows || [],
+    invites: d.invites || [],
+  }))
 }
 
 /** `quarter` is `YYYY-Qn`. Omitted means the quarter we are in, capped at today. */
