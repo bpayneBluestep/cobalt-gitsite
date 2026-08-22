@@ -5080,3 +5080,96 @@ input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) opacit
 }
 /* Nothing assigned is neither good news nor bad — it gets the neutral voice. */
 .home__headline[data-tone="none"] { color: var(--text-mute); font-weight: 400; }
+
+/*
+ * ── printing ──────────────────────────────────────────────────────────────
+ *
+ * The one print rule in Cobalt, and it exists for one page: /cs/quarter, the
+ * quarterly Client Success review, which is a document somebody hands to somebody
+ * else rather than a screen they scroll.
+ *
+ * Everything that is a way to GO somewhere or DO something comes off the paper — top
+ * bar, sub-nav, filters, buttons — because on a sheet of paper they are furniture that
+ * cannot be clicked, and they push the content that matters onto a second page.
+ * Everything that is a fact stays.
+ *
+ * Panels go to white with a hairline rather than keeping their dark or raised fill:
+ * the palette is built for a screen, and a themed background either wastes toner or,
+ * in dark mode, prints a black rectangle over the text. Colour is kept on the tone
+ * pills and the red flags, because "still open" losing its red would change what the
+ * page says.
+ *
+ * Last in the file on purpose: it must win over every themed background above it, and
+ * `@media print` never competes with the responsive blocks — only with source order.
+ */
+@media print {
+  .topbar,
+  .subnav,
+  .footer,
+  .pipebar__tools,
+  .scope,
+  .filters,
+  .btn,
+  .btn--ghost,
+  .btn--sm,
+  .linkbtn,
+  .subtoggle,
+  .minisel,
+  .themetoggle {
+    display: none !important;
+  }
+
+  /* No scroll container can hide a column on paper — there is nowhere to scroll to. */
+  .tablewrap {
+    overflow: visible !important;
+    border: none !important;
+  }
+
+  html,
+  body,
+  .shell,
+  main,
+  .page {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  .panel,
+  .kpi,
+  .reccard,
+  .callout {
+    background: #fff !important;
+    border-color: #999 !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+
+  /* The dim greys are readable on a screen at 60% contrast and not on paper. */
+  .muted,
+  .note,
+  .panel__note,
+  .panel__foot,
+  .kpi__k,
+  .kpi__n,
+  .page__sub-text {
+    color: #333 !important;
+  }
+
+  .fields thead th,
+  .fields tbody th,
+  .fields tbody td {
+    border-color: #999 !important;
+    background: #fff !important;
+  }
+
+  /* A section heading should not be the last thing on a page. */
+  .panel__head,
+  .page__head {
+    break-after: avoid;
+  }
+
+  a[href] {
+    color: #000 !important;
+    text-decoration: none;
+  }
+}

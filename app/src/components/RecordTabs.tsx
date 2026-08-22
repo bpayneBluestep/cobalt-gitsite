@@ -1,4 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
+import { useSession } from '../session'
+import type { Capability } from '../api'
 
 /*
  * The tab strip on a company.
@@ -19,6 +21,11 @@ import { Link, useLocation } from 'react-router-dom'
  *
  * A Former Client keeps Tickets — the history of what was done for them is exactly what
  * you want when they come back, and hiding it would lose it.
+ *
+ * Two independent tests, and a tab needs to pass both. `when` asks what the company IS;
+ * `needs` asks what the VIEWER may see. Success is the first tab where they differ: an
+ * engineer has every reason to open a client record and no business reading its account
+ * health, so the tab is not offered to them — the same rule the section nav follows.
  */
 
 interface Tab {
@@ -26,6 +33,8 @@ interface Tab {
   label: string
   /** Omit for a tab that is always shown. */
   when?: (categories: string[]) => boolean
+  /** The capability required to see the tab at all. Omit for a tab everyone gets. */
+  needs?: Capability
 }
 
 const isClientish = (categories: string[]) =>
@@ -35,6 +44,12 @@ const TABS: Tab[] = [
   { seg: '', label: 'Info' },
   { seg: 'deals', label: 'Deals' },
   { seg: 'tickets', label: 'Tickets', when: isClientish },
+  /*
+   * Success is clientish for the same reason Tickets is: a lead has no relationship to
+   * keep healthy yet, and a Former Client's history is exactly what you want in front of
+   * you when they come back.
+   */
+  { seg: 'success', label: 'Success', when: isClientish, needs: 'viewCs' },
   { seg: 'contacts', label: 'Contacts' },
   { seg: 'files', label: 'Files' },
 ]
@@ -46,11 +61,12 @@ export default function RecordTabs({
   categories: string[]
 }) {
   const { pathname } = useLocation()
+  const { can } = useSession()
   const base = `/clients/${companyId}`
   // Everything after the record's own path, minus slashes: '' | 'deals' | 'tickets' | …
   const here = pathname.startsWith(base) ? pathname.slice(base.length).replace(/\//g, '') : ''
 
-  const shown = TABS.filter(t => !t.when || t.when(categories))
+  const shown = TABS.filter(t => (!t.when || t.when(categories)) && (!t.needs || can(t.needs)))
 
   return (
     <nav className="subnav" aria-label="Record sections">

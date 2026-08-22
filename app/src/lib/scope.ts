@@ -19,42 +19,68 @@
  * Prospecting and Follow-ups should not reset who you are looking at — that is the same
  * question being asked three ways, and re-answering it on every navigation is the kind
  * of small friction that makes a tool feel like it is arguing with you.
+ *
+ * There are two stores, not one, because Client Success asks the same question with a
+ * different right answer. CS is one person covering every account, so its screens open
+ * on Everyone; sharing the CRM's store would mean opening the queue silently filtered
+ * to one owner's clients, or opening the pipeline unfiltered — one of the two would
+ * always be wrong. Same control, same three states, separate memory.
  */
 
 export type Scope = 'mine' | 'everyone' | string
 
-const KEY = 'cobalt-crm-scope'
+/** Which store a screen reads. The CRM's is the default, so existing callers say nothing. */
+export type ScopeStore = 'crm' | 'cs'
 
-function stored(): Scope {
+const KEYS: Record<ScopeStore, string> = {
+  crm: 'cobalt-crm-scope',
+  cs: 'cobalt-cs-scope',
+}
+
+const DEFAULTS: Record<ScopeStore, Scope> = {
+  crm: 'mine',
+  cs: 'everyone',
+}
+
+function stored(store: ScopeStore): Scope {
   try {
-    const v = localStorage.getItem(KEY)
-    return v ? v : 'mine'
+    const v = localStorage.getItem(KEYS[store])
+    return v ? v : DEFAULTS[store]
   } catch {
     // Blocked storage: the default is still the useful answer.
-    return 'mine'
+    return DEFAULTS[store]
   }
 }
 
-let current: Scope = stored()
-const listeners = new Set<(s: Scope) => void>()
-
-export function getScope(): Scope {
-  return current
+const current: Record<ScopeStore, Scope> = {
+  crm: stored('crm'),
+  cs: stored('cs'),
 }
 
-export function setScope(scope: Scope): void {
-  current = scope || 'mine'
+const listeners: Record<ScopeStore, Set<(s: Scope) => void>> = {
+  crm: new Set(),
+  cs: new Set(),
+}
+
+export function getScope(store: ScopeStore = 'crm'): Scope {
+  return current[store]
+}
+
+export function setScope(scope: Scope, store: ScopeStore = 'crm'): void {
+  current[store] = scope || DEFAULTS[store]
   try {
-    localStorage.setItem(KEY, current)
+    localStorage.setItem(KEYS[store], current[store])
   } catch {
     // Losing persistence costs the choice on next load, not the choice now.
   }
-  for (const listener of Array.from(listeners)) listener(current)
+  for (const listener of Array.from(listeners[store])) listener(current[store])
 }
 
-export function subscribeScope(listener: (s: Scope) => void): () => void {
-  listeners.add(listener)
-  return () => listeners.delete(listener)
+export function subscribeScope(
+  listener: (s: Scope) => void, store: ScopeStore = 'crm',
+): () => void {
+  listeners[store].add(listener)
+  return () => listeners[store].delete(listener)
 }
 
 /**

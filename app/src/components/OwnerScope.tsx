@@ -1,6 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useSession } from '../session'
-import { getScope, isMine, scopeToOwnerId, setScope, subscribeScope, type Scope } from '../lib/scope'
+import {
+  getScope, isMine, scopeToOwnerId, setScope, subscribeScope,
+  type Scope, type ScopeStore,
+} from '../lib/scope'
 import { loadUsers } from './UserPicker'
 import type { User } from '../api'
 
@@ -14,20 +17,26 @@ import type { User } from '../api'
  *
  * The whole thing hides when there is only one person who owns anything — a select with
  * one name in it is a control that cannot do anything.
+ *
+ * `store` picks which memory the control reads and writes. Client Success keeps its own,
+ * because it opens on Everyone where the CRM opens on Mine — see lib/scope.ts.
  */
 
 /** Read the shared scope and re-render when anything else changes it. */
-export function useScope(): [Scope, (s: Scope) => void, string] {
-  const [scope, set] = useState<Scope>(getScope)
-  useEffect(() => subscribeScope(set), [])
+export function useScope(store: ScopeStore = 'crm'): [Scope, (s: Scope) => void, string] {
+  const [scope, set] = useState<Scope>(() => getScope(store))
+  useEffect(() => subscribeScope(set, store), [store])
   const { session } = useSession()
   const ownerId = scopeToOwnerId(scope, session?.recordId || '')
-  return [scope, setScope, ownerId]
+  const write = useCallback((s: Scope) => setScope(s, store), [store])
+  return [scope, write, ownerId]
 }
 
-export default function OwnerScope({ label = 'Showing' }: { label?: string }) {
+export default function OwnerScope({
+  label = 'Showing', store = 'crm',
+}: { label?: string; store?: ScopeStore }) {
   const { session } = useSession()
-  const [scope] = useScope()
+  const [scope, setScope] = useScope(store)
   const [users, setUsers] = useState<User[]>([])
 
   useEffect(() => {
@@ -94,9 +103,11 @@ export default function OwnerScope({ label = 'Showing' }: { label?: string }) {
  * Worth its own component because a scoped total looks exactly like an unscoped one, and
  * a rep who forgets the filter is set will read their own pipeline as the company's.
  */
-export function ScopeNote({ ownerName }: { ownerName: string | null }) {
+export function ScopeNote({
+  ownerName, store = 'crm',
+}: { ownerName: string | null; store?: ScopeStore }) {
   const { session } = useSession()
-  const [scope] = useScope()
+  const [scope] = useScope(store)
   const myId = session?.recordId || ''
 
   if (scope === 'everyone') return null

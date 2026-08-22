@@ -111,6 +111,28 @@ export const SECTIONS: Section[] = [
     ],
   },
   {
+    key: 'cs',
+    path: '/cs',
+    label: 'Client Success',
+    built: true,
+    needs: 'viewCs',
+    purpose: 'No client goes quiet, no bad signal goes unowned.',
+    planned: [
+      'Owner-scoped nudges when an account crosses into Red, once there is anything to send them with',
+      'Per-contact survey targeting, when an account needs more than one voice heard',
+      'NPS over time, once there is a year of identified answers worth charting',
+      'A client-facing support panel — the strongest thing beh had that Cobalt does not',
+    ],
+    foundation:
+      'Health is computed on every read from the touchpoint log, the survey responses and the ' +
+      'calendar, so silence degrades an account with nobody typing anything — and a Red signal ' +
+      'writes an owned, dated follow-up into the same queue the CRM already reads.',
+    live: [
+      { to: '/cs', label: 'Queue', note: 'every client, worst first, with the reason' },
+      { to: '/cs/quarter', label: 'Quarter review', note: 'the printable one-pager' },
+    ],
+  },
+  {
     key: 'resources',
     path: '/resources',
     label: 'Resources',

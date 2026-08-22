@@ -163,6 +163,15 @@ export type Capability =
   | 'grantRoles'
   | 'viewReports'
   | 'viewSchema'
+  /*
+   * Client Success. `viewCs` opens the section; `viewSurveys` is the narrower one —
+   * it gates the verbatim words a client typed, which is a different kind of read
+   * from a score or a health colour and is refused in the endpoint's own code, not
+   * only in this UI.
+   */
+  | 'viewCs' | 'editCs'
+  | 'viewSurveys'
+  | 'adminCs'
 
 /**
  * Who is signed in and what they may do.
@@ -1986,3 +1995,332 @@ export const COMPANY_CATEGORIES = ['Lead', 'Client', 'Former Client'] as const
 /** Move a company to exactly one category. */
 export const setCategory = (id: string, category: string): Promise<Company> =>
   maestroPost('setCategory', { id, category })
+
+// ------------------------------------------------------------- client success
+/*
+ * The CS loop: touchpoints in, health out.
+ *
+ * Nothing here stores a health score. `CsInfo` is computed by the endpoint on every
+ * read from the touchpoint log, the survey responses and the calendar — the same
+ * derived-never-stored pattern the CRM uses for staleness — so an account can go Red
+ * because nobody called, with nobody typing anything.
+ *
+ * The vocabularies below are mirrored constants, not fetched lists: there are no new
+ * option lists on the platform, the endpoint validates against the same arrays, and a
+ * picker that waits for a round trip to learn what a temperature is would be slower for
+ * no gain. `csQueue` returns them too, which is the copy to trust if these ever drift.
+ */
+
+/** The picker list. `Intensity Change` is deliberately absent — only the audit path writes it. */
+export const TOUCHPOINT_TYPES = [
+  'Call', 'Email', 'Text', 'Video Call', 'In Person', 'Temp Check',
+] as const
+
+export const TEMPERATURES = ['Green', 'Yellow', 'Red'] as const
+
+export const SUPPORT_INTENSITIES = [
+  'Self-Sufficient', 'Low Touch', 'Standard', 'High Touch', 'White Glove',
+] as const
+
+/** How often a client of each intensity is due a contact. An unset intensity falls to 30. */
+export const CADENCE_BY_INTENSITY: Record<string, number> = {
+  'White Glove': 14, 'High Touch': 21, 'Standard': 30, 'Low Touch': 45, 'Self-Sufficient': 60,
+}
+
+export const SURVEY_DIMENSIONS = [
+  { key: 'retention', label: 'Continued Use' },
+  { key: 'ease', label: 'Ease of Use' },
+  { key: 'support', label: 'Support' },
+  { key: 'overall', label: 'Overall Recommendation' },
+] as const
+
+/** What each level actually means, carried over from beh — shown in the intensity form. */
+export const INTENSITY_DEFINITIONS: { level: string; what: string }[] = [
+  { level: 'Self-Sufficient', what: 'Rarely needs help; manages configuration independently.' },
+  { level: 'Low Touch', what: 'Occasional assistance on new features or minor troubleshooting.' },
+  { level: 'Standard', what: 'Normal engagement; moderate support requests.' },
+  { level: 'High Touch', what: 'Frequent check-ins, training, or detailed implementation support.' },
+  { level: 'White Glove', what: 'Requires constant strategic oversight or dedicated resources.' },
+]
+
+/** A detractor response nobody has answered yet. Score and dimension only — never the words. */
+export interface OpenDetractor {
+  date: string
+  dimension: string
+  score: number
+  daysAgo: number
+}
+
+/**
+ * One account's health, as of a date — the whole of what the endpoint derives.
+ *
+ * `reason` is a sentence, not a code. The queue is read by a person deciding who to
+ * ring, and "Gone quiet — 47d since contact, cadence 30" tells them that in one line
+ * where a colour and a number would need assembling in their head.
+ */
+export interface CsInfo {
+  health: 'Green' | 'Yellow' | 'Red'
+  reason: string
+  /** Blank when the account has never been contacted. */
+  lastContact: string
+  contactAgeDays: number | null
+  lastContactType: string
+  /** The latest reading. Blank when nobody has ever taken one. */
+  temperature: string
+  temperatureDate: string
+  supportIntensity: string
+  cadenceDays: number
+  checkDue: boolean
+  goneQuiet: boolean
+  neverTouched: boolean
+  openDetractor: OpenDetractor | null
+  surveyDue: boolean
+  lastInviteAt: string
+}
+
+/** A queue row: one account's health, plus the company facts needed to act on it. */
+export interface CsRow extends CsInfo {
+  companyId: string
+  companyName: string
+  category: string
+  owner: string
+  ownerId: string
+  /** Absent — not zero — for a caller without `viewMoney`. */
+  mrr?: number | null
+  renewalDate: string
+  renewsInDays: number | null
+  nextFollowUp: string
+  nextStep: string
+}
+
+export interface CsHeadline {
+  /** Null when there are no clients at all: no denominator, so no percentage. */
+  goodStandingPct: number | null
+  tone: 'good' | 'warn' | 'bad'
+  clients: number
+  green: number
+  yellow: number
+  red: number
+  checksDue: number
+  openDetractors: number
+  surveysDue: number
+}
+
+export interface CsVocabularies {
+  touchpointTypes: string[]
+  temperatures: string[]
+  supportIntensities: string[]
+  cadenceByIntensity: Record<string, number>
+}
+
+export interface CsQueue {
+  headline: CsHeadline
+  rows: CsRow[]
+  vocabularies: CsVocabularies
+  companiesScanned: number
+  /** True when money was withheld, so the screen can say so rather than imply zero. */
+  moneyHidden?: boolean
+}
+
+/** One logged contact. There is no update path: a wrong reading is corrected by a newer entry. */
+export interface Touchpoint {
+  entryId: string
+  date: string
+  type: string
+  temp: string
+  notes: string
+  loggedBy: string
+  loggedAt: string
+}
+
+export interface TouchpointList {
+  company: { id: string; name: string; category: string }
+  cs: CsInfo
+  rows: Touchpoint[]
+}
+
+export interface SurveyInvite {
+  entryId: string
+  sentAt: string
+  sentTo: string
+  contactName: string
+  token: string
+  sentBy: string
+  /** Present on the org-wide list, absent when the call named one company. */
+  companyId?: string
+  companyName?: string
+}
+
+export interface SurveyResponse {
+  entryId: string
+  submittedAt: string
+  inviteId: string
+  retention: number | null
+  ease: number | null
+  support: number | null
+  overall: number | null
+  /** The client's own words. Only reachable behind `viewSurveys`. */
+  reason: string
+  comment: string
+  /** From the joined invite — blank when the invite is gone, rather than guessed at. */
+  sentTo: string
+  contactName: string
+  companyId?: string
+  companyName?: string
+}
+
+/** NPS per dimension, with the n it was computed from. Never one without the other. */
+export interface SurveyAggregate {
+  perDimension: Record<string, { nps: number | null; n: number }>
+  total: number
+}
+
+export interface SurveyList {
+  rows: SurveyResponse[]
+  invites: SurveyInvite[]
+  aggregate: SurveyAggregate
+}
+
+export interface CsSummaryDetractor {
+  date: string
+  companyId: string
+  companyName: string
+  dimension: string
+  score: number
+  /** Null means still unanswered — nobody has logged a contact since it arrived. */
+  acknowledgedInDays: number | null
+  /** Absent, not blank, for a caller without `viewSurveys`. */
+  comment?: string
+}
+
+export interface CsSummaryRedAccount {
+  companyId: string
+  companyName: string
+  reason: string
+  owner: string
+  nextFollowUp: string
+  nextStep: string
+}
+
+export interface CsSummary {
+  quarter: string
+  startDate: string
+  endDate: string
+  headline: {
+    startPct: number | null
+    endPct: number | null
+    startTone: 'good' | 'warn' | 'bad'
+    endTone: 'good' | 'warn' | 'bad'
+  }
+  counts: { green: number; yellow: number; red: number; neverTouched: number; clients: number }
+  touchpoints: { logged: number; companiesTouched: number; coveragePct: number | null }
+  surveys: {
+    invitesSent: number
+    responses: number
+    responseRatePct: number | null
+    perDimension: Record<string, { nps: number | null; n: number }>
+    detractors: CsSummaryDetractor[]
+  }
+  redAccounts: CsSummaryRedAccount[]
+  companiesScanned: number
+}
+
+/** What `logTouchpoint` writes. `date` defaults to today server-side when omitted. */
+export interface TouchpointWrite {
+  date?: string
+  type: string
+  temperature?: string
+  notes?: string
+}
+
+export const getCsQueue = (scope: CrmScope = {}): Promise<CsQueue> =>
+  maestroGet('csQueue', scopeParams(scope))
+
+export const getTouchpoints = (companyId: string): Promise<TouchpointList> =>
+  maestroGet('touchpoints', { companyId })
+
+/**
+ * Log a contact. Returns the entry AND the freshly computed health, so a queue row can
+ * be re-rendered from the reply rather than reloading the whole screen.
+ */
+export const logTouchpoint = (
+  companyId: string, fields: TouchpointWrite,
+): Promise<{ row: Touchpoint; cs: CsInfo }> => maestroPost('logTouchpoint', { companyId, fields })
+
+/** Leadership only. A touchpoint is an attestation; removing one is not an edit. */
+export const deleteTouchpoint = (
+  companyId: string, entryId: string,
+): Promise<{ deleted: true; cs: CsInfo }> => maestroPost('deleteTouchpoint', { companyId, entryId })
+
+/**
+ * Change how much hand-holding this client gets — which changes its cadence, and so its
+ * health. The reason is required because it is the audit trail: this one field decides
+ * how loudly the queue asks about an account.
+ */
+export const setSupportIntensity = (
+  companyId: string,
+  body: { level: string; reason: string; cadenceOverrideDays?: string },
+): Promise<{ cs: CsInfo; supportIntensity: string; cadenceDays: number }> =>
+  maestroPost('setSupportIntensity', { companyId, ...body })
+
+/**
+ * Mint a survey link and the email to send with it.
+ *
+ * Creating the invite IS the send record — the 90-day clock starts here, not when the
+ * mail actually leaves. Accepted out loud: an invite copied and never sent still counts,
+ * and the response rate is what exposes that.
+ */
+export const createSurveyInvite = (
+  companyId: string, email: string, contactName: string,
+): Promise<{ invite: SurveyInvite; url: string; subject: string; body: string }> =>
+  maestroPost('createSurveyInvite', { companyId, email, contactName })
+
+export const getSurveys = (
+  params: { companyId?: string; quarter?: string } = {},
+): Promise<SurveyList> => {
+  const q: Record<string, string> = {}
+  if (params.companyId) q.companyId = params.companyId
+  if (params.quarter) q.quarter = params.quarter
+  return maestroGet('surveys', q)
+}
+
+/** `quarter` is `YYYY-Qn`. Omitted means the quarter we are in, capped at today. */
+export const getCsSummary = (quarter?: string): Promise<CsSummary> =>
+  maestroGet('csSummary', quarter ? { quarter } : {})
+
+/** `2026-Q3` — the quarter a date falls in, for the quarter picker's default. */
+export function quarterOf(d: Date = new Date()): string {
+  return `${d.getFullYear()}-Q${Math.floor(d.getMonth() / 3) + 1}`
+}
+
+/** Quarters counting back from `latest`, newest first — the picker's options. */
+export function recentQuarters(latest = quarterOf(), count = 6): string[] {
+  const m = /^(\d{4})-Q([1-4])$/.exec(latest)
+  if (!m) return [latest]
+  let year = Number(m[1])
+  let q = Number(m[2])
+  const out: string[] = []
+  for (let i = 0; i < count; i++) {
+    out.push(`${year}-Q${q}`)
+    q -= 1
+    if (q === 0) { q = 4; year -= 1 }
+  }
+  return out
+}
+
+/** `retention` reads as `Continued Use` — the dimension keys are not label text. */
+export function dimensionLabel(key: string): string {
+  const found = SURVEY_DIMENSIONS.find(d => d.key === key)
+  return found ? found.label : key
+}
+
+/**
+ * NPS tone. Above 30 is genuinely good, 0-30 is a warning, below 0 means more
+ * detractors than promoters — and null is not zero, so it gets no tone at all.
+ */
+export function npsTone(nps: number | null): 'good' | 'warn' | 'bad' | undefined {
+  if (nps === null || nps === undefined) return undefined
+  if (nps >= 30) return 'good'
+  if (nps >= 0) return 'warn'
+  return 'bad'
+}

@@ -18,6 +18,10 @@ import CrmClosed from './routes/CrmClosed'
 import CrmFollowUps from './routes/CrmFollowUps'
 import CompanyDeals from './routes/CompanyDeals'
 import CrmProspecting from './routes/CrmProspecting'
+import CsQueue from './routes/CsQueue'
+import CsSurveys from './routes/CsSurveys'
+import CsQuarter from './routes/CsQuarter'
+import CompanySuccess from './routes/CompanySuccess'
 import Sprints from './routes/Sprints'
 import Settings from './routes/Settings'
 import TicketPage from './routes/TicketPage'
@@ -83,6 +87,10 @@ const CAPABILITY_LABELS: Record<Capability, string> = {
   grantRoles: 'Leadership',
   viewReports: 'Leadership or Accounting',
   viewSchema: 'Leadership, Relate Engineer or Infra Engineer',
+  viewCs: 'Leadership, Accounting, Sales or Client Success',
+  editCs: 'Leadership, Sales or Client Success',
+  viewSurveys: 'Leadership, Sales or Client Success',
+  adminCs: 'Leadership',
 }
 
 function Shell() {
@@ -190,6 +198,17 @@ function Shell() {
             <Route path="/crm/prospecting" element={<Guarded needs="viewDeals" what="Prospecting"><CrmProspecting /></Guarded>} />
             <Route path="/crm/follow-ups" element={<Guarded needs="viewDeals" what="Follow-ups"><CrmFollowUps /></Guarded>} />
             <Route path="/crm/closed" element={<Guarded needs="viewDeals" what="Won and lost deals"><CrmClosed /></Guarded>} />
+            {/*
+                Client Success. Every page needs `viewCs` except Surveys, which needs the
+                narrower `viewSurveys` — Accounting can see that an account is unhappy
+                without reading the words the client typed, and that boundary is the
+                endpoint's, enforced again here so the app never offers a screen it
+                cannot fill.
+            */}
+            <Route path="/cs" element={<Guarded needs="viewCs" what="Client Success"><CsQueue /></Guarded>} />
+            <Route path="/cs/surveys" element={<Guarded needs="viewSurveys" what="Survey responses"><CsSurveys /></Guarded>} />
+            <Route path="/cs/quarter" element={<Guarded needs="viewCs" what="The quarter review"><CsQuarter /></Guarded>} />
+
             <Route path="/sprints" element={<Guarded needs="viewSprints" what="Sprints"><Sprints /></Guarded>} />
             <Route path="/settings" element={<Guarded needs="viewStaff" what="Settings"><Settings /></Guarded>} />
 
@@ -215,6 +234,15 @@ function Shell() {
               <Route path="deals" element={<CompanyDeals />} />
               <Route path="tickets" element={<ClientTickets />} />
               <Route path="contacts" element={<CompanyContacts />} />
+              {/* The client's CS history. Routed for every company even though the TAB is
+                  hidden for a lead, so a link from the queue always resolves — and a
+                  Former Client keeps the record of how it went. Guarded in its own right:
+                  the parent route only asks for `viewClients`, and account health is a
+                  narrower read than a company's name. */}
+              <Route
+                path="success"
+                element={<Guarded needs="viewCs" what="This client’s success record"><CompanySuccess /></Guarded>}
+              />
               <Route path="files" element={<CompanyFiles />} />
             </Route>
 
