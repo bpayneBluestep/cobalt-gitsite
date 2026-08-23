@@ -248,6 +248,14 @@ export default function CrmFollowUps() {
                             {r.kind === 'company' && (
                               <span className="pill pill--quiet">prospect</span>
                             )}
+                            {/* Nobody has opened a deal here, so this callback is on
+                                whoever picks it up. Said plainly rather than shown as
+                                somebody's, which is how it would get quietly dropped. */}
+                            {r.unassigned && (
+                              <span className="flag flag--warn" title="No deal, so no owner — open one to take it">
+                                unassigned
+                              </span>
+                            )}
                           </p>
 
                           <p className="fu__step">

@@ -444,7 +444,14 @@ export interface Company {
   contactTitle: string
   contactEmail: string
   contactPhone: string
-  /** The owner's name, cached from `ownerId`. Display only — never write this. */
+  /**
+   * The ACCOUNT owner's name, cached from the current stint. Not a sales owner.
+   *
+   * A company has no CRM owner: sales ownership belongs to each deal. This pair is the
+   * flattened current value of the Account Owner history — who is answerable for a live
+   * client system — and `updateCompany` refuses a write to it, so the only way to change
+   * it is `setAccountOwner`, which dates the handover.
+   */
   owner: string
   /** The staff record id behind `owner`. Empty on rows imported with a name only. */
   ownerId: string
@@ -516,7 +523,7 @@ export type CompanyFieldKey = (typeof COMPANY_FIELDS)[number]['key']
  * write through the same `updateCompany` action; only the rendering differs.
  */
 export type CrmFieldKey =
-  'contactName' | 'contactTitle' | 'contactEmail' | 'contactPhone' | 'ownerId'
+  'contactName' | 'contactTitle' | 'contactEmail' | 'contactPhone'
   | 'leadSource' | 'leadStatus' | 'beds' | 'lastTouch' | 'nextFollowUp' | 'crmNotes'
 
 /** Save only the keys that changed. The reply is the record as re-read server-side. */
@@ -1146,7 +1153,22 @@ export interface DealDetail extends Deal {
   activityKinds: string[]
 }
 
+/** One owner of one of a company's deals. There is no owner of the company itself. */
+export interface DealOwner {
+  ownerId: string
+  owner: string
+}
+
 export interface Lead extends Company {
+  /**
+   * The distinct owners across this company's deals, in deal order. Usually one name.
+   *
+   * This replaces the company's own owner, which never existed as a real thing: two reps
+   * working two deals at one account is normal, and the company belongs to neither.
+   */
+  dealOwners: DealOwner[]
+  /** No deal, so nobody owns it. It shows unfiltered and in nobody's "Mine". */
+  unowned: boolean
   dealCount: number
   openDealCount: number
   wonDealCount: number
@@ -1265,6 +1287,12 @@ export interface FollowUp {
   lastTouch: string
   mrr: number | null
   leadStatus?: string
+  /**
+   * Nobody owns this callback — no deal has been opened on the company, so there is no
+   * owner to derive one from. Only ever true on a `company` row, and only in the
+   * unscoped view.
+   */
+  unassigned?: boolean
   state: 'overdue' | 'today' | 'scheduled'
   overdue: boolean
   dueToday: boolean
@@ -1387,6 +1415,11 @@ export interface OwedItem {
   overdue: boolean
   /** Days since it fell due. Negative would mean the future, which is filtered out. */
   days: number | null
+  /**
+   * A prospect callback nobody owns — no deal has been opened on the company. It appears
+   * on everybody's day rather than falling out of the system for want of a name on it.
+   */
+  unassigned?: boolean
 }
 
 export interface HomeTimer {
@@ -1715,6 +1748,11 @@ export const isSprintKey = (key: string): boolean => SPRINT_PATTERN.test(String(
 
 export interface Engineer {
   entryId: string
+  /**
+   * The platform user this row is. Empty on rows added before the roster held ids —
+   * those still work, matched by name, but cannot be assigned work.
+   */
+  userId: string
   name: string
   email: string
   role: string
@@ -1745,6 +1783,8 @@ export interface Team {
 export interface SprintColumn {
   engineer: string
   entryId: string
+  /** The column's user id — what a ticket's `responsibleId` is matched against. */
+  userId: string
   role: string
   capacity: number
   tickets: Ticket[]
@@ -1778,7 +1818,7 @@ export interface SprintBoard {
   priorities: string[]
 }
 
-export type EngineerFieldKey = 'name' | 'email' | 'role' | 'capacity' | 'active' | 'sprint'
+export type EngineerFieldKey = 'userId' | 'name' | 'email' | 'role' | 'capacity' | 'active' | 'sprint'
 
 /** The roster for one sprint. No sprint asks for the default roster. */
 export const getTeam = (sprint = '', includeInactive = false): Promise<Team> =>

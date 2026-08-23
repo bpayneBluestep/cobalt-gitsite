@@ -498,6 +498,39 @@ main { flex: 1; min-height: 0; display: flex; }
   overflow-y: auto;
 }
 
+/*
+ * Flow rhythm between cards.
+ *
+ * A card owns its inside and nothing outside it: .panel and .editcard carry padding, a
+ * border and a 12px radius but no margin at all. That is right inside a grid, where the
+ * container's `gap` does the spacing — and it meant two cards laid out in ordinary flow
+ * sat edge to edge, two rounded corners touching, on every page that stacks them (the
+ * client Success tab's Touchpoints above Surveys, Company Info's three cards, the sprint
+ * roster above the board).
+ *
+ * Fixed here rather than by hanging a margin on the cards themselves: the margin belongs
+ * to the RELATIONSHIP between two of them, so a card inside a gapped grid keeps spacing
+ * exactly once. The `>` matters — it stops at .page's own children, so cards nested in
+ * .crmgrid, .board or .kpis are still spaced by their container's gap and never by both.
+ *
+ * Adjacent block margins collapse, so a .reccard (which does carry margin-bottom) meets
+ * a .panel with one gap between them, not two.
+ */
+.page > :is(.panel, .editcard, .reccard, .callout, .kpis, .crmgrid, .board, .tablewrap)
+  + :is(.panel, .editcard, .reccard, .callout, .kpis, .crmgrid, .board, .tablewrap) {
+  margin-top: var(--s-xl);
+}
+
+/*
+ * A note or a status line between two cards is part of the card above it, not a third
+ * card: it explains what just happened, so it sits close to what it explains and the
+ * next card keeps its full gap.
+ */
+.page > :is(.note, .board2__notice, .editcard__err, .panel__note)
+  + :is(.panel, .editcard, .reccard, .callout, .kpis, .crmgrid, .board, .tablewrap) {
+  margin-top: var(--s-l);
+}
+
 .page__head { margin-bottom: 1.25rem; }
 
 .page__head h1 {

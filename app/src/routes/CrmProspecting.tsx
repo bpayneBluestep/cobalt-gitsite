@@ -7,7 +7,6 @@ import {
 import CrmNav from '../components/CrmNav'
 import DealEditor from '../components/DealEditor'
 import OwnerScope, { ScopeNote, useScope } from '../components/OwnerScope'
-import UserPicker from '../components/UserPicker'
 import { useSession } from '../session'
 import { htmlToText } from '../lib/html'
 import { todayISO } from '../lib/time'
@@ -39,10 +38,10 @@ const LOGIN_URL = '/shared/login/login.jsp?desturl=' +
 /**
  * Only the lead fields this page edits inline.
  *
- * `ownerId`, not `owner`: the name is a cache the server writes from the id. Editing the
- * name directly is what made "Brandon Payne" and "Payne, Brandon" two different owners.
+ * The owner is NOT among them any more. A company has no owner to set: ownership starts
+ * when somebody opens a deal, which is the "Start a deal" action in the last column.
  */
-type TouchKey = Extract<CrmFieldKey, 'leadStatus' | 'ownerId' | 'lastTouch' | 'nextFollowUp'>
+type TouchKey = Extract<CrmFieldKey, 'leadStatus' | 'lastTouch' | 'nextFollowUp'>
 
 export default function CrmProspecting() {
   // Sales and Leadership move deals; Accounting and Client Success only watch. Reading
@@ -241,7 +240,7 @@ export default function CrmProspecting() {
                     <th scope="col">Contact</th>
                     <th scope="col">Source</th>
                     <th scope="col">Status</th>
-                    <th scope="col">Owner</th>
+                    <th scope="col">Deal owner</th>
                     <th scope="col">Beds</th>
                     <th scope="col">Last touch</th>
                     <th scope="col">Follow-up</th>
@@ -290,23 +289,22 @@ export default function CrmProspecting() {
                         </td>
                         <td>
                           {/*
-                            Assigned here because this is where leads get triaged, and a
-                            lead nobody owns appears in nobody's "Mine" — which is exactly
-                            the lead that gets forgotten. Picked, never typed: the whole
-                            reason `ownerId` exists.
+                            Read-only, and derived from the deals. Nobody is "assigned" a
+                            lead here any more: you take one by opening a deal on it, and
+                            that deal's owner is what this column reports. An unowned row
+                            is not an oversight to be corrected in place — it is a company
+                            nobody has started work on, which is what Prospecting is for.
                           */}
-                          <UserPicker
-                            value={r.ownerId || ''}
-                            placeholder="Nobody"
-                            ariaLabel={`Owner for ${r.name}`}
-                            disabled={busy === r.id || !mayEdit}
-                            onChange={id => touch(r, 'ownerId', id, id ? 'owner set.' : 'owner cleared.')}
-                          />
-                          {!r.ownerId && r.owner && (
-                            <span className="muted" title="Imported as a name with no matching staff record">
-                              {r.owner}
-                            </span>
-                          )}
+                          {r.dealOwners && r.dealOwners.length > 0
+                            ? r.dealOwners.map((o, i) => (
+                                <span key={o.ownerId || o.owner}>
+                                  {i > 0 && <span className="dot" aria-hidden="true">·</span>}
+                                  {o.owner}
+                                </span>
+                              ))
+                            : <span className="muted" title="No deal has been opened, so nobody owns it">
+                                unowned
+                              </span>}
                         </td>
                         <td className="num">{r.beds === null ? <span className="muted">—</span> : r.beds}</td>
                         <td className="nowrap">{r.lastTouch || <span className="muted">—</span>}</td>

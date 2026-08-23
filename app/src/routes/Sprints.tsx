@@ -7,7 +7,7 @@ import {
   ENGINEER_DISCIPLINES,
   type SprintBoard, type Team, type Ticket, type EngineerFieldKey, type User,
 } from '../api'
-import { loadUsers } from '../components/UserPicker'
+import UserPicker, { loadUsers } from '../components/UserPicker'
 import { useSession } from '../session'
 
 /*
@@ -27,9 +27,11 @@ import { useSession } from '../session'
  * next sprint therefore cannot reach back and rewrite the history of a sprint that has
  * already happened — which is exactly what a single shared roster did.
  *
- * Assignment writes `responsibleId`, a real user id. The roster stores names, so the
- * two are matched by name here; a roster entry with no matching user cannot be assigned
- * to, and says so rather than silently failing at the endpoint.
+ * An engineer IS a platform user. The roster holds the user id, picked from the user
+ * list, and the name shown is that user's own — so a ticket's `responsibleId` lands in
+ * the right column with nothing to match on. Rows added before the roster held ids are
+ * matched by name instead and cannot be given work until somebody re-picks them, which
+ * this page says out loud rather than leaving the column mysteriously empty.
  */
 
 type State =
@@ -43,7 +45,7 @@ const LOGIN_URL = '/shared/login/login.jsp?desturl=' +
 type EngDraft = Record<EngineerFieldKey, string>
 
 const emptyEng = (sprint: string): EngDraft => ({
-  name: '', email: '', role: 'Engineer', capacity: '32', active: 'true', sprint,
+  userId: '', name: '', email: '', role: 'Engineer', capacity: '32', active: 'true', sprint,
 })
 
 /** An engineer on the roster, paired with the user record their name resolves to. */
@@ -143,18 +145,19 @@ export default function Sprints() {
   }
 
   /**
-   * Who can be assigned this sprint: the roster, resolved to user ids.
+   * Who can be assigned this sprint: the roster, which already holds user ids.
    *
-   * A roster name with no matching user is kept in the list but not selectable — the
-   * fix is to correct the name or add the person, and hiding the row would just make
-   * an engineer quietly disappear from the board with no clue why.
+   * A legacy row with no id falls back to matching its name against the user list, so an
+   * old roster keeps working. It is kept in the list but not selectable — the fix is to
+   * edit the row and pick the person, and hiding it would just make an engineer quietly
+   * disappear from the board with no clue why.
    */
   const assignable: Assignable[] = useMemo(() => {
     const byName = new Map<string, string>()
     for (const u of users) byName.set(nameKey(u.name), u.id)
     return (team?.rows || [])
       .filter(e => e.active)
-      .map(e => ({ name: e.name, userId: byName.get(nameKey(e.name)) || '' }))
+      .map(e => ({ name: e.name, userId: e.userId || byName.get(nameKey(e.name)) || '' }))
   }, [team, users])
 
   const unresolved = assignable.filter(a => !a.userId)
@@ -178,15 +181,21 @@ export default function Sprints() {
 
   function saveEngineer() {
     if (busy || !mayRoster) return
-    if (!engDraft.name.trim()) { setFailure('An engineer needs a name.'); return }
+    if (!engDraft.userId) { setFailure('Pick the person from the list.'); return }
+    /*
+     * The name and email are NOT sent: the endpoint reads them from the chosen user's
+     * record. Sending a copy would let this form's idea of somebody's name drift from
+     * the platform's, which is the drift the picker exists to end.
+     */
     const fields: Partial<Record<EngineerFieldKey, string>> = {
-      name: engDraft.name.trim(), email: engDraft.email.trim(),
+      userId: engDraft.userId,
       role: engDraft.role, capacity: engDraft.capacity, active: engDraft.active,
       sprint: engDraft.sprint,
     }
+    const who = users.find(u => u.id === engDraft.userId)?.name || 'The engineer'
     if (engEditing === 'new') {
       run('eng', addEngineer(fields).then(t => { setTeam(t); setEngEditing(null); return t }),
-        `${fields.name} added to the roster.`)
+        `${who} added to the roster.`)
       return
     }
     run('eng', updateEngineer(engEditing as string, fields).then(t => { setTeam(t); setEngEditing(null); return t }),
@@ -300,8 +309,9 @@ export default function Sprints() {
           </p>
           <p>
             {unresolved.map(a => a.name).join(', ')} cannot be given work: a ticket stores
-            the engineer as a user, and no user has that name. Correct the roster name so it
-            matches, or add the person under Settings.
+            the engineer as a user, and these rows hold a name with no user behind it.
+            Edit each one and pick the person — or add them under Settings if they have no
+            Cobalt login yet.
           </p>
         </div>
       )}
@@ -334,26 +344,31 @@ export default function Sprints() {
               <div className="editcard__head">
                 <h2>{engEditing === 'new' ? 'New engineer' : 'Edit engineer'}</h2>
                 <p className="note">
-                  The name must match the person's user record — that is how a ticket's
+                  An engineer is somebody with a Cobalt login. Pick them and their name
+                  and email come from their own record — which is how a ticket's
                   responsible engineer finds their column.
                 </p>
               </div>
               <div className="efgrid">
                 <div className="ef">
-                  <label htmlFor="en-name">Name</label>
-                  <input id="en-name" type="text" value={engDraft.name} autoFocus autoComplete="off"
-                    list="en-users"
-                    onChange={e => setEngDraft(d => ({ ...d, name: e.target.value }))} />
-                  {/* The user list as suggestions rather than a select: the roster can
-                      legitimately name somebody who is not a Cobalt user yet. */}
-                  <datalist id="en-users">
-                    {users.map(u => <option key={u.id} value={u.name} />)}
-                  </datalist>
-                </div>
-                <div className="ef">
-                  <label htmlFor="en-email">Email</label>
-                  <input id="en-email" type="email" value={engDraft.email} autoComplete="off"
-                    onChange={e => setEngDraft(d => ({ ...d, email: e.target.value }))} />
+                  <label htmlFor="en-who">Person</label>
+                  <UserPicker id="en-who" value={engDraft.userId} placeholder="Choose a person…"
+                    disabled={!!busy}
+                    onChange={id => setEngDraft(d => ({ ...d, userId: id }))} />
+                  {/* A row that predates the picker: say whose it is, so re-picking is
+                      obviously a correction rather than a new person. */}
+                  {engEditing !== 'new' && !engDraft.userId && engDraft.name && (
+                    <p className="ef__hint">
+                      This row was added as the name “{engDraft.name}” with no user behind
+                      it, so no work can be assigned to it. Pick the person to fix that.
+                    </p>
+                  )}
+                  {engDraft.userId && (
+                    <p className="ef__hint">
+                      Not in the list? Add them under{' '}
+                      <Link className="inlink" to="/settings">Settings</Link> first.
+                    </p>
+                  )}
                 </div>
                 <div className="ef">
                   <label htmlFor="en-role">Discipline</label>
@@ -425,6 +440,7 @@ export default function Sprints() {
                               onClick={() => {
                                 setEngEditing(e.entryId)
                                 setEngDraft({
+                                  userId: e.userId || '',
                                   name: e.name, email: e.email, role: e.role || 'Engineer',
                                   capacity: String(e.capacity), active: e.active ? 'true' : 'false',
                                   sprint: e.sprint || '',

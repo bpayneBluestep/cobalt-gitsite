@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { ApiError, updateCompany, COMPANY_FIELDS, type Company, type CompanyFieldKey } from '../api'
 import { useSession } from '../session'
 import AccountOwnerCard from '../components/AccountOwnerCard'
-import UserPicker from '../components/UserPicker'
 import { useRecord } from './CompanyRecord'
 
 /*
@@ -32,70 +31,20 @@ function changedKeys(draft: Draft, saved: Company): Partial<Record<CompanyFieldK
   return out
 }
 
-/**
- * Who is working this company, for the CRM's purposes.
+/*
+ * There is no CRM owner card here, and its absence is the point.
  *
- * Separate from the Account Owner card below it, and the difference is real:
+ * A company used to carry one "owner" that every "Mine" filter read. That was a fiction:
+ * sales ownership is a per-deal question — one account can hold a new-business deal for
+ * one rep and an upsell for another — and flattening it to a single name on the company
+ * made every CRM screen agree on something untrue. Ownership now lives on the deal
+ * (see DealEditor), and the CRM scopes on that.
  *
- *   * CRM owner (this) — the rep whose book this company is in. Applies to a lead and a
- *     client alike, is what every "Mine" filter reads, and is a single current value.
- *   * Account owner — the dated record of who has been answerable for a live client
- *     system, with a handover history. Only means anything once there is a system.
- *
- * Setting the account owner mirrors into this one, so a client normally has both and
- * they agree. A lead only ever has this.
- *
- * Saved on change rather than behind a Save button: it is one value, the choice is
- * deliberate, and there is nothing to review before committing it.
+ * What remains below is the ACCOUNT owner: who is answerable for a live client system,
+ * as a dated stint with a handover history. That is a client-side role, not a sales one,
+ * and `updateCompany` now refuses a direct write to the owner pair so the flattened
+ * cache on Company Info can only ever come from a real stint.
  */
-function CrmOwnerCard() {
-  const { can } = useSession()
-  const mayEdit = can('editClients')
-  const { company, setCompany } = useRecord()
-  const [busy, setBusy] = useState(false)
-  const [failure, setFailure] = useState('')
-
-  function pick(userId: string) {
-    setBusy(true)
-    setFailure('')
-    updateCompany(company.id, { ownerId: userId })
-      .then(setCompany)
-      .catch(err => setFailure(err instanceof ApiError ? err.message : String(err)))
-      .finally(() => setBusy(false))
-  }
-
-  return (
-    <div className="editcard">
-      <div className="editcard__head">
-        <h2>CRM owner</h2>
-        <p className="note">
-          Whose book this company is in. This is what “Mine” means on every CRM screen.
-        </p>
-      </div>
-
-      {failure && <p className="editcard__err" role="alert">{failure}</p>}
-
-      <div className="efgrid">
-        <div className="ef">
-          <label htmlFor="co-owner">Owner</label>
-          <UserPicker id="co-owner" value={company.ownerId || ''} placeholder="Nobody"
-            disabled={!mayEdit || busy} onChange={pick} />
-          {/*
-            A company imported with an owner NAME and no matching staff record still has
-            to show who it says owns it — otherwise the row reads as unowned when it is
-            not, and nobody knows to fix it.
-          */}
-          {!company.ownerId && company.owner && (
-            <p className="ef__hint">
-              Currently “{company.owner}”, imported as a name with no matching staff
-              record. Pick someone to make it filterable.
-            </p>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
 
 export default function CompanyInfo() {
   // Company Info is Editor for Leadership, Sales and Client Success; Reader for the
@@ -136,15 +85,13 @@ export default function CompanyInfo() {
   /*
    * Account ownership is the dated record of who is answerable for a live client system.
    * A lead has no system, so the card would be a handover history for something that has
-   * not started — the CRM owner above is the field that covers a lead.
+   * not started. A lead has no owner at all until somebody opens a deal on it.
    */
   const clientish = company.categories.includes('Client') ||
     company.categories.includes('Former Client')
 
   return (
     <>
-      <CrmOwnerCard />
-
       {clientish && <AccountOwnerCard companyId={company.id} onChanged={reload} />}
 
       <div className="editcard">

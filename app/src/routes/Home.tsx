@@ -237,6 +237,12 @@ export default function Home() {
                         <p className="hrow__title">
                           <span className="pill pill--quiet">{o.kind}</span>
                           <Link className="inlink" to={owedHref(o)}>{o.title}</Link>
+                          {/* On everybody's day until somebody opens a deal on it. */}
+                          {o.unassigned && (
+                            <span className="flag flag--warn" title="No deal, so nobody owns this callback">
+                              unassigned
+                            </span>
+                          )}
                         </p>
                         <p className="hrow__meta">
                           <span className="hrow__due" data-late={o.overdue ? '' : undefined}>
