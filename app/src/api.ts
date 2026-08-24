@@ -487,21 +487,40 @@ export interface List {
   isClientList: boolean
 }
 
-export interface NewClient {
+export interface NewCompany {
   company: Company
-  /** The client's list, created alongside. Null only if that second step failed. */
+  /** The category it actually landed in, read back from the record. */
+  category: string
+  /** The client's list, created alongside. Null for a lead, which gets none. */
   list: List | null
+  /** True only when a Client was asked for and the Client category landed. */
   inClientCategory: boolean
-  /** Set when the client was created but its list wasn't: the client still exists. */
+  /** True when the record landed in whichever category was asked for. */
+  inCategory: boolean
+  /** Set when a client was created but its list wasn't: the client still exists. */
   listError: string | null
 }
 
+/** Kept for the Clients screen, which was written against this name. */
+export type NewClient = NewCompany
+
 /**
- * Add a client. This creates two records: the Company in the Client category and
- * its List, whose clientId points back at the company.
+ * Add a company in one of the three categories.
+ *
+ * A CLIENT creates two records: the Company and its List, whose clientId points back
+ * at the company. A LEAD creates only the company: it has nothing to file tickets
+ * against yet, and an empty board attached to a company that may never buy outlives
+ * the deal. `clientList` makes one later if it is ever needed.
  */
-export const createClient = (fields: Partial<Record<CompanyFieldKey, string>>): Promise<NewClient> =>
-  maestroPost('createClient', { fields })
+export const createCompany = (
+  fields: Partial<Record<CompanyFieldKey, string>>,
+  category = 'Client',
+): Promise<NewCompany> => maestroPost('createCompany', { fields, category })
+
+/** The Clients screen's own entry point. Same call, category fixed. */
+export const createClient = (
+  fields: Partial<Record<CompanyFieldKey, string>>,
+): Promise<NewCompany> => createCompany(fields, 'Client')
 
 /** The fields a company record exposes for editing, in display order. */
 export const COMPANY_FIELDS = [

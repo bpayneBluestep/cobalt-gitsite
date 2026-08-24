@@ -7,6 +7,7 @@ import {
 import CrmNav from '../components/CrmNav'
 import DealEditor from '../components/DealEditor'
 import OwnerScope, { ScopeNote, useScope } from '../components/OwnerScope'
+import NewCompanyCard from '../components/NewCompanyCard'
 import { useSession } from '../session'
 import { htmlToText } from '../lib/html'
 import { todayISO } from '../lib/time'
@@ -54,6 +55,7 @@ export default function CrmProspecting() {
   const [fSource, setFSource] = useState('')
   const [onlyNew, setOnlyNew] = useState(false)
   const [startFor, setStartFor] = useState<Lead | null>(null)
+  const [adding, setAdding] = useState(false)
   const [busy, setBusy] = useState('')
   const [notice, setNotice] = useState('')
   const [failure, setFailure] = useState('')
@@ -155,6 +157,34 @@ export default function CrmProspecting() {
               <span className="muted"><strong>{d.inPipeline}</strong> already in the pipeline</span>
             </div>
           </div>
+
+          {/*
+            Adding a lead belongs here rather than on the Clients screen, which is
+            where it used to have to happen: a company you have not won is not a client,
+            and creating one as a client just to demote it left a ticket board behind.
+          */}
+          {mayEdit && !adding && (
+            <div className="board2__tools">
+              <button type="button" className="btn" onClick={() => setAdding(true)}>
+                <span aria-hidden="true">+</span> Add lead
+              </button>
+            </div>
+          )}
+
+          {adding && (
+            <NewCompanyCard
+              category="Lead"
+              title="New lead"
+              note="Creates the company in the Lead category. No ticket list: it gets one if it becomes a client."
+              submitLabel="Add lead"
+              onCancel={() => setAdding(false)}
+              onCreated={made => {
+                setAdding(false)
+                setNotice(`${made.company.name} added as a lead.`)
+                load(ownerId)
+              }}
+            />
+          )}
 
           <div className="board2__tools">
             <input
