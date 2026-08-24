@@ -1,5 +1,5 @@
 /*
- * Whose work you are looking at — remembered, and "mine" until you say otherwise.
+ * Whose work you are looking at: remembered, and "mine" until you say otherwise.
  *
  * Every CRM screen used to open on the whole company's pipeline. That is the right
  * default for exactly one person, the sales manager, and the wrong one for everybody
@@ -7,23 +7,23 @@
  *
  * Three states, one value:
  *
- *   'mine'      — resolved against the signed-in person at read time
- *   'everyone'  — no owner filter at all
- *   '<recordId>' — one named rep
+ *   'mine': resolved against the signed-in person at read time
+ *   'everyone': no owner filter at all
+ *   '<recordId>': one named rep
  *
  * 'mine' is stored as the literal word rather than the caller's own id, deliberately.
  * Storing the id would mean a shared browser, or a person whose record is re-pointed,
  * silently keeps looking at someone else's book and calling it "mine".
  *
  * Shared as a store rather than per-screen state because moving between Pipeline,
- * Prospecting and Follow-ups should not reset who you are looking at — that is the same
+ * Prospecting and Follow-ups should not reset who you are looking at. That is the same
  * question being asked three ways, and re-answering it on every navigation is the kind
  * of small friction that makes a tool feel like it is arguing with you.
  *
  * There are two stores, not one, because Client Success asks the same question with a
  * different right answer. CS is one person covering every account, so its screens open
  * on Everyone; sharing the CRM's store would mean opening the queue silently filtered
- * to one owner's clients, or opening the pipeline unfiltered — one of the two would
+ * to one owner's clients, or opening the pipeline unfiltered: one of the two would
  * always be wrong. Same control, same three states, separate memory.
  */
 
@@ -84,7 +84,7 @@ export function subscribeScope(
 }
 
 /**
- * The `ownerId` a scope means for this caller — '' for everyone.
+ * The `ownerId` a scope means for this caller - '' for everyone.
  *
  * A signed-in person with no record behind their login cannot own anything, so 'mine'
  * collapses to no filter for them rather than to an empty-string owner that would match

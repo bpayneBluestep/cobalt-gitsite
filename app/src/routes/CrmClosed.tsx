@@ -10,7 +10,7 @@ import OwnerScope, { ScopeNote, useScope } from '../components/OwnerScope'
 import { useSession } from '../session'
 
 /*
- * Won and lost — the deals that are over.
+ * Won and lost: the deals that are over.
  *
  * Off the pipeline board on purpose, and it is not just tidiness. The board is a
  * forecast, so a won deal sitting in it overstates what is still to come and a lost one
@@ -18,7 +18,7 @@ import { useSession } from '../session'
  * pipeline that quietly swallows them means nobody ever reviews a loss.
  *
  * So: a log. Newest close first, with the win rate and the loss reasons counted over
- * exactly the rows on screen — filter to one rep and the breakdown follows, which is how
+ * exactly the rows on screen: filter to one rep and the breakdown follows, which is how
  * "why do my deals die" becomes a question you can answer without a separate report.
  */
 
@@ -91,7 +91,7 @@ export default function CrmClosed() {
   /**
    * Tick the box the phase already implies.
    *
-   * The phase is left exactly as it is — that is the whole point of keeping phase and
+   * The phase is left exactly as it is. That is the whole point of keeping phase and
    * closed separate: a deal lost at Negotiating should still say Negotiating. All this
    * does is record that it is over, which stamps the close date and takes it out of the
    * forecast.
@@ -112,7 +112,7 @@ export default function CrmClosed() {
         <h1>Won &amp; lost</h1>
         <p className="page__sub-text">
           Deals that are over, newest first. The win rate and the reasons below are counted
-          over what is showing — narrow it to one person and they follow.
+          over what is showing: narrow it to one person and they follow.
         </p>
       </header>
 
@@ -141,7 +141,7 @@ export default function CrmClosed() {
               <span><strong>{d.wonCount}</strong> won</span>
               <span><strong>{d.lostCount}</strong> lost</span>
               <span className="muted">
-                <strong>{d.winRate === null ? '—' : `${d.winRate}%`}</strong> win rate
+                <strong>{d.winRate === null ? '-' : `${d.winRate}%`}</strong> win rate
               </span>
               <span className="muted">
                 <strong>{formatCompactMoney(maySeeMoney ? d.wonMrr : null)}</strong> won MRR
@@ -197,7 +197,7 @@ export default function CrmClosed() {
                 <>
                   {' '}
                   <strong>Note:</strong> that stamps the close date as today, which is right for
-                  a deal closing now and wrong for one that was really won months ago — so it will
+                  a deal closing now and wrong for one that was really won months ago, so it will
                   skew how long those look like they took. Set the date on the record itself if the
                   real one matters.
                 </>
@@ -283,7 +283,7 @@ export default function CrmClosed() {
                           <span className="tag tag--warn">not marked closed</span>
                         )}
                         {/*
-                          The phase a lost deal reached is the interesting part — losing at
+                          The phase a lost deal reached is the interesting part: losing at
                           Agreements is a very different story from losing at Contact Made,
                           and it is exactly what a single "Lost" status would erase.
                         */}
@@ -294,7 +294,7 @@ export default function CrmClosed() {
                           <div className="muted">{deal.lossReason}</div>
                         )}
                       </td>
-                      <td className="nowrap">{deal.closedAt || <span className="muted">—</span>}</td>
+                      <td className="nowrap">{deal.closedAt || <span className="muted">-</span>}</td>
                       <td className="num">{formatMoney(deal.mrr)}</td>
                       <td>{deal.owner || <span className="muted">unowned</span>}</td>
                       <td className="nowrap">
@@ -304,7 +304,7 @@ export default function CrmClosed() {
                           a longer and longer sales cycle every time anyone looked.
                         */}
                         {deal.cycleDays === null
-                          ? <span className="muted" title="No close date recorded">—</span>
+                          ? <span className="muted" title="No close date recorded">-</span>
                           : `${deal.cycleDays}d`}
                       </td>
                       {mayEdit && d.needsClosingCount > 0 && (

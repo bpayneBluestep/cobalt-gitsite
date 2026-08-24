@@ -5,7 +5,7 @@ import useTheme from './useTheme'
  * The one-button theme cycle, now used only on the sign-in screen.
  *
  * Signed in, the display mode lives in the account menu as a three-way segmented
- * control — more discoverable, and it sits with the other personal settings. But you
+ * control: more discoverable, and it sits with the other personal settings. But you
  * cannot open an account menu before you have an account, so the gate keeps this: a
  * single button that cycles, which is the smallest thing that still gives someone
  * reading a dark room a way out.

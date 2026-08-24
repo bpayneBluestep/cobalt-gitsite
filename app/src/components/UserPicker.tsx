@@ -22,7 +22,7 @@ export function loadUsers(): Promise<User[]> {
     cache = getUsers()
       .then(list => list.rows)
       .catch(err => {
-        // Don't cache a failure — a picker mounted after the network recovers should
+        // Don't cache a failure: a picker mounted after the network recovers should
         // be able to try again rather than being permanently empty.
         cache = null
         throw err
@@ -37,7 +37,7 @@ export function forgetUsers(): void {
 }
 
 export default function UserPicker({
-  id, value, onChange, disabled, placeholder = '—', ariaLabel,
+  id, value, onChange, disabled, placeholder = '-', ariaLabel,
 }: {
   id?: string
   /** The selected user's record id, or '' for nobody. */
@@ -58,7 +58,7 @@ export default function UserPicker({
     return () => { live = false }
   }, [])
 
-  // A selected user who is not in the list — someone who has since left — would
+  // A selected user who is not in the list, someone who has since left: would
   // otherwise silently reset the select to "nobody" the moment anything else is
   // edited. Keep them visible instead, and say why.
   const known = users.some(u => u.id === value)

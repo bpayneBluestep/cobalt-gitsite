@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import LocationsMap from './LocationsMap'
 
 /*
- * Native BlueStep admin tools, folded into this SPA's toolbar — the same idea as
+ * Native BlueStep admin tools, folded into this SPA's toolbar: the same idea as
  * gitsite-spa-starter/src/chrome.ts, adapted for a standalone GitSite.
  *
  * Two differences from that implementation, both forced:
@@ -16,11 +16,11 @@ import LocationsMap from './LocationsMap'
  *
  *  2. No current-page id. Those same items also read `curPagePrimaryObject` to
  *     scope themselves to the page you're on. A GitSite is not a BlueStep page
- *     object, so there is nothing to scope to — Current Container Child Tree,
+ *     object, so there is nothing to scope to: Current Container Child Tree,
  *     Change History and Alternate Identifiers are left out rather than shipped
  *     pointing at nothing. This is the ONLY remaining gap against eccrm's menu,
  *     and it is not closeable: those four items answer "about this page", and
- *     there is no page. Console Trace is the same story — it toggles a global the
+ *     there is no page. Console Trace is the same story. It toggles a global the
  *     embedding page defines.
  *
  * Every href is root-relative so it resolves against whatever host is serving
@@ -28,7 +28,7 @@ import LocationsMap from './LocationsMap'
  * by BlueStep, not here: an unauthorised visitor gets the login page.
  *
  * The menu as a whole is rendered only for `viewSchema` (Leadership and the two
- * engineer roles) — see App.tsx. That resolves the old TODO here, which wanted
+ * engineer roles). See App.tsx. That resolves the old TODO here, which wanted
  * super-only gating once a login existed: the login landed, and roles turned out
  * to be the better boundary than isSuper, since an engineer needs these tools and
  * is not a super. The `schema-behind-login` branch that TODO pointed at is dead.
@@ -45,7 +45,7 @@ interface Group {
   tools: Tool[]
 }
 
-// Ids verified to resolve on this org (U142140) via remoteObject — they are
+// Ids verified to resolve on this org (U142140) via remoteObject. They are
 // global (`___` with no U segment), not per-org, despite eccrm's note to refresh
 // them per deployment.
 const GROUPS: Group[] = [
@@ -128,7 +128,7 @@ export default function ToolsMenu() {
 
       {open && (
         <div className="tools__menu" role="menu">
-          {/* In-app tools come first and route internally — no new tab. */}
+          {/* In-app tools come first and route internally: no new tab. */}
           <div className="tools__group">
             <p className="tools__heading">In this app</p>
             <Link className="tools__item" role="menuitem" to="/schema" onClick={() => setOpen(false)}>

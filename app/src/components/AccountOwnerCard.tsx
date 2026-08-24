@@ -8,7 +8,7 @@ import { todayISO } from '../lib/time'
 /*
  * Who owns this client, and since when.
  *
- * The history is deliberately not shown — it is kept so that the question "who had this
+ * The history is deliberately not shown. It is kept so that the question "who had this
  * last spring" has an answer later, and a table nobody reads yet would just be noise. The
  * count is surfaced instead, so it is obvious the history exists.
  *
@@ -95,7 +95,7 @@ export default function AccountOwnerCard({ companyId, onChanged }: {
                     <strong>{data.current.userName}</strong>
                     <span className="muted"> since {data.current.from}</span>
                   </>
-                ) : <span className="muted">Nobody — this client is unowned</span>}
+                ) : <span className="muted">Nobody. This client is unowned</span>}
               </dd>
             </div>
             <div>

@@ -4,8 +4,8 @@ import { useSession } from '../session'
 /*
  * What you see instead of a section you cannot reach.
  *
- * It answers the three questions someone in this position actually has — what did I try
- * to open, what do I hold, and who can change it — and then points at something that does
+ * It answers the three questions someone in this position actually has: what did I try
+ * to open, what do I hold, and who can change it, and then points at something that does
  * work. An empty page or a bare "Forbidden" makes a person wonder whether the app is
  * broken, and they ask a colleague instead of asking the one person who can fix it.
  *

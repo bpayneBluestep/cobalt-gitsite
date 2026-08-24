@@ -11,7 +11,7 @@ import { useSession } from '../session'
 import { todayISO } from '../lib/time'
 
 /*
- * The Success tab of a company record — one account's whole CS history.
+ * The Success tab of a company record: one account's whole CS history.
  *
  * The queue answers "who do I ring today"; this answers "what has happened with this
  * client", which is the question you have open while you are on the phone to them. So
@@ -19,7 +19,7 @@ import { todayISO } from '../lib/time'
  * the evidence: every contact logged, newest first, and every survey they answered.
  *
  * Two capabilities carve this page up. Without `viewSurveys` the survey block is not
- * rendered at all — the words a client typed are a narrower read than their score, and
+ * rendered at all: the words a client typed are a narrower read than their score, and
  * that boundary is enforced in the endpoint, not here. Without `adminCs` there is no
  * delete: a touchpoint is an attestation, and correcting one means logging a newer one.
  */
@@ -93,14 +93,14 @@ export default function CompanySuccess() {
   const [state, setState] = useState<State>({ phase: 'loading' })
   const [surveys, setSurveys] = useState<SurveyList | null>(null)
   /*
-   * The client's ticket list, if it has one — read-only, and the reason the escalation
+   * The client's ticket list, if it has one. Read-only, and the reason the escalation
    * button is here rather than on the queue row.
    *
    * `lists` is a GET that reports what exists. The tickets TAB uses `clientList`, which
    * is a POST that creates the list when it is missing, so linking to it unconditionally
    * would mint a list for the fourteen clients that have none the first time anyone
    * clicked. Asking first costs one request on a single-company screen and buys an
-   * affordance that is absent when there is nothing behind it — the same rule "Go to Org"
+   * affordance that is absent when there is nothing behind it: the same rule "Go to Org"
    * follows for a blank ehrLink.
    */
   const [listId, setListId] = useState('')
@@ -290,7 +290,7 @@ export default function CompanySuccess() {
                 <header className="editcard__head">
                   <h2>Support intensity</h2>
                   <p className="note">
-                    How much ongoing guidance this client needs — it sets how often the
+                    How much ongoing guidance this client needs. It sets how often the
                     queue asks about them.
                   </p>
                 </header>
@@ -314,14 +314,14 @@ export default function CompanySuccess() {
                     <textarea id="cs-reason" rows={2} value={reason}
                       onChange={e => setReason(e.target.value)} />
                     <p className="ef__hint">
-                      Required — it is the audit trail, and it is logged as an Intensity
+                      Required. It is the audit trail, and it is logged as an Intensity
                       Change touchpoint that does not count as contact.
                     </p>
                   </div>
                 </div>
                 <ul className="callout__list">
                   {INTENSITY_DEFINITIONS.map(x => (
-                    <li key={x.level}><strong>{x.level}</strong> — {x.what}</li>
+                    <li key={x.level}><strong>{x.level}</strong> · {x.what}</li>
                   ))}
                 </ul>
                 <div className="editcard__foot">
@@ -384,7 +384,7 @@ export default function CompanySuccess() {
               {surveys && surveys.rows.length === 0 && surveys.invites.length === 0 && (
                 <p className="empty">
                   No invite has been sent to this client yet. Send one from the{' '}
-                  <Link className="inlink" to="/cs">queue</Link> — it takes a copy and a paste.
+                  <Link className="inlink" to="/cs">queue</Link>. It takes a copy and a paste.
                 </p>
               )}
 
@@ -411,7 +411,7 @@ export default function CompanySuccess() {
                       {surveys.rows.map(r => (
                         <tr key={r.entryId}>
                           <th scope="row" className="nowrap">
-                            {(r.submittedAt || '').slice(0, 10) || '—'}
+                            {(r.submittedAt || '').slice(0, 10) || '-'}
                             {r.contactName && <><br /><span className="muted">{r.contactName}</span></>}
                           </th>
                           {SURVEY_DIMENSIONS.map(dim => {
@@ -419,7 +419,7 @@ export default function CompanySuccess() {
                             return (
                               <td className="num" key={dim.key}>
                                 {v === null || v === undefined
-                                  ? '—'
+                                  ? '-'
                                   : <span className="pill" data-tone={v >= 9 ? 'good' : v >= 7 ? 'warn' : 'bad'}>{v}</span>}
                               </td>
                             )
@@ -447,7 +447,7 @@ export default function CompanySuccess() {
                     const nps = agg ? agg.nps : null
                     return (
                       <span key={dim.key} className="flag" data-tone={npsTone(nps)}>
-                        {dim.label} {nps === null ? '—' : (nps > 0 ? `+${nps}` : nps)} · n={n}
+                        {dim.label} {nps === null ? '-' : (nps > 0 ? `+${nps}` : nps)} · n={n}
                       </span>
                     )
                   })}
@@ -467,9 +467,9 @@ export default function CompanySuccess() {
                     <tbody>
                       {surveys.invites.map(i => (
                         <tr key={i.entryId}>
-                          <th scope="row" className="nowrap">{i.sentAt || '—'}</th>
+                          <th scope="row" className="nowrap">{i.sentAt || '-'}</th>
                           <td>{i.contactName || <span className="muted">unnamed</span>}{i.sentTo ? ` · ${i.sentTo}` : ''}</td>
-                          <td>{i.sentBy || <span className="muted">—</span>}</td>
+                          <td>{i.sentBy || <span className="muted">-</span>}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -501,7 +501,7 @@ function TouchpointRow({ row, mayAdmin, busy, confirming, onAsk, onCancel, onDel
     <li className="hrow">
       <div className="hrow__main">
         <p className="hrow__title">
-          <span className="hrow__num">{row.date || '—'}</span>
+          <span className="hrow__num">{row.date || '-'}</span>
           <span className="pill">{row.type || 'contact'}</span>
           {row.temp && (
             <>

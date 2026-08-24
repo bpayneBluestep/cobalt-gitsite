@@ -2,7 +2,7 @@
  * Screen recording with narration, as two simultaneous MediaRecorders.
  *
  * Ported from beh's intake, where this shape was arrived at the hard way. It looks
- * redundant — one recorder already has the mic track — but it is not:
+ * redundant, one recorder already has the mic track, but it is not:
  *
  *   Recorder 1  screen video + mic  →  the KEPT recording, stored in BlueStep
  *   Recorder 2  a SECOND getUserMedia capture, mic only  →  audio → transcript
@@ -21,13 +21,13 @@
  * Capture settings, and why they are what they are.
  *
  * These were ported from beh at 1.5 Mbps and full resolution, against a 10 MB upload
- * ceiling — which the recorder crossed at 53 SECONDS. A one-minute walkthrough could
+ * ceiling, which the recorder crossed at 53 SECONDS. A one-minute walkthrough could
  * not be submitted, and nothing said so until the end of the interview. The two numbers
  * had simply never been checked against each other.
  *
  * The fix is mostly not the ceiling, it is the capture. A screen is overwhelmingly
  * static pixels: dropping to 1280-wide at 10 fps costs almost nothing for showing a
- * workflow — text stays sharp, fast scrolling softens slightly — and cuts the bitrate
+ * workflow, text stays sharp, fast scrolling softens slightly, and cuts the bitrate
  * needed by roughly two thirds. At these settings 64 MB holds about 18 minutes.
  */
 export const REC_MAX_MS = 20 * 60 * 1000    // 20 minutes, and the byte budget usually bites first
@@ -47,7 +47,7 @@ export interface RecResult {
   videoMime: string
   /** Null when there was no microphone, or the mic recorder produced nothing. */
   audioBlob: Blob | null
-  /** Why there is no audio, for the log — never shown raw to the user. */
+  /** Why there is no audio, for the log, never shown raw to the user. */
   audioNote: string
   /** True when recording was stopped because it reached the size budget, not by the user. */
   stoppedForSize: boolean
@@ -92,7 +92,7 @@ const audioMime = () => pickMime(
 /**
  * Ask for a screen, start recording, and resolve the handle once it is running.
  *
- * `onDone` fires when BOTH recorders have flushed — not when stop() is called. Track
+ * `onDone` fires when BOTH recorders have flushed, not when stop() is called. Track
  * teardown is deliberately deferred until then: stopping the tracks first truncates
  * whatever the recorders had not yet emitted.
  *
@@ -105,7 +105,7 @@ export async function startRecording(
   budget: number = REC_DEFAULT_BUDGET,
 ): Promise<Recording> {
   // Constraints, not just bitrate. Asking the browser for fewer, smaller frames is what
-  // makes a low bitrate look fine — throttling bits alone just produces a mushy 1080p.
+  // makes a low bitrate look fine: throttling bits alone just produces a mushy 1080p.
   const display = await navigator.mediaDevices.getDisplayMedia({
     video: {
       width: { max: REC_MAX_WIDTH },
@@ -113,7 +113,7 @@ export async function startRecording(
     },
   })
 
-  // A missing mic is not fatal — the video is still worth keeping, and the user is
+  // A missing mic is not fatal: the video is still worth keeping, and the user is
   // told afterwards that no narration was picked up.
   let mic: MediaStream
   try {
@@ -134,7 +134,7 @@ export async function startRecording(
     audioBitsPerSecond: REC_AUDIO_BITS,
   })
 
-  // The separate capture. See the header — cloning the track above does not work.
+  // The separate capture. See the header: cloning the track above does not work.
   let audioStream: MediaStream | null = null
   if (micTracks.length) {
     try { audioStream = await navigator.mediaDevices.getUserMedia({ audio: true }) } catch { audioStream = null }
@@ -180,7 +180,7 @@ export async function startRecording(
     window.clearInterval(tick)
     window.clearTimeout(cap)
 
-    // Only now — see the header.
+    // Only now. See the header.
     display.getTracks().forEach(t => t.stop())
     mic.getTracks().forEach(t => t.stop())
     audioStream?.getTracks().forEach(t => t.stop())
@@ -217,14 +217,14 @@ export async function startRecording(
 
   // Both recorders take a timeslice. On the audio side it stops a short recording from
   // ending before anything is emitted at all; on the video side it is what makes the
-  // running byte count — and therefore the hard stop above — possible.
+  // running byte count, and therefore the hard stop above: possible.
   videoRec.start(CHUNK_MS)
   if (audioRec) audioRec.start(1000)
 
   return { stop, startedAt }
 }
 
-/** Base64 without the `data:…;base64,` prefix — what the endpoint expects. */
+/** Base64 without the `data:…;base64,` prefix, what the endpoint expects. */
 export function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -238,7 +238,7 @@ export function blobToBase64(blob: Blob): Promise<string> {
   })
 }
 
-/** `9:05` — elapsed and remaining, on the recording chip. */
+/** `9:05`, elapsed and remaining, on the recording chip. */
 export function formatClock(ms: number): string {
   const total = Math.floor(Math.max(0, ms) / 1000)
   const m = Math.floor(total / 60)

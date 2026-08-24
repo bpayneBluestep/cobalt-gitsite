@@ -6,7 +6,7 @@
  * already resolved to yes/no, so there is no second copy of the matrix to drift.
  *
  * This is presentation, not security. The bundle is public and `/b/maestro` can be called
- * by hand — enforcement is the form ACL on the platform, which the endpoint runs against
+ * by hand: enforcement is the form ACL on the platform, which the endpoint runs against
  * as the signed-in caller. What this buys is a UI that only offers what will actually
  * work, and says plainly when something is out of reach.
  *
@@ -20,7 +20,7 @@ import { ApiError, getSession, logout, onSessionLost, type Capability, type Sess
 interface SessionState {
   session: Session | null
   loading: boolean
-  /** Set when the session could not be read at all — not the same as "no access". */
+  /** Set when the session could not be read at all, not the same as "no access". */
   error: string
   /**
    * True when there is no authenticated session: either there never was one, or it
@@ -68,7 +68,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const signOut = useCallback(() => {
-    // Show the gate as soon as the request settles, whichever way it settled — the user
+    // Show the gate as soon as the request settles, whichever way it settled: the user
     // asked to be signed out, and `logout` never rejects.
     logout().then(() => setState({ ...INITIAL, loading: false, signedOut: true }))
   }, [])
@@ -93,7 +93,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setState({
           ...INITIAL,
           loading: false,
-          // An auth failure is not an error to report — it is the normal state of a
+          // An auth failure is not an error to report. It is the normal state of a
           // visitor who has not signed in, and it gets the gate rather than a message.
           error: err?.needsLogin ? '' : err?.message || 'Could not read your session.',
           signedOut: !!err?.needsLogin,

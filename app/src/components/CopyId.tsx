@@ -10,7 +10,7 @@ export default function CopyId({ value, label }: { value: string; label?: string
       setCopied(true)
       window.setTimeout(() => setCopied(false), 1200)
     } catch {
-      // Clipboard is unavailable (insecure context or denied) — select it instead
+      // Clipboard is unavailable (insecure context or denied): select it instead
       // so the id can still be copied by hand.
       const sel = window.getSelection()
       if (sel) {

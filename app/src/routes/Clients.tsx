@@ -57,7 +57,7 @@ export default function Clients() {
     setSaving(true)
     setFailure('')
 
-    // Send only what was filled in — an empty field is "not set", not "".
+    // Send only what was filled in: an empty field is "not set", not "".
     const fields: Partial<Record<CompanyFieldKey, string>> = {}
     for (const f of COMPANY_FIELDS) {
       const v = draft[f.key].trim()
@@ -193,7 +193,7 @@ export default function Clients() {
                   <tr key={row.id} className="rowlink">
                     <th scope="row">
                       {/* A real link, so the row is keyboard-reachable and opens in a
-                          new tab on middle-click — not a div with an onClick. */}
+                          new tab on middle-click, not a div with an onClick. */}
                       <Link className="rowlink__a" to={`/clients/${row.id}`}>
                         {row.name || <span className="muted">(unnamed)</span>}
                       </Link>
@@ -201,11 +201,11 @@ export default function Clients() {
                     <td>
                       {row.website
                         ? <a className="inlink" href={row.website} target="_blank" rel="noopener noreferrer">{row.website}</a>
-                        : <span className="muted">—</span>}
+                        : <span className="muted">-</span>}
                     </td>
-                    <td>{row.city || <span className="muted">—</span>}</td>
-                    <td>{row.state || <span className="muted">—</span>}</td>
-                    <td>{row.postalCode || <span className="muted">—</span>}</td>
+                    <td>{row.city || <span className="muted">-</span>}</td>
+                    <td>{row.state || <span className="muted">-</span>}</td>
+                    <td>{row.postalCode || <span className="muted">-</span>}</td>
                     {/* Straight into the client's own BlueStep org. A new tab, always:
                         this leaves Cobalt for a different system entirely, and coming
                         "back" would mean losing whatever you had open here. */}
@@ -218,7 +218,7 @@ export default function Clients() {
                             Go to Org ↗
                           </a>
                         )
-                        : <span className="muted">—</span>}
+                        : <span className="muted">-</span>}
                     </td>
                   </tr>
                 ))}

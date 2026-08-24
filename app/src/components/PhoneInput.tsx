@@ -5,7 +5,7 @@ import { formatTyped, isPhoneOk, PHONE_HINT } from '../lib/phone'
  *
  * Type digits and the punctuation appears; paste anything and it is re-punctuated. The
  * only way to end up with a number the platform will refuse is an area code or prefix
- * starting 0 or 1, which is called out under the field rather than corrected — see
+ * starting 0 or 1, which is called out under the field rather than corrected. See
  * lib/phone.ts for why shifting someone's digits is the worse option.
  */
 

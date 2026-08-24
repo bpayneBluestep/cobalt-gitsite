@@ -156,8 +156,8 @@ const CLASS_RELATE_APP = 530002;
  * Record-type structure comes from the relationship graph, not from
  * list_record_types / get_record_type. Both of those under-report on this
  * platform: get_record_type throws (RequiredDynoMetaMaster … null) for every type
- * with no required form — which includes the built-in Individual and Organization
- * — and list_record_types omits categories of any type that throws. The graph is
+ * with no required form, which includes the built-in Individual and Organization
+ * and list_record_types omits categories of any type that throws. The graph is
  * authoritative and always answers.
  *
  *   children(<relate app>, 1000003) -> every record type in the org
@@ -165,7 +165,7 @@ const CLASS_RELATE_APP = 530002;
  *   children(<form>,        1000003) -> the record types a form is attached to
  *
  * A type is a CATEGORY iff it appears as another type's child; everything else is
- * a base type. (Depth alone won't do it — the Relate app lists every type as a
+ * a base type. (Depth alone won't do it: the Relate app lists every type as a
  * child, categories included.)
  */
 async function readTypeGraph(gw, org, warnings) {
@@ -226,7 +226,7 @@ async function extract(org) {
       name: meta.name || t.displayName,
       displayName: meta.displayName || t.displayName,
       description: meta.description || null,
-      // Derived from the graph, not the platform's baseType flag — that flag
+      // Derived from the graph, not the platform's baseType flag. That flag
       // reads false for a type whose base form isn't wired yet.
       baseType: graph ? !categoryIds.has(t.topId) : !!meta.baseType,
       displayOrder: meta.displayOrder ?? 0,
@@ -256,7 +256,7 @@ async function extract(org) {
     (hidden.length ? ` (${hidden.length} found only via the relationship graph)` : ''));
   if (hidden.length) {
     warnings.push(
-      `${hidden.length} record type(s) exist but are missing from list_record_types — ` +
+      `${hidden.length} record type(s) exist but are missing from list_record_types - ` +
       `${hidden.map(t => `"${t.displayName}"`).join(', ')}. They were recovered from the ` +
       `relationship graph. This is what a record type with no base form wired looks like.`,
     );
@@ -264,7 +264,7 @@ async function extract(org) {
 
   /*
    * A base record type's identity form is its `baseForm`, and that association is
-   * NOT a parent/child link — so the children() graph can't see it, and
+   * NOT a parent/child link, so the children() graph can't see it, and
    * list_forms doesn't necessarily list the form either (Cobalt's "Company Info"
    * base form is absent from it). Read baseForm + allForms per type over GraphQL
    * and treat those as form discovery as well as linkage; otherwise the most
@@ -303,8 +303,8 @@ async function extract(org) {
   const partial = recordTypes.filter(t => t.status === 'partial');
   if (partial.length) {
     warnings.push(
-      `get_record_type failed for ${partial.length} type(s) — ` +
-      `${partial.map(t => `"${t.displayName}"`).join(', ')} — so their forms are shown as ` +
+      `get_record_type failed for ${partial.length} type(s) - ` +
+      `${partial.map(t => `"${t.displayName}"`).join(', ')}, so their forms are shown as ` +
       `"attached" without a required/optional distinction. The platform throws ` +
       `RequiredDynoMetaMaster…getRequiredMetaMasters() is null for any type with no ` +
       `required form, including the built-in Individual and Organization. Structure is ` +
@@ -331,14 +331,14 @@ async function extract(org) {
   }
   if (missed.length) {
     warnings.push(
-      `${missed.length} form(s) are referenced by a record type but missing from list_forms — ` +
+      `${missed.length} form(s) are referenced by a record type but missing from list_forms - ` +
       `${missed.map(n => `"${n}"`).join(', ')}. Recovered from the record types' baseForm/allForms. ` +
       `A base form in particular can be absent from that list.`,
     );
   }
   console.log(`[extract] ${rawForms.length} forms` +
     (missed.length ? ` (${missed.length} recovered from record types)` : '') +
-    (formRes.data?.hasMore ? ' (list truncated at 100 — see warnings)' : ''));
+    (formRes.data?.hasMore ? ' (list truncated at 100. See warnings)' : ''));
 
   const forms = [];
   let done = 0;
@@ -374,12 +374,12 @@ async function extract(org) {
 
   // --- form <-> record type links -----------------------------------
   // A form's attachment shows up as the record type being a CHILD of the form,
-  // so children(<form>) is the authoritative link — it resolves even for types
+  // so children(<form>) is the authoritative link. It resolves even for types
   // whose get_record_type throws. Requirement comes from get_record_type where
   // that worked, otherwise the link is reported as plain "attached".
   const requirementOf = new Map();
   for (const rt of recordTypes) {
-    // A base form is the type's identity form — the strongest link there is, and
+    // A base form is the type's identity form: the strongest link there is, and
     // it must win over any weaker attachment for the same pair.
     if (rt.baseFormId) requirementOf.set(`${rt.baseFormId}:${rt.topId}`, 'base');
     for (const [kind, ids] of [['required', rt.requiredForms], ['optional', rt.optionalForms]]) {

@@ -8,7 +8,7 @@ import CrmNav from '../components/CrmNav'
 import OwnerScope, { ScopeNote, useScope } from '../components/OwnerScope'
 
 /*
- * The CRM dashboard — the sixty-second read.
+ * The CRM dashboard: the sixty-second read.
  *
  * Modelled on beh's CRM Intelligence Dashboard, reduced to what actually gets
  * looked at on a Monday: what the pipeline is worth, what it is worth once
@@ -29,7 +29,7 @@ type State =
 const LOGIN_URL = '/shared/login/login.jsp?desturl=' +
   encodeURIComponent(window.location.pathname + window.location.search)
 
-/** A weighted figure is a forecast, not a total — the label has to say which. */
+/** A weighted figure is a forecast, not a total: the label has to say which. */
 function Kpi({ label, value, note, tone }: {
   label: string; value: string; note?: string; tone?: 'good' | 'warn' | 'bad'
 }) {
@@ -130,7 +130,7 @@ export default function CrmDashboard() {
             />
             <Kpi
               label="Win rate"
-              value={d.winRate === null ? '—' : `${d.winRate}%`}
+              value={d.winRate === null ? '-' : `${d.winRate}%`}
               note={d.winRate === null
                 ? 'nothing decided yet'
                 : `${d.counts.wonDeals} won · ${d.counts.lostDeals} lost`}
@@ -259,7 +259,7 @@ export default function CrmDashboard() {
                               ? <div className="muted">{f.nextStep || f.companyName}</div>
                               : <span className="mark">no deal</span>}
                           </th>
-                          <td>{f.owner || <span className="muted">—</span>}</td>
+                          <td>{f.owner || <span className="muted">-</span>}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -305,7 +305,7 @@ export default function CrmDashboard() {
                           <td className="num">{formatMoney(deal.mrr)}</td>
                           <td className="num muted">{formatMoney(deal.weightedMrr)}</td>
                           <td className="nowrap">{formatMonth(deal.firstBillingMonth)}</td>
-                          <td>{deal.owner || <span className="muted">—</span>}</td>
+                          <td>{deal.owner || <span className="muted">-</span>}</td>
                         </tr>
                       ))}
                     </tbody>

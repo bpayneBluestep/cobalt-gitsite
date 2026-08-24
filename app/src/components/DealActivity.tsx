@@ -11,7 +11,7 @@ import { useSession } from '../session'
  *
  * The two live together because they are one loop: you log what happened, and in the
  * same breath you decide when to come back to it. Split across two places, the second
- * half stops being done — which is how a CRM ends up full of deals nobody has touched
+ * half stops being done, which is how a CRM ends up full of deals nobody has touched
  * and nobody has decided to drop either.
  *
  * Newest first, unlike a ticket's history. A ticket is read forwards to understand how
@@ -50,7 +50,7 @@ function Entry({ item }: { item: ActivityItem }) {
         <span className="act__when" title={whenExact(item.at)}>{whenLabel(item.at)}</span>
       </div>
       {/* Plain text, rendered as text. Notes are typed by people and never contain
-          markup we should honour — the deal's rich-text `notes` field is the place for
+          markup we should honour: the deal's rich-text `notes` field is the place for
           formatted content. */}
       <p className="act__text">{item.text}</p>
     </li>
@@ -77,7 +77,7 @@ export default function DealActivity({
   const [text, setText] = useState('')
   const [alsoSchedule, setAlsoSchedule] = useState(false)
 
-  // The follow-up being set — either alongside a note or on its own.
+  // The follow-up being set. Either alongside a note or on its own.
   const [when, setWhen] = useState('')
   const [step, setStep] = useState('')
   const [rescheduling, setRescheduling] = useState(false)
@@ -115,7 +115,7 @@ export default function DealActivity({
     run('note', addDealNote(companyId, entryId, {
       text: text.trim(),
       kind,
-      // Only send the follow-up half if it was actually filled in — an unticked box
+      // Only send the follow-up half if it was actually filled in: an unticked box
       // must not clear a follow-up that already exists.
       ...(alsoSchedule && when ? { nextFollowUp: when, nextStep: step.trim() } : {}),
     }), () => {
@@ -179,7 +179,7 @@ export default function DealActivity({
           <p className="dact__step">
             {deal.nextStep
               ? deal.nextStep
-              : <span className="muted">No action written down — say what you will do, or it will not get done.</span>}
+              : <span className="muted">No action written down. Say what you will do, or it will not get done.</span>}
             <span className="dact__on"> · {deal.nextFollowUp}</span>
           </p>
         )}

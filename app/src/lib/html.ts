@@ -2,7 +2,7 @@
  * Sanitising for ticket details.
  *
  * Details are rich text, stored as HTML and rendered with dangerouslySetInnerHTML.
- * That is only safe with an allowlist, so this strips everything not on it — on the
+ * That is only safe with an allowlist, so this strips everything not on it: on the
  * way IN (before saving, and after a paste) and again on the way OUT (before
  * rendering). Twice on purpose: content already in the field predates this code,
  * and a value can also be edited straight on the BlueStep form.
@@ -84,7 +84,7 @@ export function sanitizeHtml(html: string): string {
   return /^(<p>(\s|&nbsp;|<br\s*\/?>)*<\/p>|<br\s*\/?>|\s)*$/i.test(out) ? '' : out
 }
 
-/** Rich text as one line of plain text — for table cells and search. */
+/** Rich text as one line of plain text, for table cells and search. */
 export function htmlToText(html: string): string {
   if (!html) return ''
   const host = document.createElement('div')

@@ -5,14 +5,14 @@ import { sanitizeHtml } from '../lib/html'
  * A small rich-text editor for ticket details.
  *
  * contentEditable plus execCommand. execCommand is deprecated and it is still the
- * only formatting API every browser implements without a library — and a library is
+ * only formatting API every browser implements without a library, and a library is
  * not an option here: the artifact CSP blocks external scripts, and bundling an
  * editor to get bold and bullets is a poor trade for an internal tool.
  *
  * Two rules make it safe and predictable:
  *   * the DOM is only written on mount and when the ticket changes (`docKey`).
  *     Re-rendering into a focused contentEditable moves the caret to the start,
- *     which makes typing feel broken — so React never touches it while editing.
+ *     which makes typing feel broken, so React never touches it while editing.
  *   * paste is intercepted and sanitised, so pasting from Word or a browser cannot
  *     smuggle markup past the allowlist.
  */
@@ -31,12 +31,12 @@ export default function RichTextEditor({
   value, docKey, onChange, placeholder, ariaLabel, tall,
 }: {
   value: string
-  /** Changes when a different ticket is loaded — the only time the DOM is reset. */
+  /** Changes when a different ticket is loaded: the only time the DOM is reset. */
   docKey: string
   onChange: (html: string) => void
   placeholder?: string
   ariaLabel: string
-  /** Give the body room — the ticket page's description is the main event. */
+  /** Give the body room: the ticket page's description is the main event. */
   tall?: boolean
 }) {
   const ref = useRef<HTMLDivElement | null>(null)
@@ -62,7 +62,7 @@ export default function RichTextEditor({
     try {
       document.execCommand(cmd, false, arg)
     } catch {
-      // A browser that refuses the command leaves the text alone — acceptable.
+      // A browser that refuses the command leaves the text alone: acceptable.
     }
     emit()
   }

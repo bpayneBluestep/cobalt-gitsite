@@ -12,14 +12,14 @@ import { htmlToText } from '../lib/html'
 import { todayISO } from '../lib/time'
 
 /*
- * Prospecting — the companies that are not in the pipeline yet.
+ * Prospecting: the companies that are not in the pipeline yet.
  *
  * The list is derived, not stored: a company appears here because it has no OPEN
  * deal, so it can never disagree with the pipeline. Two very different jobs live
  * here and are labelled rather than mixed:
  *
- *   * never worked — no deal has ever been opened. A first conversation.
- *   * previously decided — won or lost before. A re-approach, which is a different
+ *   * never worked: no deal has ever been opened. A first conversation.
+ *   * previously decided: won or lost before. A re-approach, which is a different
  *     call with different words.
  *
  * "Start a deal" is the one action that matters: it opens the company's first deal,
@@ -58,7 +58,7 @@ export default function CrmProspecting() {
   const [notice, setNotice] = useState('')
   const [failure, setFailure] = useState('')
 
-  // Whose leads. Shared with every other CRM screen, and Mine by default — see
+  // Whose leads. Shared with every other CRM screen, and Mine by default. See
   // `lib/scope.ts` for why the default is not Everyone.
   const [, , ownerId] = useScope()
 
@@ -124,7 +124,7 @@ export default function CrmProspecting() {
       </header>
 
       {/* Only the Prospecting count: this page knows how many leads are in the
-          pipeline, which is not the same number as how many open DEALS there are —
+          pipeline, which is not the same number as how many open DEALS there are,
           a client can carry an upsell. A badge that means two things is worse than
           one that is absent. */}
       <CrmNav counts={d ? { Prospecting: d.prospecting } : undefined} />
@@ -212,7 +212,7 @@ export default function CrmProspecting() {
               sources={d.sources}
               onSaved={deal => {
                 setStartFor(null)
-                setNotice(`${deal.title} opened — it is on the pipeline board now.`)
+                setNotice(`${deal.title} opened. It is on the pipeline board now.`)
                 load(ownerId)
               }}
               onDeleted={() => setStartFor(null)}
@@ -227,7 +227,7 @@ export default function CrmProspecting() {
               </p>
               <p>
                 {d.prospecting === 0
-                  ? 'Nothing left to prospect — the whole lead list is in the pipeline.'
+                  ? 'Nothing left to prospect: the whole lead list is in the pipeline.'
                   : 'No leads match the current search or filters.'}
               </p>
             </div>
@@ -257,7 +257,7 @@ export default function CrmProspecting() {
                           <span className="rowmarks">
                             {r.city && <span className="muted">{r.city}{r.state ? `, ${r.state}` : ''}</span>}
                             {r.decidedOnly && (
-                              <span className="mark" title="Has a decided deal — this is a re-approach">
+                              <span className="mark" title="Has a decided deal. This is a re-approach">
                                 {r.wonDealCount ? 'won before' : 'lost before'}
                               </span>
                             )}
@@ -272,9 +272,9 @@ export default function CrmProspecting() {
                                 <><br /><a className="inlink" href={`mailto:${r.contactEmail}`}>{r.contactEmail}</a></>
                               )}
                             </>
-                          ) : <span className="muted">—</span>}
+                          ) : <span className="muted">-</span>}
                         </td>
-                        <td>{r.leadSource || <span className="muted">—</span>}</td>
+                        <td>{r.leadSource || <span className="muted">-</span>}</td>
                         <td>
                           <select
                             className="minisel"
@@ -283,7 +283,7 @@ export default function CrmProspecting() {
                             disabled={busy === r.id || !mayEdit}
                             onChange={e => touch(r, 'leadStatus', e.target.value, `status → ${e.target.value}.`)}
                           >
-                            <option value="">—</option>
+                            <option value="">-</option>
                             {LEAD_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
                           </select>
                         </td>
@@ -292,7 +292,7 @@ export default function CrmProspecting() {
                             Read-only, and derived from the deals. Nobody is "assigned" a
                             lead here any more: you take one by opening a deal on it, and
                             that deal's owner is what this column reports. An unowned row
-                            is not an oversight to be corrected in place — it is a company
+                            is not an oversight to be corrected in place. It is a company
                             nobody has started work on, which is what Prospecting is for.
                           */}
                           {r.dealOwners && r.dealOwners.length > 0
@@ -306,10 +306,10 @@ export default function CrmProspecting() {
                                 unowned
                               </span>}
                         </td>
-                        <td className="num">{r.beds === null ? <span className="muted">—</span> : r.beds}</td>
-                        <td className="nowrap">{r.lastTouch || <span className="muted">—</span>}</td>
+                        <td className="num">{r.beds === null ? <span className="muted">-</span> : r.beds}</td>
+                        <td className="nowrap">{r.lastTouch || <span className="muted">-</span>}</td>
                         <td className="nowrap">
-                          {r.nextFollowUp || <span className="muted">—</span>}
+                          {r.nextFollowUp || <span className="muted">-</span>}
                           {overdue && <span className="tag tag--warn">overdue</span>}
                         </td>
                         <td className="leads__act">
@@ -325,7 +325,7 @@ export default function CrmProspecting() {
                               </button>
                             </>
                           ) : (
-                            <span className="muted">—</span>
+                            <span className="muted">-</span>
                           )}
                         </td>
                       </tr>

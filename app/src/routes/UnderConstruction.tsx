@@ -6,7 +6,7 @@ import type { Section } from '../sections'
  *
  * It says three things, in this order, because that is the order someone landing
  * here wants them: what this section is for, what is already in place that it will
- * use, and where to go instead right now. No progress bars and no dates — an
+ * use, and where to go instead right now. No progress bars and no dates: an
  * invented percentage is worse than an honest "not yet".
  */
 

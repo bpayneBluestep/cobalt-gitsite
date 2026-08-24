@@ -17,8 +17,8 @@
  *
  * DO NOT RUN THIS YET. Records cannot be deleted.
  * ------------------------------------------------
- * `record DELETE` is refused — "AI tools are not permitted to perform DELETE
- * operations" — the same restriction that blocks deleting schema objects. So every
+ * `record DELETE` is refused - "AI tools are not permitted to perform DELETE
+ * operations": the same restriction that blocks deleting schema objects. So every
  * record this creates is PERMANENT until a human removes it in Relate. There is no
  * working --undo; the flag is kept only to report that.
  *
@@ -34,7 +34,7 @@
  *
  * The sanctioned path for seeding is through the endpoint's own BSJS
  * (`query.newRecord()` + field writes + `B.commit()`), which creates the record in
- * the right unit. That needs the Maestro compiled — i.e. it waits on b6p reaching
+ * the right unit. That needs the Maestro compiled. I.e. it waits on b6p reaching
  * this org. Prefer adding one record by hand in Relate over running this.
  *
  * Credentials: never in this repo. Reads the global b6pt_ bearer from
@@ -50,7 +50,7 @@ const GATEWAY_HOST = 'gateway.bluestep.net'
 const ORG = 'U142140'
 
 const RECORD_TYPE_COMPANY = '1000003__FID_company'
-const FORM_COMPANY = '1000001___2197371' // Company Info — the base form
+const FORM_COMPANY = '1000001___2197371' // Company Info: the base form
 const CATEGORY = {
   Lead: '1000003___141112',
   Client: '1000003___141130',
@@ -65,7 +65,7 @@ const FIELD = {
   postalCode: '1000101___3674473',
 }
 
-// Deliberately fictional — example.com domains, invented names — so nothing in
+// Deliberately fictional, example.com domains, invented names, so nothing in
 // here can be mistaken for a real customer record.
 const COMPANIES = [
   { category: 'Client', name: 'Cedar Ridge Behavioral Health', website: 'https://example.com/cedar-ridge', street: '1420 Canyon Road', city: 'Provo', state: 'UT', postalCode: '84604' },
@@ -172,7 +172,7 @@ const LEDGER = path.resolve(process.cwd(), 'seeded-companies.json')
 if (dry) {
   console.log(`[seed] would create ${COMPANIES.length} Company records:\n`)
   for (const c of COMPANIES) console.log(`  ${c.category.padEnd(14)} ${c.name}  (${c.city}, ${c.state})`)
-  console.log('\n[seed] nothing was created — drop --dry to run for real.')
+  console.log('\n[seed] nothing was created: drop --dry to run for real.')
   process.exit(0)
 }
 
@@ -204,7 +204,7 @@ for (const [i, c] of COMPANIES.entries()) {
   })
   if (!rec.ok) {
     failed++
-    console.error(`[${i + 1}/10] ${c.name} — record CREATE failed: ${clean(rec.error)}`)
+    console.error(`[${i + 1}/10] ${c.name}: record CREATE failed: ${clean(rec.error)}`)
     if (/record category/i.test(String(rec.error))) {
       console.error(`\n[seed] STOPPING. The Company record type has no base form, so the platform`)
       console.error(`[seed] refuses to type a record as Company. Set a base form + display field on`)
@@ -214,7 +214,7 @@ for (const [i, c] of COMPANIES.entries()) {
     continue
   }
   const recordId = rec.data?.topId
-  if (!recordId) { failed++; console.error(`[${i + 1}/10] ${c.name} — no record id returned`); continue }
+  if (!recordId) { failed++; console.error(`[${i + 1}/10] ${c.name}: no record id returned`); continue }
 
   const entry = await gw.call('form_entry', {
     action: 'UPDATE',

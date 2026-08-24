@@ -2,7 +2,7 @@
  * Phone numbers, in the one format the platform accepts.
  *
  * BlueStep enforces `(AAA) BBB-CCCC` with an optional `xNNN` extension, and both the
- * area code and the prefix must start 2–9 — a real North American rule, not a whim, so
+ * area code and the prefix must start 2–9: a real North American rule, not a whim, so
  * the classic fake 555-01xx numbers are rejected. Rather than let someone find that out
  * from a failed save, typing digits produces the format as you go.
  *
@@ -15,13 +15,13 @@
 export const PHONE_RE = /^\([2-9]\d{2}\) [2-9]\d{2}-\d{4}(x\d+)?$/
 
 export const PHONE_HINT =
-  'Ten digits, with the area code and prefix starting 2–9 — like (555) 234-0101. ' +
+  'Ten digits, with the area code and prefix starting 2–9: like (555) 234-0101. ' +
   'Extensions go on the end as x123.'
 
 const digitsOf = (v: string): string => v.replace(/\D+/g, '')
 
 /**
- * Digits in, formatted number out — partial as you type, so the shape appears while
+ * Digits in, formatted number out: partial as you type, so the shape appears while
  * the number is still incomplete.
  */
 export function formatDigits(raw: string): string {
@@ -50,7 +50,7 @@ export const formatPhone = (v: string): string => formatDigits(digitsOf(v))
  *
  * Backspacing over a `)` or `-` leaves the digits unchanged, so re-formatting would put
  * the character straight back and the field would feel stuck. When the text got shorter
- * but the digits did not, take a digit instead — which is what was meant.
+ * but the digits did not, take a digit instead, which is what was meant.
  */
 export function formatTyped(previous: string, next: string): string {
   const before = digitsOf(previous)
@@ -59,5 +59,5 @@ export function formatTyped(previous: string, next: string): string {
   return formatDigits(d)
 }
 
-/** Empty is fine — these fields are optional. Anything present must be complete. */
+/** Empty is fine. These fields are optional. Anything present must be complete. */
 export const isPhoneOk = (v: string): boolean => v.trim() === '' || PHONE_RE.test(v.trim())

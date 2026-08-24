@@ -1,5 +1,5 @@
 /*
- * Field types are coloured from the cobalt pigment family — the mineral the org
+ * Field types are coloured from the cobalt pigment family: the mineral the org
  * is named after. Every hue here is a real pigment name, which keeps the legend
  * teachable ("DATE is cobalt teal") instead of arbitrary.
  *

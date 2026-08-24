@@ -7,7 +7,7 @@ import {
 import RecordTabs from '../components/RecordTabs'
 
 /*
- * The company record — the shell every one of its sections renders inside.
+ * The company record: the shell every one of its sections renders inside.
  *
  * The name, the facts, the stage control and the tab strip belong to the RECORD, not to
  * any one section, so they live here and each tab is a child route that fills in below.
@@ -28,7 +28,7 @@ const LOGIN_URL = '/shared/login/login.jsp?desturl=' +
 
 export interface RecordContext {
   company: Company
-  /** Re-read the record — for a child that changed something the header shows. */
+  /** Re-read the record, for a child that changed something the header shows. */
   reload: () => void
   /** Replace the header's copy from a child's own fresh reply. */
   setCompany: (c: Company) => void
@@ -39,7 +39,7 @@ export const useRecord = () => useOutletContext<RecordContext>()
 
 export default function CompanyRecord() {
   const { id = '' } = useParams()
-  // Set when we arrive straight from "New client" and the list step failed — the
+  // Set when we arrive straight from "New client" and the list step failed: the
   // client exists, so this is a warning about what's missing, not an error.
   const arrivalWarning = (useLocation().state as { warning?: string } | null)?.warning || ''
   const [state, setState] = useState<State>({ phase: 'loading' })
@@ -104,7 +104,7 @@ export default function CompanyRecord() {
             <p className="eyebrow">Company</p>
             <div className="page__headrow">
               <h1>{company.name || <span className="muted">Untitled</span>}</h1>
-              {/* Only rendered when there is somewhere to go — a dead button that
+              {/* Only rendered when there is somewhere to go: a dead button that
                   explains itself on click is worse than no button. */}
               {company.ehrLink && (
                 <a className="btn btn--ghost" href={company.ehrLink}
@@ -153,14 +153,14 @@ export default function CompanyRecord() {
                 <dd>
                   {company.website
                     ? <a className="inlink" href={company.website} target="_blank" rel="noopener noreferrer">{company.website}</a>
-                    : <span className="muted">—</span>}
+                    : <span className="muted">-</span>}
                 </dd>
               </div>
               <div>
                 <dt>Address</dt>
                 <dd>
                   {[company.street, company.city, company.state, company.postalCode]
-                    .filter(Boolean).join(', ') || <span className="muted">—</span>}
+                    .filter(Boolean).join(', ') || <span className="muted">-</span>}
                 </dd>
               </div>
               <div>

@@ -6,7 +6,7 @@ import {
 } from '../api'
 
 /*
- * The company's filing cabinet — eccrm's design, reused rather than reinvented.
+ * The company's filing cabinet: eccrm's design, reused rather than reinvented.
  *
  * Folders are not objects. Each entry carries a "/"-separated `folder` path and the
  * tree is derived from every path in use, so there is no folder schema to keep in step
@@ -77,7 +77,7 @@ export default function FilesPanel({ companyId }: { companyId: string }) {
       .sort((a, b) => (a.name || '').toLowerCase().localeCompare((b.name || '').toLowerCase()))
   }, [data, path])
 
-  /** Files plus subfolders beneath a folder — what a delete would take with it. */
+  /** Files plus subfolders beneath a folder: what a delete would take with it. */
   function countUnder(folder: string): { files: number; folders: number } {
     if (!data) return { files: 0, folders: 0 }
     const under = (p: string) => p === folder || p.indexOf(folder + '/') === 0
@@ -314,8 +314,8 @@ export default function FilesPanel({ companyId }: { companyId: string }) {
                             </span>
                           </th>
                           <td className="nowrap">{formatBytes(f.file.size)}</td>
-                          <td className="nowrap">{f.timestamp || <span className="muted">—</span>}</td>
-                          <td>{f.uploadedBy || <span className="muted">—</span>}</td>
+                          <td className="nowrap">{f.timestamp || <span className="muted">-</span>}</td>
+                          <td>{f.uploadedBy || <span className="muted">-</span>}</td>
                           <td className="leads__act">
                             {movingFile === f.entryId ? (
                               <span className="cab__move">
@@ -370,7 +370,7 @@ export default function FilesPanel({ companyId }: { companyId: string }) {
           <p className="panel__foot">
             Up to {formatBytes(data.maxBytes)} per file. Removing a file deletes the stored
             document, though anyone already holding its direct link may still be able to
-            fetch it — the platform keeps serving that URL.
+            fetch it: the platform keeps serving that URL.
           </p>
         </>
       )}

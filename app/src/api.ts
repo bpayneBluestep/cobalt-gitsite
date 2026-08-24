@@ -14,7 +14,7 @@ const MAESTRO_URL = '/b/maestro'
 
 /*
  * Where the platform's own sign-in lives. These are the real, verified paths on this
- * host — not guesses:
+ * host, not guesses:
  *
  *   login.jsp   accepts a form POST as `myassn.user.UserLoginWebView` (see `login`)
  *   logout.jsp  303s to whatever `desturl` names. The `.jsp` matters: the extensionless
@@ -25,7 +25,7 @@ const LOGIN_URL = '/shared/login/login.jsp'
 const LOGOUT_URL = '/shared/login/logout.jsp'
 
 /*
- * The OAuth2 broker is a separate, fixed host — the org host is passed to it as a
+ * The OAuth2 broker is a separate, fixed host: the org host is passed to it as a
  * parameter rather than being where the request goes.
  */
 const OAUTH2_HOST = 'oauth2.bluestep.net'
@@ -35,7 +35,7 @@ const OAUTH2_HOST = 'oauth2.bluestep.net'
  *
  * Any of ~40 calls can be the one that discovers the session died, and each is made from
  * a route with its own error state. Rather than teach all of them to raise the login gate,
- * `handle` — the single funnel every response passes through — announces it, and the
+ * `handle`, the single funnel every response passes through: announces it, and the
  * session context listens. One place knows, one place reacts.
  */
 type SessionLostListener = () => void
@@ -90,7 +90,7 @@ async function handle(res: Response): Promise<any> {
     if (res.status >= 500) {
       throw new ApiError(
         `The Maestro returned HTTP ${res.status} with a non-JSON body. A bare "Error" here ` +
-        `means the endpoint exists on the platform but no compiled code is published — the ` +
+        `means the endpoint exists on the platform but no compiled code is published: the ` +
         `live snapshot needs scripts/app.js, not just a draft.`,
         { code: 'NOT_PUBLISHED', status: res.status },
       )
@@ -146,7 +146,7 @@ export async function maestroPost(action: string, payload: Record<string, unknow
  * Every capability the Maestro reports. Names match the server's `CAPABILITIES` map.
  *
  * A `view` capability means Reader-or-better on the form behind it, an `edit` capability
- * means Editor — so these mirror the platform ACL rather than inventing a second, softer
+ * means Editor, so these mirror the platform ACL rather than inventing a second, softer
  * set of rules that could disagree with it.
  */
 export type Capability =
@@ -164,7 +164,7 @@ export type Capability =
   | 'viewReports'
   | 'viewSchema'
   /*
-   * Client Success. `viewCs` opens the section; `viewSurveys` is the narrower one —
+   * Client Success. `viewCs` opens the section; `viewSurveys` is the narrower one,
    * it gates the verbatim words a client typed, which is a different kind of read
    * from a score or a health colour and is refused in the endpoint's own code, not
    * only in this UI.
@@ -180,7 +180,7 @@ export type Capability =
  * the role → capability rules, so the matrix has exactly one home and a change to it
  * takes effect on the next request without a redeploy of the front end.
  *
- * None of this is a security boundary — the bundle is public and anyone can call
+ * None of this is a security boundary: the bundle is public and anyone can call
  * `/b/maestro` directly. The boundary is the form ACL on the platform, which the endpoint
  * runs against as the caller. This is here so the UI tells the truth about what is
  * reachable, instead of offering buttons that fail.
@@ -188,7 +188,7 @@ export type Capability =
 export interface Session {
   loggedIn: boolean
   userId: string
-  /** The Individual record behind the login — the id that identifies you in the data. */
+  /** The Individual record behind the login: the id that identifies you in the data. */
   recordId: string
   fullName: string
   isSuper: boolean
@@ -206,7 +206,7 @@ export const getSession = (): Promise<Session> => maestroGet('session')
  * Signing in, four ways, because the platform offers four and hiding any of them just
  * sends people to a different page to do the same thing.
  *
- * BlueStep login is not a JSON API — it is a form POST against a WebView class. Posting
+ * BlueStep login is not a JSON API. It is a form POST against a WebView class. Posting
  * it same-origin authenticates the cookie on THIS host, which is the host the Maestro is
  * on, so the session the SPA then uses is the one that was just created. A password typed
  * here goes to this BlueStep host and nowhere else; it is never sent to the Maestro, never
@@ -230,7 +230,7 @@ function loginFormBody(username: string, password: string): URLSearchParams {
  * Why a sign-in did not produce a usable session.
  *
  * A named reason rather than a set of optional booleans, so the caller has to handle the
- * cases rather than testing flags that may or may not be present — and so TypeScript
+ * cases rather than testing flags that may or may not be present, and so TypeScript
  * narrows `error` onto exactly the variants that carry one.
  *
  *   twoFactor  a global account's e-mail verification; hand off to `nativeLoginSubmit`
@@ -248,7 +248,7 @@ export type LoginResult =
  * Detect a signed-in response from the login handler.
  *
  * The platform re-serves the login page on success as well as on failure, with HTTP 200
- * both times — but a successful one is rendered with the signed-in chrome, and that chrome
+ * both times, but a successful one is rendered with the signed-in chrome, and that chrome
  * declares `isLoggedIn = true`. Measured on this host: present on success, absent when the
  * credentials are rejected.
  *
@@ -275,7 +275,7 @@ function looksSignedIn(html: string): boolean {
  * as "wrong username or password" is what this used to do, and it sent a real person
  * hunting for a typo in a password that was correct.
  *
- * Check the endpoint's own permissions before believing a "bad credentials" report — on
+ * Check the endpoint's own permissions before believing a "bad credentials" report: on
  * Cobalt this was `Registered Users: No Access` on the script itself.
  */
 export async function login(username: string, password: string): Promise<LoginResult> {
@@ -296,7 +296,7 @@ export async function login(username: string, password: string): Promise<LoginRe
   }
 
   // A global account is bounced to e-mail verification, which an in-page fetch cannot
-  // finish — the user has to see the platform's own page.
+  // finish: the user has to see the platform's own page.
   if (res.redirected && /\/oauth2\/v1\/login\/verify/.test(res.url)) {
     return { ok: false, reason: 'twoFactor' }
   }
@@ -318,7 +318,7 @@ export async function login(username: string, password: string): Promise<LoginRe
       ok: false,
       reason: 'noAccess',
       error:
-        'Your username and password were accepted — you are signed in to BlueStep. But ' +
+        'Your username and password were accepted. You are signed in to BlueStep. But ' +
         'this account has no access to the endpoint Cobalt reads its data from, so there ' +
         'is nothing to show you. An administrator needs to grant this account access to ' +
         'the Cobalt Maestro endpoint; signing in again will not help.',
@@ -333,7 +333,7 @@ export async function login(username: string, password: string): Promise<LoginRe
  *
  * A path, not an absolute URL: the platform's own login page passes a path and resolves
  * it against the host it was given, so matching that is the behaviour actually known to
- * work. Verified — `?desturl=/spa/` 303s to `/spa/` on this host.
+ * work. Verified - `?desturl=/spa/` 303s to `/spa/` on this host.
  */
 function returnPath(): string {
   return window.location.pathname + window.location.search + window.location.hash
@@ -343,7 +343,7 @@ function returnPath(): string {
  * Hand the browser to the platform's login page as a real page load, carrying the
  * credentials already typed, so it can run the e-mail 2FA step and send us back.
  *
- * A hidden form rather than a redirect because this has to be a POST — a password does
+ * A hidden form rather than a redirect because this has to be a POST: a password does
  * not belong in a URL.
  */
 export function nativeLoginSubmit(username: string, password: string): void {
@@ -374,7 +374,7 @@ export type SsoProvider = 'microsoft' | 'google'
  * Where to send someone signing in with Microsoft or Google.
  *
  * The broker is a fixed separate host and the org is a parameter, so `host` must be the
- * hostname the user is actually on — read from the page, never hard-coded. Cobalt answers
+ * hostname the user is actually on. Read from the page, never hard-coded. Cobalt answers
  * on two hostnames (`cobalt` and `cobaltorg`) and only the one being used will have a
  * session afterwards, so guessing would sign people in to the wrong place.
  */
@@ -403,7 +403,7 @@ export function globalLoginUrl(): string {
  * page. Mirrors what the eccrm CRM does.
  *
  * A failure here is not reported. If the request did not land the session may still be
- * alive, but the user asked to be signed out — showing them the gate is the right
+ * alive, but the user asked to be signed out: showing them the gate is the right
  * response either way, and the next call they make will bounce and confirm it.
  */
 export async function logout(): Promise<void> {
@@ -423,7 +423,7 @@ export function logoutUrl(): string {
 }
 
 /**
- * A company as `companyRow` returns it — the whole Company Info catalog, including
+ * A company as `companyRow` returns it: the whole Company Info catalog, including
  * the CRM half. The four `contact*` fields are a MIRROR of the primary contact, kept
  * in step by the endpoint, so every screen that shows a company gets the contact's
  * name without walking the Contacts form.
@@ -448,8 +448,8 @@ export interface Company {
    * The ACCOUNT owner's name, cached from the current stint. Not a sales owner.
    *
    * A company has no CRM owner: sales ownership belongs to each deal. This pair is the
-   * flattened current value of the Account Owner history — who is answerable for a live
-   * client system — and `updateCompany` refuses a write to it, so the only way to change
+   * flattened current value of the Account Owner history, who is answerable for a live
+   * client system, and `updateCompany` refuses a write to it, so the only way to change
    * it is `setAccountOwner`, which dates the handover.
    */
   owner: string
@@ -492,7 +492,7 @@ export interface NewClient {
   /** The client's list, created alongside. Null only if that second step failed. */
   list: List | null
   inClientCategory: boolean
-  /** Set when the client was created but its list wasn't — the client still exists. */
+  /** Set when the client was created but its list wasn't: the client still exists. */
   listError: string | null
 }
 
@@ -519,7 +519,7 @@ export type CompanyFieldKey = (typeof COMPANY_FIELDS)[number]['key']
  * The CRM half of Company Info.
  *
  * Kept separate from COMPANY_FIELDS because that list drives the record page's plain
- * text inputs, and these are not all text — two are dates and one is rich text. They
+ * text inputs, and these are not all text: two are dates and one is rich text. They
  * write through the same `updateCompany` action; only the rendering differs.
  */
 export type CrmFieldKey =
@@ -534,7 +534,7 @@ export const updateCompany = (
 
 // ------------------------------------------------------------------- tickets
 // Vocabulary and tab mapping match the beh "Clickup Killer" exactly. The endpoint
-// is the authority — these are the client's copy for rendering controls, and the
+// is the authority. These are the client's copy for rendering controls, and the
 // endpoint validates every write against its own list.
 
 export const TICKET_STATUSES = ['Open', 'Up Next', 'In Progress', 'In Review', 'Complete'] as const
@@ -542,7 +542,7 @@ export const TICKET_PRIORITIES = ['Low', 'Normal', 'High', 'Critical'] as const
 
 /*
  * Two tabs, not one per status: what is still to do, and what is finished. Splitting the
- * open work across Open / Ready / Current hid it — a board is for seeing everything
+ * open work across Open / Ready / Current hid it: a board is for seeing everything
  * outstanding at once. The statuses still matter, so the Open tab GROUPS by them, in the
  * order of TICKET_STATUSES.
  */
@@ -551,10 +551,10 @@ export const TICKET_TABS = [
   { key: 'completed', label: 'Completed', statuses: ['Complete'] },
 ] as const
 
-/** Priority order for sorting a group, highest first — beh's PRIORITY_RANK. */
+/** Priority order for sorting a group, highest first: beh's PRIORITY_RANK. */
 export const PRIORITY_RANK: Record<string, number> = { Critical: 4, High: 3, Normal: 2, Low: 1 }
 
-/** One row in a ticket's time log. Ids are stable — never address these by index. */
+/** One row in a ticket's time log. Ids are stable, never address these by index. */
 export interface TimeEntry {
   id: string
   date: string
@@ -575,7 +575,7 @@ export interface Attachment {
   by: string
 }
 
-/** A BlueStep thing a ticket changed — the engineer's own record of the blast radius. */
+/** A BlueStep thing a ticket changed: the engineer's own record of the blast radius. */
 export interface ComponentRef {
   id: string
   name: string
@@ -610,13 +610,13 @@ export interface Ticket {
   dueDate: string
   /** A plain sprint number as a string ('3'), or '' for unplanned. Set from the board. */
   sprint: string
-  /** Rich text (HTML). Sanitise before rendering — see lib/html.ts. */
+  /** Rich text (HTML). Sanitise before rendering. See lib/html.ts. */
   details: string
 
   /** The PM answerable to the client. Written only through `setTicketPeople`. */
   accountableId: string
   accountableName: string
-  /** The engineer doing the work — what the sprint board groups by. */
+  /** The engineer doing the work: what the sprint board groups by. */
   responsibleId: string
   responsibleName: string
   /** Retired free-text owner. Read-only, kept so old tickets still read sensibly. */
@@ -670,14 +670,14 @@ export interface Ticket {
   /** How many subtasks this ticket has, and how many are done. Both 0 when it has none. */
   subtaskCount: number
   subtaskDone: number
-  /** The children's hours, summed — kept apart from the parent's own so nothing double-counts. */
+  /** The children's hours, summed: kept apart from the parent's own so nothing double-counts. */
   subtaskEstHours: number
   subtaskLoggedHours: number
 
   // ---- activity ---------------------------------------------------------------
   /** Events and comments in one ordered list, oldest first. Empty on a board row. */
   activity: ActivityItem[]
-  /** How many items the log holds — present on board rows, where `activity` is not. */
+  /** How many items the log holds: present on board rows, where `activity` is not. */
   activityCount: number
   commentCount: number
 
@@ -690,7 +690,7 @@ export interface Ticket {
 /**
  * One line of a ticket's history.
  *
- * `event` is written by the endpoint when a write actually changed something — derived
+ * `event` is written by the endpoint when a write actually changed something: derived
  * from the diff, so re-saving an unchanged form adds nothing. `comment` is a person's,
  * and is the only kind that can be removed: an event is the record's own account of
  * what happened, and letting people rewrite that turns a history into a story.
@@ -729,7 +729,7 @@ export interface TicketList {
  * value alone would leave the ticket inconsistent: a roadblock needs its reason and
  * stamps, the time log, attachments and components are append-and-recompute rather
  * than overwrite, and the two owners need their names resolved from the user record.
- * `sprint` is missing on purpose — it is set from the sprint board, not typed on the
+ * `sprint` is missing on purpose. It is set from the sprint board, not typed on the
  * ticket page. The endpoint enforces all of this; it is not a convention.
  */
 export type TicketFieldKey =
@@ -739,7 +739,7 @@ export const getTickets = (params: { listId?: string; responsible?: string; spri
   maestroGet('tickets', params as Record<string, string>)
 
 /**
- * One ticket, by number or entry id, without knowing which list it is on — what a
+ * One ticket, by number or entry id, without knowing which list it is on: what a
  * shared `/tickets/8` link resolves through. Ticket numbers are org-wide, so the
  * number alone is enough; `listId` skips the endpoint's scan when it is known.
  */
@@ -751,14 +751,14 @@ export const getList = (id: string): Promise<List & { tickets: Ticket[] }> => ma
 export const getLists = (params: { clientId?: string; kind?: string } = {}): Promise<{ total: number; rows: List[] }> =>
   maestroGet('lists', params as Record<string, string>)
 
-/** Create or find the list for a client — how a client's board comes into being. */
+/** Create or find the list for a client: how a client's board comes into being. */
 export const getClientList = (clientId: string): Promise<List & { created: boolean; tickets: Ticket[] }> =>
   maestroPost('clientList', { clientId })
 
 /**
  * Create a ticket. The two owners ride alongside `fields` rather than inside it,
  * because the endpoint resolves them against the user list instead of writing them
- * straight through — the same reason they are absent from `TicketFieldKey`.
+ * straight through: the same reason they are absent from `TicketFieldKey`.
  */
 export const addTicket = (
   listId: string,
@@ -772,7 +772,7 @@ export const updateTicket = (listId: string, entryId: string, fields: Partial<Re
 
 /**
  * Delete a ticket. A parent with subtasks is refused (409 HAS_SUBTASKS) unless
- * `cascade` is passed — the caller has to have seen the children named before the
+ * `cascade` is passed: the caller has to have seen the children named before the
  * delete takes them too.
  */
 export const deleteTicket = (
@@ -784,7 +784,7 @@ export const deleteTicket = (
 
 // ------------------------------------------------------------------- subtasks
 // Breaking a big ticket into bite-sized chunks. A subtask is a full ticket with a
-// parent — its own number, status, owner, estimate and timer — because the pieces of
+// parent, its own number, status, owner, estimate and timer, because the pieces of
 // a large job are precisely the things that go to different people in different
 // sprints, which a checklist row could never express.
 //
@@ -818,12 +818,12 @@ export const setParent = (on: On, parentId: string): Promise<Ticket> =>
 export const addComment = (on: On, text: string): Promise<Ticket> =>
   maestroPost('addComment', { ...on, text })
 
-/** Comments only — the endpoint refuses an event with NOT_A_COMMENT. */
+/** Comments only: the endpoint refuses an event with NOT_A_COMMENT. */
 export const deleteComment = (on: On, commentId: string): Promise<Ticket> =>
   maestroPost('deleteComment', { ...on, commentId })
 
 // ------------------------------------------------------- time, blocks, files
-// Each of these returns the WHOLE ticket, re-read server-side — so a caller
+// Each of these returns the WHOLE ticket, re-read server-side, so a caller
 // replaces its copy rather than patching it and hoping the patch matches.
 
 type On = { listId: string; entryId: string }
@@ -853,7 +853,7 @@ export const setRoadblock = (on: On, active: boolean, reason?: string): Promise<
 
 /** Max upload the endpoint accepts, so the UI can refuse before sending. */
 export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
-/** Video gets far more room — see MAX_RECORDING_BYTES in the endpoint. */
+/** Video gets far more room. See MAX_RECORDING_BYTES in the endpoint. */
 export const MAX_RECORDING_BYTES = 64 * 1024 * 1024
 /** The ceiling that applies to a given file. Mirrors `uploadCeiling` server-side. */
 export const ceilingFor = (mimeType: string): number =>
@@ -868,7 +868,7 @@ export const deleteAttachment = (on: On, attachmentId: string): Promise<Ticket> 
   maestroPost('deleteAttachment', { ...on, attachmentId })
 
 /**
- * Set either owner. An omitted key leaves that role alone; an empty string clears it —
+ * Set either owner. An omitted key leaves that role alone; an empty string clears it,
  * which is why this takes a partial rather than two strings.
  */
 export const setTicketPeople = (
@@ -924,7 +924,7 @@ export interface IqTurn {
 export interface IqAttachment {
   kind: 'video' | 'image' | 'url'
   fileName?: string
-  /** Empty until uploaded — a link has one from the start, a file gets one at submit. */
+  /** Empty until uploaded: a link has one from the start, a file gets one at submit. */
   url: string
   mime?: string
   size?: number
@@ -959,7 +959,7 @@ export const wesleyStatus = (): Promise<{
 }> => maestroGet('wesleyStatus')
 
 /**
- * One turn. Send the WHOLE conversation every time — the endpoint holds no session,
+ * One turn. Send the WHOLE conversation every time: the endpoint holds no session,
  * which is what makes a reload or a second tab harmless.
  */
 export const wesleyChat = (
@@ -1003,7 +1003,7 @@ export function formatMinutes(minutes: number): string {
 
 /** Hours as `3.5h`, or an em dash when there is no value at all. */
 export function formatHours(hours: number | null): string {
-  if (hours === null || hours === undefined) return '—'
+  if (hours === null || hours === undefined) return '-'
   return `${Math.round(hours * 100) / 100}h`
 }
 
@@ -1015,15 +1015,15 @@ export function formatBytes(bytes: number): string {
 }
 
 // ----------------------------------------------------------------------- crm
-// Vocabularies match beh's CRM Intelligence Dashboard exactly — same phases, same
-// lead sources, same loss reasons — so the two tools describe one pipeline the same
+// Vocabularies match beh's CRM Intelligence Dashboard exactly: same phases, same
+// lead sources, same loss reasons, so the two tools describe one pipeline the same
 // way. The endpoint is the authority and validates every write against its own copy.
 
 export const DEAL_PHASES = [
   'Open Lead', 'Contact Made', 'Scheduling Demo', 'Negotiating', 'Agreements', 'Won', 'Lost',
 ] as const
 
-/** The phases a deal is still being worked in — the pipeline's columns. */
+/** The phases a deal is still being worked in: the pipeline's columns. */
 export const OPEN_PHASES = [
   'Open Lead', 'Contact Made', 'Scheduling Demo', 'Negotiating', 'Agreements',
 ] as const
@@ -1035,7 +1035,7 @@ export interface Deal {
   entryId: string
   title: string
   phase: string
-  /** The owner's name, cached from `ownerId`. Display only — never write this. */
+  /** The owner's name, cached from `ownerId`. Display only, never write this. */
   owner: string
   /** The staff record id behind `owner`. Empty on deals imported with a name only. */
   ownerId: string
@@ -1044,7 +1044,7 @@ export interface Deal {
   fees: number | null
   confidence: string
   /**
-   * `YYYY-MM` — when billing is expected to start. Month precision on purpose: this
+   * `YYYY-MM`, when billing is expected to start. Month precision on purpose: this
    * replaced a day-precise close date nobody could answer honestly while the deal was
    * still open, and the forecast now buckets by it.
    */
@@ -1056,14 +1056,14 @@ export interface Deal {
   createdAt: string
   closedAt: string
 
-  /** What happens next, and when. Two halves of one thought — set together. */
+  /** What happens next, and when. Two halves of one thought. Set together. */
   nextStep: string
   nextFollowUp: string
   /** Server-stamped: last time anyone worked it, and when it entered this phase. */
   lastTouch: string
   phaseSince: string
 
-  /** Derived server-side from the phase — never stored, so they cannot disagree. */
+  /** Derived server-side from the phase, never stored, so they cannot disagree. */
   isOpen: boolean
   isWon: boolean
   isLost: boolean
@@ -1074,11 +1074,11 @@ export interface Deal {
   /**
    * Age, in two numbers that answer different questions: how long it has existed, and
    * how long it has sat where it is now. The second is the one that says whether it is
-   * moving — a deal can be young and stuck, or old and progressing.
+   * moving: a deal can be young and stuck, or old and progressing.
    */
   ageDays: number | null
   /**
-   * How long the deal actually TOOK — creation to close. Null while it is open.
+   * How long the deal actually TOOK: creation to close. Null while it is open.
    *
    * Distinct from `ageDays`, which measures against today: a closed deal reported by
    * `ageDays` keeps ageing for ever, so every sales-cycle figure drifts up with the
@@ -1088,7 +1088,7 @@ export interface Deal {
   phaseAgeDays: number | null
   touchAgeDays: number | null
   /**
-   * The phase entry date is the same as the open date — either it genuinely never
+   * The phase entry date is the same as the open date. Either it genuinely never
    * moved, or the entry predates the field. Render as "at least N days", not exactly N.
    */
   phaseSinceEstimated: boolean
@@ -1109,7 +1109,7 @@ export interface Deal {
   /**
    * Set only by `closedDeals`: this deal reached a Won or Lost phase but its `closed`
    * box was never ticked, so it is invisible on the board and still in the forecast.
-   * `impliedOutcome` is what the phase says, offered as the fix — never stored.
+   * `impliedOutcome` is what the phase says, offered as the fix, never stored.
    */
   needsClosing?: boolean
   impliedOutcome?: string
@@ -1126,7 +1126,7 @@ export interface Deal {
  * The kinds of contact a deal note can record.
  *
  * A closed vocabulary rather than free text, because the point of typing a note is to
- * make the log countable — "six calls and no meeting" says the deal is stuck, and no
+ * make the log countable - "six calls and no meeting" says the deal is stuck, and no
  * amount of prose does.
  */
 export const ACTIVITY_KINDS = [
@@ -1140,14 +1140,14 @@ export interface ActivityItem {
   /** `comment` is a person's note; `event` is something the server recorded. */
   type: 'comment' | 'event'
   who: string
-  /** An ISO instant, not a date — history is ordered to the second. */
+  /** An ISO instant, not a date: history is ordered to the second. */
   at: string
   text: string
   /** Present on deal comments only. Tickets have no notion of a contact kind. */
   kind?: string
 }
 
-/** One deal with its history — what a list view deliberately leaves out. */
+/** One deal with its history: what a list view deliberately leaves out. */
 export interface DealDetail extends Deal {
   activity: ActivityItem[]
   activityKinds: string[]
@@ -1174,9 +1174,9 @@ export interface Lead extends Company {
   wonDealCount: number
   lostDealCount: number
   hasOpenDeal: boolean
-  /** No deal has ever been opened — a genuine first conversation. */
+  /** No deal has ever been opened: a genuine first conversation. */
   neverWorked: boolean
-  /** Has deals, but all decided — a re-approach, not a first call. */
+  /** Has deals, but all decided: a re-approach, not a first call. */
   decidedOnly: boolean
   openMrr: number
   weightedMrr: number
@@ -1224,12 +1224,12 @@ export interface Pipeline {
   ownerId: string | null
   search: string | null
   companiesScanned: number
-  /** Open deals the board can actually place — the sum of the columns. */
+  /** Open deals the board can actually place: the sum of the columns. */
   openTotal: number
   /**
    * Open deals sitting at a Won or Lost phase with the `closed` box never ticked, so no
    * column can hold them. Almost all are imported rows whose outcome was recorded as a
-   * phase and not as a close — which means they are also still inflating the forecast.
+   * phase and not as a close, which means they are also still inflating the forecast.
    */
   unplacedTotal: number
   unplacedPhases: { phase: string; count: number }[]
@@ -1261,14 +1261,14 @@ export interface ClosedDeals {
   needsClosingCount: number
   wonMrr: number
   lostMrr: number
-  /** Null when nothing has been decided — a 0% win rate is a claim, that is not it. */
+  /** Null when nothing has been decided: a 0% win rate is a claim, that is not it. */
   winRate: number | null
   /** Counted over the FILTERED set, so "why do my deals die" is answerable. */
   byReason: { reason: string; count: number }[]
   rows: Deal[]
 }
 
-/** One row of the follow-up queue — a deal's follow-up, or a company's. */
+/** One row of the follow-up queue: a deal's follow-up, or a company's. */
 export interface FollowUp {
   kind: 'deal' | 'company'
   companyId: string
@@ -1288,7 +1288,7 @@ export interface FollowUp {
   mrr: number | null
   leadStatus?: string
   /**
-   * Nobody owns this callback — no deal has been opened on the company, so there is no
+   * Nobody owns this callback: no deal has been opened on the company, so there is no
    * owner to derive one from. Only ever true on a `company` row, and only in the
    * unscoped view.
    */
@@ -1322,12 +1322,12 @@ export interface CrmSummary {
     companies: number; leads: number; clients: number
     prospecting: number; neverWorked: number
     openDeals: number; wonDeals: number; lostDeals: number
-    /** Hygiene rather than value — is the pipeline being worked. */
+    /** Hygiene rather than value: is the pipeline being worked. */
     staleDeals: number; neverTouchedDeals: number; stuckDeals: number; dueToday: number
   }
   value: {
     openMrr: number; weightedMrr: number; openAnnualValue: number; wonMrr: number
-    /** Open deals whose billing is expected to START this month — not deals closing. */
+    /** Open deals whose billing is expected to START this month, not deals closing. */
     billingThisMonthCount: number; billingThisMonthMrr: number; averageOpenMrr: number
   }
   winRate: number | null
@@ -1355,7 +1355,7 @@ export interface CrmSummary {
 /**
  * The deal fields a client may write; the rest are server-owned.
  *
- * `owner` is NOT here — it is written as `ownerId`, and the server resolves the name.
+ * `owner` is NOT here. It is written as `ownerId`, and the server resolves the name.
  * `nextStep` is back, having been retired in the first pass for not being filled in
  * honestly: that was true while it stood alone, and it earns its place now that a
  * follow-up queue reads it. `products` stays retired, and `anticipatedDate` is still
@@ -1376,7 +1376,7 @@ export type DealFieldKey =
  * The owner/search parameters every CRM list understands.
  *
  * One shape for all of them so a screen can hold a single piece of state and hand it
- * to whichever call it makes — and so adding a filter does not mean editing five
+ * to whichever call it makes, and so adding a filter does not mean editing five
  * signatures. Blank values are dropped by `maestroGet`, so an unset filter is absent
  * rather than an empty string the server has to interpret.
  */
@@ -1393,10 +1393,10 @@ const scopeParams = (scope: CrmScope): Record<string, string> => {
 }
 
 /*
- * Home — the caller's own start-of-day page.
+ * Home: the caller's own start-of-day page.
  *
  * An inbox, not a dashboard: every field here is something to act on. There is no scope
- * parameter on purpose — Home is definitionally yours, and a Mine/Everyone switch would
+ * parameter on purpose: Home is definitionally yours, and a Mine/Everyone switch would
  * turn it into another CRM page.
  */
 
@@ -1409,14 +1409,14 @@ export interface OwedItem {
   title: string
   /** The company, or the list a ticket lives on. */
   context: string
-  /** What it is — the next step, the phase, or the ticket's status and priority. */
+  /** What it is: the next step, the phase, or the ticket's status and priority. */
   what: string
   due: string
   overdue: boolean
   /** Days since it fell due. Negative would mean the future, which is filtered out. */
   days: number | null
   /**
-   * A prospect callback nobody owns — no deal has been opened on the company. It appears
+   * A prospect callback nobody owns: no deal has been opened on the company. It appears
    * on everybody's day rather than falling out of the system for want of a name on it.
    */
   unassigned?: boolean
@@ -1430,7 +1430,7 @@ export interface HomeTimer {
   clientName: string
   startedAt: string
   elapsedMinutes: number
-  /** Running longer than five hours — almost certainly forgotten, and poisoning totals. */
+  /** Running longer than five hours: almost certainly forgotten, and poisoning totals. */
   probablyForgotten: boolean
 }
 
@@ -1551,7 +1551,7 @@ export const getDeal = (companyId: string, entryId: string): Promise<DealDetail>
 
 /**
  * Log activity on a deal. Also stamps the touch, which is what makes the staleness
- * signal trustworthy — it is a by-product of doing the work, not a field to maintain.
+ * signal trustworthy. It is a by-product of doing the work, not a field to maintain.
  */
 export const addDealNote = (
   companyId: string,
@@ -1567,7 +1567,7 @@ export const setDealFollowUp = (
 ): Promise<DealDetail> => maestroPost('setDealFollowUp', { companyId, entryId, ...body })
 
 /**
- * Record that a follow-up HAPPENED — as opposed to just clearing the date, which
+ * Record that a follow-up HAPPENED: as opposed to just clearing the date, which
  * would leave no evidence anyone did the thing they said they would.
  */
 export const completeFollowUp = (
@@ -1589,7 +1589,7 @@ export const deleteDeal = (companyId: string, entryId: string): Promise<{ delete
 /** `2026-09` as `Sep 2026`. An empty or malformed month renders as an em dash. */
 export function formatMonth(month: string): string {
   const m = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(String(month || ''))
-  if (!m) return '—'
+  if (!m) return '-'
   // Built from parts rather than parsed as a date: `new Date('2026-09')` is UTC
   // midnight, which in a western timezone renders as August.
   const names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -1597,13 +1597,13 @@ export function formatMonth(month: string): string {
 }
 
 export function formatMoney(value: number | null): string {
-  if (value === null || value === undefined) return '—'
+  if (value === null || value === undefined) return '-'
   return '$' + Math.round(value).toLocaleString('en-US')
 }
 
-/** `$13.4k` — for headline figures where the exact dollar is noise. */
+/** `$13.4k`, for headline figures where the exact dollar is noise. */
 export function formatCompactMoney(value: number | null): string {
-  if (value === null || value === undefined) return '—'
+  if (value === null || value === undefined) return '-'
   const n = Math.round(value)
   if (Math.abs(n) >= 1000000) return '$' + (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'm'
   if (Math.abs(n) >= 1000) return '$' + (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k'
@@ -1638,7 +1638,7 @@ export interface ContactList {
   roles: string[]
   total: number
   primaryEntryId: string | null
-  /** True if more than one entry carries the flag — only possible via the platform UI. */
+  /** True if more than one entry carries the flag, only possible via the platform UI. */
   primaryConflict: boolean
   /** The primary's details as copied onto Company Info. */
   mirrored: { contactName: string; contactTitle: string; contactEmail: string; contactPhone: string }
@@ -1668,7 +1668,7 @@ export const deleteContact = (companyId: string, entryId: string): Promise<Conta
 
 // --------------------------------------------------------------------- files
 // A filing cabinet per company, using eccrm's design: one entry per file, and
-// FOLDERS ARE NOT OBJECTS — the folder is a "/"-separated path on the entry and the
+// FOLDERS ARE NOT OBJECTS: the folder is a "/"-separated path on the entry and the
 // tree is derived from every path in use. An entry with a folder and no file is a
 // marker, which is the only thing that makes an empty folder persist.
 
@@ -1728,20 +1728,20 @@ export const deleteFolder = (companyId: string, folder: string): Promise<{ delet
 
 // ------------------------------------------------------------------- sprints
 // beh's model: each engineer is a column, and the column measures the estimates
-// assigned to them against their capacity. Cobalt needs almost no new schema for it —
+// assigned to them against their capacity. Cobalt needs almost no new schema for it,
 // a ticket already carries `sprint`, `responsible` and `estHours`.
 //
-// A sprint is a plain counting number — 1, 2, 3 — the way the team says it out loud.
+// A sprint is a plain counting number, 1, 2, 3: the way the team says it out loud.
 // It used to be an ISO week (2026-W33), which reads like a date but is not one, and
 // nobody ever said it. The server treats the key as an opaque string; the format is
 // the only thing the two sides have to agree on, so it is validated at both ends.
 //
 // The roster is PER SPRINT. Capacity moves week to week, and an engineer who is out
-// comes off that sprint only — never off a sprint that already happened.
+// comes off that sprint only, never off a sprint that already happened.
 
 export const ENGINEER_DISCIPLINES = ['Engineer', 'Implementation', 'Support', 'Design', 'Other'] as const
 
-/** Digits only, no leading zero — mirrors the endpoint's own check. */
+/** Digits only, no leading zero: mirrors the endpoint's own check. */
 export const SPRINT_PATTERN = /^[1-9]\d{0,3}$/
 
 export const isSprintKey = (key: string): boolean => SPRINT_PATTERN.test(String(key || ''))
@@ -1749,7 +1749,7 @@ export const isSprintKey = (key: string): boolean => SPRINT_PATTERN.test(String(
 export interface Engineer {
   entryId: string
   /**
-   * The platform user this row is. Empty on rows added before the roster held ids —
+   * The platform user this row is. Empty on rows added before the roster held ids,
    * those still work, matched by name, but cannot be assigned work.
    */
   userId: string
@@ -1783,7 +1783,7 @@ export interface Team {
 export interface SprintColumn {
   engineer: string
   entryId: string
-  /** The column's user id — what a ticket's `responsibleId` is matched against. */
+  /** The column's user id: what a ticket's `responsibleId` is matched against. */
   userId: string
   role: string
   capacity: number
@@ -1801,7 +1801,7 @@ export interface SprintBoard {
   sprint: string
   /** True when the default roster is standing in because this sprint has none yet. */
   rosterIsTemplate: boolean
-  /** Every sprint that has a roster, oldest first — what the picker offers. */
+  /** Every sprint that has a roster, oldest first: what the picker offers. */
   sprints: string[]
   listsScanned: number
   columns: SprintColumn[]
@@ -1828,7 +1828,7 @@ export const getTeam = (sprint = '', includeInactive = false): Promise<Team> =>
   })
 
 /**
- * Start a sprint by copying the previous roster forward. Idempotent — a sprint that
+ * Start a sprint by copying the previous roster forward. Idempotent: a sprint that
  * already has a roster comes back untouched, so a double-click cannot double a column.
  */
 export const createSprint = (sprint: string, from?: string): Promise<Team & { created: number; copiedFrom: string | null; note?: string }> =>
@@ -1848,7 +1848,7 @@ export const getSprint = (sprint: string): Promise<SprintBoard> =>
 
 /**
  * Put a ticket into a sprint (and optionally onto an engineer). An empty sprint pulls
- * it out. The engineer is the RESPONSIBLE one — moving a ticket between sprints never
+ * it out. The engineer is the RESPONSIBLE one: moving a ticket between sprints never
  * changes who is accountable to the client for it.
  */
 export const assignSprint = (
@@ -1868,8 +1868,8 @@ export function shiftSprint(key: string, by: number): string {
 /**
  * A name reduced to something two spellings of the same person agree on.
  *
- * A BlueStep person record reads "Payne, Brandon"; every hand-entered name — a roster
- * row, an old assignee — reads "Brandon Payne". Lower-case, drop punctuation, sort the
+ * A BlueStep person record reads "Payne, Brandon"; every hand-entered name: a roster
+ * row, an old assignee: reads "Brandon Payne". Lower-case, drop punctuation, sort the
  * words, and both become "brandon payne". Mirrors `nameKey` in the endpoint, because
  * the two have to agree about which column a ticket belongs in.
  */
@@ -1883,19 +1883,19 @@ export function nameKey(name: string): string {
     .join(' ')
 }
 
-/** `Sprint 3` — the one label the whole app uses for a sprint. */
+/** `Sprint 3`: the one label the whole app uses for a sprint. */
 export function sprintLabel(key: string): string {
   return key ? `Sprint ${key}` : 'No sprint'
 }
 
 // ------------------------------------------------------------- settings: users
-// A person in Cobalt carries BOTH the Staff and User categories — never one or the other —
+// A person in Cobalt carries BOTH the Staff and User categories, never one or the other,
 // with employment details on the Employee Info form. Both matter: User is what the All
 // Users query lists, and Staff is what every "Security - <Role>" query requires, so a
 // User-only record could have roles ticked and be granted nothing. `createUser` creates
 // through a query that demands both so they attach together.
 //
-// Supervisor is a text id plus a denormalised name — the standing pattern in this project
+// Supervisor is a text id plus a denormalised name: the standing pattern in this project
 // rather than a relationship field.
 
 export const DEPARTMENTS = [
@@ -1904,7 +1904,7 @@ export const DEPARTMENTS = [
 export const EMPLOYMENT_TYPES = ['Full-time', 'Part-time', 'Contract', 'Intern'] as const
 
 /*
- * Permission roles. A fallback, not the source of truth — `users` returns `staffRoles`
+ * Permission roles. A fallback, not the source of truth - `users` returns `staffRoles`
  * and the UI should prefer that, so adding a role on the platform does not need a
  * redeploy here. This copy exists only so the checkbox group can render before the first
  * response lands.
@@ -1929,7 +1929,7 @@ export interface User {
   notes: string
   /**
    * Permission roles, any number of them. Ticking one puts the person in the matching
-   * dynamic security group — this is a permission change, not a label.
+   * dynamic security group. This is a permission change, not a label.
    */
   roles: string[]
   supervisorId: string
@@ -1944,7 +1944,7 @@ export interface User {
 export interface UserList {
   departments: string[]
   employmentTypes: string[]
-  /** The server's role vocabulary — prefer this over the STAFF_ROLES fallback. */
+  /** The server's role vocabulary: prefer this over the STAFF_ROLES fallback. */
   staffRoles: string[]
   total: number
   withEmployeeInfo: number
@@ -1956,7 +1956,7 @@ export type EmployeeFieldKey =
   | 'workEmail' | 'workPhone' | 'employed' | 'notes'
 
 /**
- * An employment write. Every field is a string except `roles`, which is a real array —
+ * An employment write. Every field is a string except `roles`, which is a real array,
  * the endpoint validates it as a set, and stringifying it would arrive as one bogus
  * option name rather than several roles.
  *
@@ -1976,7 +1976,7 @@ export const setSupervisor = (id: string, supervisorId: string): Promise<User> =
   maestroPost('setSupervisor', { id, supervisorId })
 
 /**
- * Creates the person RECORD only — the API cannot mint a BlueStep login.
+ * Creates the person RECORD only: the API cannot mint a BlueStep login.
  *
  * `firstName` and `lastName` are sent separately and are both required. The endpoint does
  * accept a single `name` and split it on the last space, but that fallback guesses which
@@ -1996,7 +1996,7 @@ export const createUser = (
 ): Promise<User & {
   loginCreated: boolean
   nameWritten: boolean
-  /** What the platform's Name and E-mail form holds now — not what was requested. */
+  /** What the platform's Name and E-mail form holds now, not what was requested. */
   nameForm: { firstName: string; lastName: string; email: string }
   /** False means the name did not reach the platform's own form; `note` says so too. */
   nameFormWritten: boolean
@@ -2024,7 +2024,7 @@ export interface AccountOwner {
   companyId: string
   companyName: string
   current: OwnerStint | null
-  /** More than one open stint — only possible by hand-editing the BlueStep form. */
+  /** More than one open stint, only possible by hand-editing the BlueStep form. */
   conflict: boolean
   history: OwnerStint[]
   total: number
@@ -2051,8 +2051,8 @@ export const setCategory = (id: string, category: string): Promise<Company> =>
  * The CS loop: touchpoints in, health out.
  *
  * Nothing here stores a health score. `CsInfo` is computed by the endpoint on every
- * read from the touchpoint log, the survey responses and the calendar — the same
- * derived-never-stored pattern the CRM uses for staleness — so an account can go Red
+ * read from the touchpoint log, the survey responses and the calendar: the same
+ * derived-never-stored pattern the CRM uses for staleness, so an account can go Red
  * because nobody called, with nobody typing anything.
  *
  * The vocabularies below are mirrored constants, not fetched lists: there are no new
@@ -2061,7 +2061,7 @@ export const setCategory = (id: string, category: string): Promise<Company> =>
  * no gain. `csQueue` returns them too, which is the copy to trust if these ever drift.
  */
 
-/** The picker list. `Intensity Change` is deliberately absent — only the audit path writes it. */
+/** The picker list. `Intensity Change` is deliberately absent, only the audit path writes it. */
 export const TOUCHPOINT_TYPES = [
   'Call', 'Email', 'Text', 'Video Call', 'In Person', 'Temp Check',
 ] as const
@@ -2084,7 +2084,7 @@ export const SURVEY_DIMENSIONS = [
   { key: 'overall', label: 'Overall Recommendation' },
 ] as const
 
-/** What each level actually means, carried over from beh — shown in the intensity form. */
+/** What each level actually means, carried over from beh: shown in the intensity form. */
 export const INTENSITY_DEFINITIONS: { level: string; what: string }[] = [
   { level: 'Self-Sufficient', what: 'Rarely needs help; manages configuration independently.' },
   { level: 'Low Touch', what: 'Occasional assistance on new features or minor troubleshooting.' },
@@ -2093,7 +2093,7 @@ export const INTENSITY_DEFINITIONS: { level: string; what: string }[] = [
   { level: 'White Glove', what: 'Requires constant strategic oversight or dedicated resources.' },
 ]
 
-/** A detractor response nobody has answered yet. Score and dimension only — never the words. */
+/** A detractor response nobody has answered yet. Score and dimension only, never the words. */
 export interface OpenDetractor {
   date: string
   dimension: string
@@ -2102,10 +2102,10 @@ export interface OpenDetractor {
 }
 
 /**
- * One account's health, as of a date — the whole of what the endpoint derives.
+ * One account's health, as of a date: the whole of what the endpoint derives.
  *
  * `reason` is a sentence, not a code. The queue is read by a person deciding who to
- * ring, and "Gone quiet — 47d since contact, cadence 30" tells them that in one line
+ * ring, and "Gone quiet, 47d since contact, cadence 30" tells them that in one line
  * where a colour and a number would need assembling in their head.
  */
 export interface CsInfo {
@@ -2136,7 +2136,7 @@ export interface CsRow extends CsInfo {
   owner: string
   ownerId: string
   /**
-   * Absent — not zero — for a caller without `viewMoney`.
+   * Absent, not zero, for a caller without `viewMoney`.
    *
    * The endpoint's redactor deletes the key rather than blanking it, so presence is the
    * test: `'mrr' in row` separates "you may not see this" from "this client has no won
@@ -2175,7 +2175,7 @@ export interface CsQueue {
   vocabularies: CsVocabularies
   companiesScanned: number
   /**
-   * Not sent by the endpoint — redaction is expressed by dropping the `mrr` key. Kept
+   * Not sent by the endpoint: redaction is expressed by dropping the `mrr` key. Kept
    * optional so the screen can honour it if it ever arrives, but `moneyWithheld()` below
    * is what the UI actually reads.
    */
@@ -2236,7 +2236,7 @@ export interface SurveyResponse {
   /** The client's own words. Only reachable behind `viewSurveys`. */
   reason: string
   comment: string
-  /** From the joined invite — blank when the invite is gone, rather than guessed at. */
+  /** From the joined invite: blank when the invite is gone, rather than guessed at. */
   sentTo: string
   contactName: string
   companyId?: string
@@ -2261,7 +2261,7 @@ export interface CsSummaryDetractor {
   companyName: string
   dimension: string
   score: number
-  /** Null means still unanswered — nobody has logged a contact since it arrived. */
+  /** Null means still unanswered. Nobody has logged a contact since it arrived. */
   acknowledgedInDays: number | null
   /** Absent, not blank, for a caller without `viewSurveys`. */
   comment?: string
@@ -2327,7 +2327,7 @@ export const deleteTouchpoint = (
 ): Promise<{ deleted: true; cs: CsInfo }> => maestroPost('deleteTouchpoint', { companyId, entryId })
 
 /**
- * Change how much hand-holding this client gets — which changes its cadence, and so its
+ * Change how much hand-holding this client gets, which changes its cadence, and so its
  * health. The reason is required because it is the audit trail: this one field decides
  * how loudly the queue asks about an account.
  */
@@ -2340,7 +2340,7 @@ export const setSupportIntensity = (
 /**
  * Mint a survey link and the email to send with it.
  *
- * Creating the invite IS the send record — the 90-day clock starts here, not when the
+ * Creating the invite IS the send record: the 90-day clock starts here, not when the
  * mail actually leaves. Accepted out loud: an invite copied and never sent still counts,
  * and the response rate is what exposes that.
  */
@@ -2351,7 +2351,7 @@ export const createSurveyInvite = (
 
 /*
  * `invites` is defaulted rather than trusted. Two screens count it before rendering
- * anything, so a response that omits the key took both of them to a blank page — the
+ * anything, so a response that omits the key took both of them to a blank page: the
  * one failure mode worth spending a line to make impossible.
  */
 export const getSurveys = (
@@ -2371,12 +2371,12 @@ export const getSurveys = (
 export const getCsSummary = (quarter?: string): Promise<CsSummary> =>
   maestroGet('csSummary', quarter ? { quarter } : {})
 
-/** `2026-Q3` — the quarter a date falls in, for the quarter picker's default. */
+/** `2026-Q3`: the quarter a date falls in, for the quarter picker's default. */
 export function quarterOf(d: Date = new Date()): string {
   return `${d.getFullYear()}-Q${Math.floor(d.getMonth() / 3) + 1}`
 }
 
-/** Quarters counting back from `latest`, newest first — the picker's options. */
+/** Quarters counting back from `latest`, newest first: the picker's options. */
 export function recentQuarters(latest = quarterOf(), count = 6): string[] {
   const m = /^(\d{4})-Q([1-4])$/.exec(latest)
   if (!m) return [latest]
@@ -2391,7 +2391,7 @@ export function recentQuarters(latest = quarterOf(), count = 6): string[] {
   return out
 }
 
-/** `retention` reads as `Continued Use` — the dimension keys are not label text. */
+/** `retention` reads as `Continued Use`: the dimension keys are not label text. */
 export function dimensionLabel(key: string): string {
   const found = SURVEY_DIMENSIONS.find(d => d.key === key)
   return found ? found.label : key
@@ -2399,7 +2399,7 @@ export function dimensionLabel(key: string): string {
 
 /**
  * NPS tone. Above 30 is genuinely good, 0-30 is a warning, below 0 means more
- * detractors than promoters — and null is not zero, so it gets no tone at all.
+ * detractors than promoters, and null is not zero, so it gets no tone at all.
  */
 export function npsTone(nps: number | null): 'good' | 'warn' | 'bad' | undefined {
   if (nps === null || nps === undefined) return undefined

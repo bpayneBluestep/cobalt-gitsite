@@ -4,7 +4,7 @@ import useTheme from './useTheme'
 import { useSession } from '../session'
 
 /*
- * Who you are, and everything personal to you — modelled on the eccrm CRM's account
+ * Who you are, and everything personal to you: modelled on the eccrm CRM's account
  * menu, which is where that app puts the same three things:
  *
  *   • the name, spelled out, because a shared machine or a second account is exactly
@@ -23,7 +23,7 @@ function initials(fullName: string): string {
   const words = fullName.replace(/,/g, ' ').split(/\s+/).filter(Boolean)
   if (!words.length) return '?'
   if (words.length === 1) return words[0].slice(0, 2).toUpperCase()
-  // Surname-first means the LAST word is the given name — so take the outer two either
+  // Surname-first means the LAST word is the given name, so take the outer two either
   // way and let the order look how it looks. Two letters is all this needs to be.
   const first = words[0][0] || ''
   const last = words[words.length - 1][0] || ''
@@ -81,7 +81,7 @@ export default function UserMenu() {
         <div className="usermenu__menu" role="menu">
           <div className="usermenu__id">
             <p className="usermenu__idname">{name}</p>
-            {/* The roles, because in this app they decide what you can see — so "why
+            {/* The roles, because in this app they decide what you can see, so "why
                 can't I open Sprints" is answered here rather than by asking someone. */}
             <p className="usermenu__idroles">
               {roles.length ? roles.join(' · ') : 'No roles'}

@@ -2,13 +2,13 @@
  * The top-level sections of the ERP.
  *
  * Most of these are not built yet. Rather than hide them until they are, each gets
- * an honest placeholder that says what it is for and what it will draw on — so the
+ * an honest placeholder that says what it is for and what it will draw on, so the
  * shape of the system is visible, and nobody has to guess whether a blank section
  * means "empty" or "not written".
  *
  * `live` links point at the parts that DO work today, so a placeholder is never a
  * dead end. Delete a section's entry here and both its nav item and its route go
- * with it — this list is the single source for both.
+ * with it. This list is the single source for both.
  */
 
 import type { Capability } from './api'
@@ -21,7 +21,7 @@ export interface Section {
    * The capability required to see this section at all.
    *
    * Declared here rather than checked in the router, so a section's nav item and its
-   * route can never disagree about who may reach it — the same reason this list drives
+   * route can never disagree about who may reach it: the same reason this list drives
    * both in the first place. Omit for the sections everyone signed in can see.
    */
   needs?: Capability
@@ -33,7 +33,7 @@ export interface Section {
   foundation?: string
   /** Working pages worth pointing at from here. */
   live?: { to: string; label: string; note: string }[]
-  /** Built for real — keeps its nav item but gets no placeholder route. */
+  /** Built for real: keeps its nav item but gets no placeholder route. */
   built?: boolean
 }
 
@@ -42,7 +42,7 @@ export const SECTIONS: Section[] = [
     key: 'home',
     path: '/',
     label: 'Home',
-    purpose: 'Where the day starts — what is assigned to you, what is blocked, what is due.',
+    purpose: 'Where the day starts, what is assigned to you, what is blocked, what is due.',
     planned: [
       'Your open tickets across every client, newest first',
       'Anything roadblocked, with who flagged it and when',
@@ -54,7 +54,7 @@ export const SECTIONS: Section[] = [
       'with its reason, a sprint, a time log and the components they changed, so this is a matter ' +
       'of arranging what is already recorded.',
     live: [
-      { to: '/clients', label: 'Clients', note: 'the company list, live — open one to reach its tickets' },
+      { to: '/clients', label: 'Clients', note: 'the company list, live. Open one to reach its tickets' },
     ],
     built: true,
   },
@@ -101,7 +101,7 @@ export const SECTIONS: Section[] = [
       'A call and note timeline against each company',
       'Contacts as their own records, not one primary per company',
       'Conference ROI, once there are conferences to attribute to',
-      'Trends over time — the analysis that needs history to say anything',
+      'Trends over time: the analysis that needs history to say anything',
     ],
     foundation:
       'Dashboard, Pipeline and Prospecting are live, on the same phases and lead sources beh uses.',
@@ -121,11 +121,11 @@ export const SECTIONS: Section[] = [
       'Owner-scoped nudges when an account crosses into Red, once there is anything to send them with',
       'Per-contact survey targeting, when an account needs more than one voice heard',
       'NPS over time, once there is a year of identified answers worth charting',
-      'A client-facing support panel — the strongest thing beh had that Cobalt does not',
+      'A client-facing support panel: the strongest thing beh had that Cobalt does not',
     ],
     foundation:
       'Health is computed on every read from the touchpoint log, the survey responses and the ' +
-      'calendar, so silence degrades an account with nobody typing anything — and a Red signal ' +
+      'calendar, so silence degrades an account with nobody typing anything, and a Red signal ' +
       'writes an owned, dated follow-up into the same queue the CRM already reads.',
     live: [
       { to: '/cs', label: 'Queue', note: 'every client, worst first, with the reason' },
@@ -136,7 +136,7 @@ export const SECTIONS: Section[] = [
     key: 'resources',
     path: '/resources',
     label: 'Resources',
-    purpose: 'The shared shelf — the documents everyone keeps re-finding or re-writing.',
+    purpose: 'The shared shelf, the documents everyone keeps re-finding or re-writing.',
     planned: [
       'Implementation runbooks and go-live checklists',
       'Reusable form and report templates',
@@ -151,7 +151,7 @@ export const SECTIONS: Section[] = [
     needs: 'viewReports',
     purpose: 'The numbers the company runs on, pulled from the records rather than a spreadsheet.',
     planned: [
-      'Hours by client, by person, by week — billable and not',
+      'Hours by client, by person, by week: billable and not',
       'Throughput: tickets opened against closed',
       'Pipeline by stage and value',
       'Time-to-close, and where tickets actually sit and wait',
@@ -168,7 +168,7 @@ export const SECTIONS: Section[] = [
     needs: 'viewStaff',
     purpose: 'How Cobalt is set up: who works here, and the lists everything else picks from.',
     planned: [
-      'Option lists — departments, deal phases, ticket statuses — editable rather than in code',
+      'Option lists, departments, deal phases, ticket statuses: editable rather than in code',
       'Permissions: who can move a company between stages, who can see money',
       'Default file folders per company type',
       'Integrations and API credentials',

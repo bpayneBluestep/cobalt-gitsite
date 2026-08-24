@@ -13,7 +13,7 @@ import { sanitizeHtml } from '../lib/html'
 import RichTextEditor from '../components/RichTextEditor'
 
 /*
- * Wesley — guided intake.
+ * Wesley: guided intake.
  *
  * Someone with a half-formed need talks it through; Wesley interviews them, coaches
  * them into recording their screen, and assembles a request an engineer can act on
@@ -22,12 +22,12 @@ import RichTextEditor from '../components/RichTextEditor'
  *
  * The shape of the thing is the argument for it: a person who would have written
  * "the report is broken" is asked what they expected, what happened, and where to
- * find it — and is nudged into showing it. That is the whole product.
+ * find it, and is nudged into showing it. That is the whole product.
  *
  * Three properties worth keeping when editing this:
  *
  *   * Wesley proposes; it never creates. The proposal lands in an editable review
- *     card, and only the user's Submit creates a ticket — through `addTicket`, the
+ *     card, and only the user's Submit creates a ticket: through `addTicket`, the
  *     same path and the same validation as one typed by hand.
  *   * Nothing is uploaded until submit. A recording lives as a blob and an object
  *     URL until then, so abandoning the interview leaves nothing behind.
@@ -40,7 +40,7 @@ type Stage = 'chat' | 'review' | 'done'
 
 const NARRATION_PREFIX = '(While recording, I said:)'
 
-/** Plain text into safe HTML, keeping line breaks — chat bubbles are not rich text. */
+/** Plain text into safe HTML, keeping line breaks: chat bubbles are not rich text. */
 function textToHtml(raw: string): string {
   return String(raw || '')
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -79,7 +79,7 @@ export default function Intake() {
   const [sending, setSending] = useState('')
   const [created, setCreated] = useState<{ number: number | null; entryId: string } | null>(null)
 
-  // Recording. `recBytes` is what the chip counts down against — time was the wrong
+  // Recording. `recBytes` is what the chip counts down against: time was the wrong
   // meter: the limit is a file size, and a busy screen fills it faster than a still one.
   const [recording, setRecording] = useState<Recording | null>(null)
   const [elapsed, setElapsed] = useState(0)
@@ -139,7 +139,7 @@ export default function Intake() {
       const detail = err instanceof ApiError ? err.message : String(err)
       setMessages([...history, {
         role: 'assistant',
-        content: `Sorry — I had trouble there. Mind trying that again?\n\n(${detail})`,
+        content: `Sorry. I had trouble there. Mind trying that again?\n\n(${detail})`,
       }])
     } finally {
       setThinking(false)
@@ -189,7 +189,7 @@ export default function Intake() {
     })
   }
 
-  // Pasting a screenshot straight into the composer — the fastest path there is.
+  // Pasting a screenshot straight into the composer: the fastest path there is.
   function onPaste(e: React.ClipboardEvent) {
     const items = e.clipboardData?.items
     if (!items) return
@@ -224,13 +224,13 @@ export default function Intake() {
 
     // Checked HERE, not at submit. The old code attached whatever came back and let the
     // endpoint reject it at the end, which threw away the interview along with the file.
-    // The recorder now hard-stops at the budget, so this should be unreachable — it is
+    // The recorder now hard-stops at the budget, so this should be unreachable. It is
     // kept because "should be unreachable" is not the same as "is".
     if (result.videoBlob.size > recBudget) {
       setRecWarn(
         `That recording came out at ${formatBytes(result.videoBlob.size)}, over the ` +
         `${formatBytes(recBudget)} limit, so it hasn't been attached. Record a shorter ` +
-        `stretch — or just tell me what it showed.`,
+        `stretch, or just tell me what it showed.`,
       )
       setRecBusy('')
       return
@@ -238,7 +238,7 @@ export default function Intake() {
 
     if (result.stoppedForSize) {
       setRecWarn(
-        `Recording stopped at the ${formatBytes(recBudget)} limit — everything up to that ` +
+        `Recording stopped at the ${formatBytes(recBudget)} limit. Everything up to that ` +
         `point is attached. Record a second clip if there's more to show.`,
       )
     }
@@ -252,13 +252,13 @@ export default function Intake() {
       localUrl: URL.createObjectURL(result.videoBlob),
     })
 
-    // The narration IS the user's answer — transcribe it and let Wesley react, rather
+    // The narration IS the user's answer: transcribe it and let Wesley react, rather
     // than leaving a silent attachment and an unanswered question.
     if (!result.audioBlob) {
       setRecBusy('')
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: 'Got your recording — it’s attached. I didn’t catch any narration in it, ' +
+        content: 'Got your recording. It’s attached. I didn’t catch any narration in it, ' +
           'though. No problem: record again and talk me through what’s happening, or just ' +
           'tell me here what you wanted to show.',
       }])
@@ -274,7 +274,7 @@ export default function Intake() {
       if (!said) {
         setMessages(prev => [...prev, {
           role: 'assistant',
-          content: 'Got your recording — it’s attached, but I couldn’t make out any speech. ' +
+          content: 'Got your recording. It’s attached, but I couldn’t make out any speech. ' +
             'Tell me here what you wanted to show, or record again and talk me through it.',
         }])
         return
@@ -288,7 +288,7 @@ export default function Intake() {
       setRecBusy('')
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: 'Got your recording — it’s attached. I couldn’t listen to it just now ' +
+        content: 'Got your recording. It’s attached. I couldn’t listen to it just now ' +
           `(${err instanceof ApiError ? err.message : String(err)}), so tell me here what ` +
           'you were showing me.',
       }])
@@ -299,7 +299,7 @@ export default function Intake() {
     if (recording) return
     setRecWarn('')
     if (!recordingSupported()) {
-      setRecWarn('Recording isn’t available in this browser — add a screenshot or just describe it.')
+      setRecWarn('Recording isn’t available in this browser. Add a screenshot or just describe it.')
       return
     }
     try {
@@ -366,7 +366,7 @@ export default function Intake() {
     setStage('chat')
     setMessages(prev => [...prev, {
       role: 'assistant',
-      content: 'Sure — what else should I add, or what did I get wrong? Tell me and I’ll update your request.',
+      content: 'Sure, what else should I add, or what did I get wrong? Tell me and I’ll update your request.',
     }])
   }
 
@@ -398,7 +398,7 @@ export default function Intake() {
           <h2>Your request is in</h2>
           <p>
             We’ve logged {created?.number != null ? `ticket #${created.number}` : 'your ticket'}.
-            {' '}We’ll take it from here — thanks for the detail.
+            {' '}We’ll take it from here: thanks for the detail.
           </p>
           <p className="callout__actions">
             {created?.number != null && (
@@ -433,7 +433,7 @@ export default function Intake() {
         <span className="wes-spark" aria-hidden="true"><Spark /></span>
         <div>
           <div className="wes-brand-name">Wesley</div>
-          <div className="wes-brand-sub">Tell me what you need — I’ll turn it into a request.</div>
+          <div className="wes-brand-sub">Tell me what you need. I’ll turn it into a request.</div>
         </div>
       </div>
 
@@ -466,7 +466,7 @@ export default function Intake() {
               <span className="wes-rec-dot" aria-hidden="true" />
               <span className="wes-rec-label">Recording</span>
               <span className="wes-rec-time">{formatClock(elapsed)}</span>
-              {/* Size, not just time — the limit is a file size, and a busy screen eats
+              {/* Size, not just time: the limit is a file size, and a busy screen eats
                   it faster than a still one. Time is still shown because that is what a
                   person is actually tracking while they talk. */}
               <span className="muted">
@@ -481,7 +481,7 @@ export default function Intake() {
                 Stop
               </button>
               <p className="wes-rec-coach">
-                Talk me through it out loud — say what you expected versus what happened, and
+                Talk me through it out loud. Say what you expected versus what happened, and
                 point to where things are. (Please don’t read client names aloud.)
               </p>
             </div>
@@ -494,7 +494,7 @@ export default function Intake() {
             <div className="wes-tools">
               <button type="button" className="wes-tool wes-tool--primary"
                 onClick={beginRecording} disabled={!!recording || !!recBusy}
-                title="Record your screen — the most helpful thing you can do">
+                title="Record your screen: the most helpful thing you can do">
                 Record screen
               </button>
               <label className="wes-tool">
@@ -542,7 +542,7 @@ export default function Intake() {
             </div>
             <p className="wes-hint">
               The most helpful thing you can do is <strong>record your screen and talk me
-              through it</strong> — show me what’s happening, or point to where you’d want
+              through it</strong>: show me what’s happening, or point to where you’d want
               something. Please describe what you see rather than typing client names.
             </p>
           </div>
@@ -554,7 +554,7 @@ export default function Intake() {
             <div>
               <div className="wes-review-h">Here’s your request</div>
               <div className="wes-review-sub">
-                Give it a look. Edit anything, or keep refining — then send it our way.
+                Give it a look. Edit anything, or keep refining: then send it our way.
               </div>
             </div>
           </div>

@@ -14,12 +14,12 @@ import { todayISO } from '../lib/time'
  * The Monday screen.
  *
  * Every current client, with a health colour Cobalt worked out and a sentence saying
- * why — sorted so the worst thing is at the top. Nobody maintains a health field:
+ * why: sorted so the worst thing is at the top. Nobody maintains a health field:
  * silence alone degrades an account, on a cadence matched to how much hand-holding
  * that client needs, so an account can go Red with nobody typing anything.
  *
- * Built on the follow-ups queue's skeleton on purpose. It is the same kind of screen —
- * a list of things owed, each actionable in place — and a queue you have to leave in
+ * Built on the follow-ups queue's skeleton on purpose. It is the same kind of screen,
+ * a list of things owed, each actionable in place, and a queue you have to leave in
  * order to act on is a queue people stop using. Logging a touchpoint here re-renders
  * the row from the reply, so the account leaves "check due" without a reload.
  *
@@ -68,7 +68,7 @@ const spine = (health: string) =>
  * The four groups, in the order they are worked.
  *
  * Surveys due is its own group rather than a flag on a row, because it is a different
- * action with a different rhythm — eight emails a week — and a healthy account can owe
+ * action with a different rhythm, eight emails a week, and a healthy account can owe
  * one. A client that is both Red and survey-due appears in Act now: the call comes
  * first, and sending a survey to an account you already know is unhappy is a worse
  * version of ringing them.
@@ -126,7 +126,7 @@ export default function CsQueue() {
    * Rows patched in place from an action's reply.
    *
    * `logTouchpoint` returns the freshly computed health, so the row can be corrected
-   * without another walk of every company — which is the whole point of acting from
+   * without another walk of every company, which is the whole point of acting from
    * the queue. Keyed by company id and cleared on every reload.
    */
   const [patched, setPatched] = useState<Record<string, CsInfo>>({})
@@ -197,7 +197,7 @@ export default function CsQueue() {
         <h1>Client Success</h1>
         <p className="page__sub-text">
           No client goes quiet, no bad signal goes unowned. Every current client is here
-          with a computed health and the reason for it — worst first.
+          with a computed health and the reason for it: worst first.
         </p>
       </header>
 
@@ -245,7 +245,7 @@ export default function CsQueue() {
           <div className="kpis">
             <Kpi
               label="Good standing"
-              value={pct === null ? '—' : `${pct}%`}
+              value={pct === null ? '-' : `${pct}%`}
               note={pct === null
                 ? 'no clients to measure'
                 : `${headline.green} of ${headline.clients} on a fresh Green inside cadence`}
@@ -283,7 +283,7 @@ export default function CsQueue() {
           {moneyWithheld(d.rows, d.moneyHidden) && (
             <p className="note">
               Revenue is hidden for your roles, so these rows carry no MRR. Health does not
-              depend on it — nothing on this screen is missing because of it.
+              depend on it. Nothing on this screen is missing because of it.
             </p>
           )}
 
@@ -406,9 +406,9 @@ function QueueRow({
         <p className="fu__step">{row.reason}</p>
 
         <p className="fu__meta">
-          {/* The one place a colour is carried by CSS rather than a word — the house
+          {/* The one place a colour is carried by CSS rather than a word: the house
               Green/Yellow/Red dot, same control the pipeline uses for confidence. */}
-          <span className="dotc" data-c={row.health} title={`${row.health} — ${row.reason}`} />
+          <span className="dotc" data-c={row.health} title={`${row.health}: ${row.reason}`} />
           {row.neverTouched ? (
             <span className="bad">never contacted</span>
           ) : (
@@ -461,7 +461,7 @@ function QueueRow({
             onCancel={() => setOpen({ kind: 'none' })}
             onSave={fields => run(id, logTouchpoint(id, fields), result => {
               const r = result as { cs: CsInfo }
-              patch(id, r.cs, `${row.companyName} — logged. ${r.cs.reason}`)
+              patch(id, r.cs, `${row.companyName}: logged. ${r.cs.reason}`)
             })} />
         )}
 
@@ -477,7 +477,7 @@ function QueueRow({
             onCancel={() => setOpen({ kind: 'none' })}
             onSave={body => run(id, setSupportIntensity(id, body), result => {
               const r = result as { cs: CsInfo; cadenceDays: number }
-              patch(id, r.cs, `${row.companyName} — now ${body.level}, every ${r.cadenceDays}d.`)
+              patch(id, r.cs, `${row.companyName}: now ${body.level}, every ${r.cadenceDays}d.`)
             })} />
         )}
       </div>
@@ -500,7 +500,7 @@ function QueueRow({
           </button>
           {/*
             Escalation lives on the account's Success tab, not on this row, and it is
-            deliberate rather than automatic — a CS save is usually a phone call, and
+            deliberate rather than automatic: a CS save is usually a phone call, and
             auto-created tickets nobody triaged are noise with a number.
 
             It is not here because a queue row cannot tell whether this client HAS a
@@ -534,7 +534,7 @@ function LogForm({ row, types, busy, onCancel, onSave }: {
   return (
     <div className="editcard">
       <header className="editcard__head">
-        <h2>Log a touchpoint — {row.companyName}</h2>
+        <h2>Log a touchpoint: {row.companyName}</h2>
         <p className="note">
           A record of a contact that happened. There is no edit afterwards: a wrong
           reading is corrected by logging a newer one, like a ledger.
@@ -566,7 +566,7 @@ function LogForm({ row, types, busy, onCancel, onSave }: {
             ))}
           </div>
           <p className="ef__hint">
-            Optional — but a contact with no reading leaves the account Yellow, because
+            Optional, but a contact with no reading leaves the account Yellow, because
             silence about how it went proves nothing good.
           </p>
         </div>
@@ -653,7 +653,7 @@ function InviteForm({ row, busy, onCancel, onSend }: {
   return (
     <div className="editcard">
       <header className="editcard__head">
-        <h2>Survey invite — {row.companyName}</h2>
+        <h2>Survey invite: {row.companyName}</h2>
         <p className="note">
           Cobalt writes the email; you send it from your own address, with your name on
           it. There is no mail robot here, and no promise of anonymity we would have to
@@ -684,7 +684,7 @@ function InviteForm({ row, busy, onCancel, onSend }: {
                   {contacts.map(c => (
                     <option key={c.entryId} value={c.entryId}>
                       {c.fullName || `${c.firstName} ${c.lastName}`.trim()}
-                      {c.primary ? ' (primary)' : ''} — {c.email}
+                      {c.primary ? ' (primary)' : ''} · {c.email}
                     </option>
                   ))}
                 </select>
@@ -714,7 +714,7 @@ function InviteForm({ row, busy, onCancel, onSend }: {
               Cancel
             </button>
             <span className="editcard__status">
-              Copying records this invite as sent — it starts the 90-day clock whether or
+              Copying records this invite as sent. It starts the 90-day clock whether or
               not the email leaves.
             </span>
           </div>
@@ -735,7 +735,7 @@ function InviteForm({ row, busy, onCancel, onSend }: {
                 <button type="button" className="linkbtn" onClick={() => copy('url', minted.url)}>
                   Copy the link
                 </button>
-                {copied === 'url' && <span className="muted"> — copied</span>}
+                {copied === 'url' && <span className="muted">· copied</span>}
               </p>
             </div>
             <div className="ef ef--wide">
@@ -745,7 +745,7 @@ function InviteForm({ row, busy, onCancel, onSend }: {
                 <button type="button" className="linkbtn" onClick={() => copy('subject', minted.subject)}>
                   Copy the subject
                 </button>
-                {copied === 'subject' && <span className="muted"> — copied</span>}
+                {copied === 'subject' && <span className="muted">· copied</span>}
               </p>
             </div>
             <div className="ef ef--wide">
@@ -755,7 +755,7 @@ function InviteForm({ row, busy, onCancel, onSend }: {
                 <button type="button" className="linkbtn" onClick={() => copy('body', minted.body)}>
                   Copy the body
                 </button>
-                {copied === 'body' && <span className="muted"> — copied</span>}
+                {copied === 'body' && <span className="muted">· copied</span>}
               </p>
             </div>
           </div>
@@ -790,10 +790,10 @@ function IntensityForm({ row, levels, busy, onCancel, onSave }: {
   return (
     <div className="editcard">
       <header className="editcard__head">
-        <h2>Support intensity — {row.companyName}</h2>
+        <h2>Support intensity: {row.companyName}</h2>
         <p className="note">
           How much ongoing guidance or hand-holding this client typically needs. Use it to
-          prioritise follow-ups and tailor the level of service — it sets how often the
+          prioritise follow-ups and tailor the level of service. It sets how often the
           queue asks about the account.
         </p>
       </header>
@@ -812,7 +812,7 @@ function IntensityForm({ row, levels, busy, onCancel, onSave }: {
             placeholder="leave blank to use the level"
             onChange={e => setOverride(e.target.value)} />
           <p className="ef__hint">
-            For the accounts that need their own rhythm — 7 for a weekly outreach client.
+            For the accounts that need their own rhythm, 7 for a weekly outreach client.
             Blank clears it.
           </p>
         </div>
@@ -830,7 +830,7 @@ function IntensityForm({ row, levels, busy, onCancel, onSave }: {
 
       <ul className="callout__list">
         {INTENSITY_DEFINITIONS.map(d => (
-          <li key={d.level}><strong>{d.level}</strong> — {d.what}</li>
+          <li key={d.level}><strong>{d.level}</strong> · {d.what}</li>
         ))}
       </ul>
 

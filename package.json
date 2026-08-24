@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Cobalt — static SPA deployed as a BlueStep GitSite (served at the domain root).",
+  "description": "Cobalt, static SPA deployed as a BlueStep GitSite (served at the domain root).",
   "scripts": {
     "dev": "vite",
     "extract-schema": "node scripts/extract-schema.mjs",

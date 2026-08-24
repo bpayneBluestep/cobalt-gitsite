@@ -1,12 +1,12 @@
 /*
- * "Open in Claude Code" — a claude:// deep link into Claude Desktop.
+ * "Open in Claude Code": a claude:// deep link into Claude Desktop.
  *
  * Following one of these hands the URL to the OS, which launches Claude Desktop (or
  * focuses it if already running) and opens its Claude Code area with `q` already typed
  * into the composer. It is NOT sent: the user reads it and presses Enter. Nothing here
  * executes on the server, and nothing reaches a model until that keypress.
  *
- * There are TWO schemes and they are not interchangeable — this is the trap worth
+ * There are TWO schemes and they are not interchangeable. This is the trap worth
  * remembering if the target ever changes again:
  *
  *   claude://code/new    Claude Desktop's Code area.  directory key: `folder`   ~14,000 chars
@@ -25,7 +25,7 @@
  *     means a long ticket produces a prompt that visibly stops rather than one that
  *     looks whole and isn't.
  *
- *   * If Claude Desktop isn't installed the link does nothing AT ALL — no error, no
+ *   * If Claude Desktop isn't installed the link does nothing AT ALL: no error, no
  *     navigation, no event to catch, so the page cannot detect it. The prompt is copied
  *     to the clipboard first for exactly that case: a dead click still leaves the user
  *     able to paste, which is recoverable.
@@ -48,7 +48,7 @@ export const promptMax = (target: ClaudeTarget = 'desktop'): number => SCHEMES[t
  * Open Claude Code with `prompt` pre-filled, and leave it on the clipboard.
  *
  * `dir` is an absolute path to open in; omitted, the session starts wherever Claude
- * Desktop last was. It is deliberately not defaulted here — a path that is right for
+ * Desktop last was. It is deliberately not defaulted here: a path that is right for
  * one person is wrong for everyone else.
  *
  * Returns true if the prompt had to be shortened, so the caller can say so.

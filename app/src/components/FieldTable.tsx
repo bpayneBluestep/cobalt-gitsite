@@ -41,7 +41,7 @@ export default function FieldTable({ fields, highlight }: { fields: Field[]; hig
               <td>
                 {f.dbColumnName
                   ? <code className="db">{f.dbColumnName}</code>
-                  : <span className="muted" title="Headers store no data, so they have no column">—</span>}
+                  : <span className="muted" title="Headers store no data, so they have no column">-</span>}
               </td>
               <td><CopyId value={f.fieldId} label="field id" /></td>
             </tr>

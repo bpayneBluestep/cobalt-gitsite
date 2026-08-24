@@ -13,12 +13,12 @@ import { useSession } from '../session'
  *
  * A person here carries both the Staff and User categories, with employment details on the
  * Employee Info form. Supervisor is picked from the same list, which is why it can only
- * ever point at a real user — the endpoint resolves the name from that record rather than
+ * ever point at a real user: the endpoint resolves the name from that record rather than
  * trusting what the browser sends, so the stored name is always the real one.
  *
  * ROLES ARE PERMISSIONS. Ticking one puts that person into a dynamic security group on the
  * platform; unticking removes them. That is why the roles editor sits behind Edit rather
- * than being an inline toggle in the table — a permission change should take a deliberate
+ * than being an inline toggle in the table: a permission change should take a deliberate
  * act, not a stray click on a row. Unticking "Currently employed" removes every role at
  * once, because each role's query also requires it.
  *
@@ -39,7 +39,7 @@ const LOGIN_URL = '/shared/login/login.jsp?desturl=' +
 /*
  * First and last name are two fields, because a person's name is two facts. The endpoint
  * can split a single string on the last space, but that guesses which words are the
- * surname — "Mary Anne van der Berg" has no rule worth trusting — so this form never asks
+ * surname - "Mary Anne van der Berg" has no rule worth trusting, so this form never asks
  * it to. Name is create-only; renaming afterwards is not offered here.
  */
 type Draft = Record<EmployeeFieldKey | 'firstName' | 'lastName', string> & { roles: string[] }
@@ -63,8 +63,8 @@ function draftOf(u: User): Draft {
 
 export default function Settings() {
   /*
-   * Everyone with a role can read the directory — the platform grants Reader on Employee
-   * Info to all six — but only Leadership holds Editor, so only Leadership sees the
+   * Everyone with a role can read the directory: the platform grants Reader on Employee
+   * Info to all six, but only Leadership holds Editor, so only Leadership sees the
    * controls that write. Anyone else gets the same page without them, rather than buttons
    * that fail on click.
    */
@@ -146,7 +146,7 @@ export default function Settings() {
     run('save', updateEmployee(editing as string, fields), 'Employee details saved.')
   }
 
-  /** Roles are a set — tick to add, untick to remove. */
+  /** Roles are a set: tick to add, untick to remove. */
   function toggleRole(role: string) {
     setDraft(x => ({
       ...x,
@@ -156,7 +156,7 @@ export default function Settings() {
     }))
   }
 
-  const dash = <span className="muted">—</span>
+  const dash = <span className="muted">-</span>
 
   return (
     <section className="page">
@@ -212,7 +212,7 @@ export default function Settings() {
 
           {!mayEdit && (
             <p className="board2__notice" role="status">
-              Read-only — the staff directory is visible to every role, but changing
+              Read-only: the staff directory is visible to every role, but changing
               employment details or roles needs Leadership.
             </p>
           )}
@@ -226,8 +226,8 @@ export default function Settings() {
                 <h2>{editing === 'new' ? 'New person' : 'Employee details'}</h2>
                 <p className="note">
                   {editing === 'new'
-                    ? 'This creates the person record only. A BlueStep login has to be issued from the platform’s account tooling — the scripting API cannot mint credentials.'
-                    : 'Type a phone number as digits — it formats itself.'}
+                    ? 'This creates the person record only. A BlueStep login has to be issued from the platform’s account tooling: the scripting API cannot mint credentials.'
+                    : 'Type a phone number as digits. It formats itself.'}
                 </p>
               </div>
               <div className="efgrid">
@@ -259,7 +259,7 @@ export default function Settings() {
                   <label htmlFor="u-dept">Department</label>
                   <select id="u-dept" value={draft.department}
                     onChange={e => setDraft(x => ({ ...x, department: e.target.value }))}>
-                    <option value="">—</option>
+                    <option value="">-</option>
                     {DEPARTMENTS.map(x => <option key={x} value={x}>{x}</option>)}
                   </select>
                 </div>
@@ -272,7 +272,7 @@ export default function Settings() {
                   <label htmlFor="u-type">Employment type</label>
                   <select id="u-type" value={draft.employmentType}
                     onChange={e => setDraft(x => ({ ...x, employmentType: e.target.value }))}>
-                    <option value="">—</option>
+                    <option value="">-</option>
                     {EMPLOYMENT_TYPES.map(x => <option key={x} value={x}>{x}</option>)}
                   </select>
                 </div>
@@ -302,7 +302,7 @@ export default function Settings() {
                 <fieldset className="ef ef--wide rolebox">
                   <legend className="rolebox__legend">Roles</legend>
                   <p className="rolebox__hint">
-                    What this person may see. Any number of roles — someone can be both a
+                    What this person may see. Any number of roles. Someone can be both a
                     Relate Engineer and Client Success. Each one grants access on the
                     platform, and unticking removes it.
                   </p>
@@ -317,7 +317,7 @@ export default function Settings() {
                   </div>
                   {draft.employed !== 'true' && draft.roles.length > 0 && (
                     <p className="rolebox__warn">
-                      Not currently employed — these roles are stored but grant nothing until
+                      Not currently employed. These roles are stored but grant nothing until
                       that box is ticked again.
                     </p>
                   )}
@@ -381,7 +381,7 @@ export default function Settings() {
                           <span className={'rolechips' + (u.employed ? '' : ' rolechips--inactive')}
                             title={u.employed
                               ? u.roles.join(', ')
-                              : `Not currently employed — ${u.roles.join(', ')} grant nothing`}>
+                              : `Not currently employed, ${u.roles.join(', ')} grant nothing`}>
                             {u.roles.map(r => <span className="rolechip" key={r}>{r}</span>)}
                           </span>
                         )
@@ -399,7 +399,7 @@ export default function Settings() {
                             ? `${u.name} now reports to ${rows.find(r => r.id === e.target.value)?.name || 'them'}.`
                             : `${u.name} no longer reports to anyone.`)}
                       >
-                        <option value="">—</option>
+                        <option value="">-</option>
                         {rows.filter(r => r.id !== u.id).map(r => (
                           <option key={r.id} value={r.id}>{r.name}</option>
                         ))}
@@ -426,7 +426,7 @@ export default function Settings() {
 
           <p className="panel__foot">
             A person here is both a Staff and a User record. Adding one creates the record,
-            both categories, and its employment details — issuing the BlueStep login is a
+            both categories, and its employment details: issuing the BlueStep login is a
             separate step in the platform’s account tooling, which no script can do.
             Roles take effect on the platform as soon as they are saved.
           </p>

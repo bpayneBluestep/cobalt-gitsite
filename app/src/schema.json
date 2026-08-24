@@ -546,7 +546,7 @@
     }
   ],
   "warnings": [
-    "get_record_type failed for 3 type(s) — \"Individual\", \"Staff\", \"Organization\" — so their forms are shown as \"attached\" without a required/optional distinction. The platform throws RequiredDynoMetaMaster…getRequiredMetaMasters() is null for any type with no required form, including the built-in Individual and Organization. Structure is unaffected: it comes from the relationship graph.",
-    "3 form(s) are referenced by a record type but missing from list_forms — \"Name and E-mail\", \"Organization\", \"Company Info\". Recovered from the record types' baseForm/allForms. A base form in particular can be absent from that list."
+    "get_record_type failed for 3 type(s), \"Individual\", \"Staff\", \"Organization\", so their forms are shown as \"attached\" without a required/optional distinction. The platform throws RequiredDynoMetaMaster…getRequiredMetaMasters() is null for any type with no required form, including the built-in Individual and Organization. Structure is unaffected: it comes from the relationship graph.",
+    "3 form(s) are referenced by a record type but missing from list_forms, \"Name and E-mail\", \"Organization\", \"Company Info\". Recovered from the record types' baseForm/allForms. A base form in particular can be absent from that list."
   ]
 }

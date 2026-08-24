@@ -7,7 +7,7 @@ import { useRecord } from './CompanyRecord'
 /*
  * The Info tab: the record's base form, 1:1 with Company Info on the platform.
  *
- * Follows the eccrm pattern — render the live values as inputs, send ONLY the fields
+ * Follows the eccrm pattern: render the live values as inputs, send ONLY the fields
  * the user actually changed, and re-render from the record the server echoes back
  * rather than from what we hoped we sent.
  */
@@ -35,8 +35,8 @@ function changedKeys(draft: Draft, saved: Company): Partial<Record<CompanyFieldK
  * There is no CRM owner card here, and its absence is the point.
  *
  * A company used to carry one "owner" that every "Mine" filter read. That was a fiction:
- * sales ownership is a per-deal question — one account can hold a new-business deal for
- * one rep and an upsell for another — and flattening it to a single name on the company
+ * sales ownership is a per-deal question: one account can hold a new-business deal for
+ * one rep and an upsell for another, and flattening it to a single name on the company
  * made every CRM screen agree on something untrue. Ownership now lives on the deal
  * (see DealEditor), and the CRM scopes on that.
  *
@@ -104,12 +104,12 @@ export default function CompanyInfo() {
 
         {!mayEdit && (
           <p className="callout callout--plain">
-            Read-only — engineers and Accounting can see a client's details but not change
+            Read-only: engineers and Accounting can see a client's details but not change
             them. Leadership, Sales and Client Success own this record.
           </p>
         )}
 
-        {/* One fieldset, one `disabled` — see DealEditor for why this beats a flag on
+        {/* One fieldset, one `disabled`. See DealEditor for why this beats a flag on
             every input. */}
         <fieldset className="efgrid efgrid--fs" disabled={!mayEdit}>
           {COMPANY_FIELDS.map(f => (

@@ -7,7 +7,7 @@ import { useRecord } from './CompanyRecord'
 /*
  * The Tickets tab of a company record.
  *
- * A child route, so the company's name, facts and tab strip stay above it — the board is
+ * A child route, so the company's name, facts and tab strip stay above it: the board is
  * a section of the record, not a place you go instead of it.
  *
  * The list is resolved through `clientList`, which returns the client's list or creates
@@ -43,7 +43,7 @@ export default function ClientTickets() {
   useEffect(load, [load])
 
   // After an add or delete, re-read just this list's tickets rather than
-  // re-resolving the list itself — nothing about the list changed. The id is passed
+  // re-resolving the list itself. Nothing about the list changed. The id is passed
   // in so this doesn't close over a stale state.
   const reloadTickets = useCallback((listId: string) => {
     getTickets({ listId })
@@ -51,7 +51,7 @@ export default function ClientTickets() {
       .catch(() => load())
   }, [load])
 
-  // Every ticket write returns the whole ticket, re-read server-side — so an edit
+  // Every ticket write returns the whole ticket, re-read server-side, so an edit
   // swaps that one row in place instead of costing another round trip for the list.
   const patchTicket = useCallback((updated: Ticket) => {
     setState(s => (s.phase === 'ready'

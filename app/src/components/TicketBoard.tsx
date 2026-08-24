@@ -14,7 +14,7 @@ export const ticketPath = (t: Ticket): string =>
   `/tickets/${t.ticketNumber === null ? t.entryId : t.ticketNumber}`
 
 /*
- * The ticket board for one list — the Cobalt port of beh's "Clickup Killer".
+ * The ticket board for one list: the Cobalt port of beh's "Clickup Killer".
  *
  * Deliberately the same shape as that tool: Open / Ready / Current / Completed
  * tabs over the same status vocabulary, a table grouped by status (only when a
@@ -24,10 +24,10 @@ export const ticketPath = (t: Ticket): string =>
  * One difference, and it's an improvement rather than a shortcut: beh fetches per
  * tab and asks the server for counts separately. A Cobalt list is small and comes
  * back in a single `tickets` call, so tabs, counts and filters are all computed
- * here — four round trips become one, and switching tabs is instant.
+ * here: four round trips become one, and switching tabs is instant.
  *
  * The board owns the table and the create form. A ticket itself is a PAGE, at
- * /tickets/<number> — so it can be linked to and sent to someone. A row is a real
+ * /tickets/<number>, so it can be linked to and sent to someone. A row is a real
  * link, which also means middle-click and "open in new tab" work.
  */
 
@@ -35,7 +35,7 @@ export const ticketPath = (t: Ticket): string =>
  * Only the fields the create form collects; the rest are set from the ticket page.
  *
  * Sprint is not among them any more. A sprint is planned on the sprint board, against
- * a roster and a capacity — typing one here was a way to put work into a week without
+ * a roster and a capacity: typing one here was a way to put work into a week without
  * ever looking at whether the week had room for it.
  */
 type NewDraft = Pick<Record<TicketFieldKey, string>, 'title' | 'status' | 'priority' | 'dueDate'>
@@ -46,7 +46,7 @@ const EMPTY_DRAFT: NewDraft = {
   accountableId: '', responsibleId: '',
 }
 
-/** Which tab a status belongs to — beh's `tabOf`, unchanged. */
+/** Which tab a status belongs to: beh's `tabOf`, unchanged. */
 function tabOf(status: string): string {
   for (const t of TICKET_TABS) if ((t.statuses as readonly string[]).indexOf(status || 'Open') >= 0) return t.key
   return 'open'
@@ -67,7 +67,7 @@ export default function TicketBoard({
 }) {
   /*
    * Engineers, Client Success and Leadership work tickets. Sales and Accounting read them
-   * — Sales for context before a call, Accounting for the hours behind a bill — and must
+   * Sales for context before a call, Accounting for the hours behind a bill, and must
    * not be able to move somebody else's work. The board is the same board either way; it
    * just loses the controls that write.
    */
@@ -115,7 +115,7 @@ export default function TicketBoard({
       if (fResponsible === '__none' && t.responsibleName) return false
       if (fResponsible && fResponsible !== '__none' && !t.responsibleName.toLowerCase().includes(fResponsible.toLowerCase())) return false
       if (!q) return true
-      // Details is markup — search its text, so a query can't match a tag name. The
+      // Details is markup: search its text, so a query can't match a tag name. The
       // retired free-text assignee stays searchable so an old ticket still turns up
       // under the name it was originally filed against.
       const haystack = [
@@ -134,7 +134,7 @@ export default function TicketBoard({
   // children fold into their parent and the parent carries a 3/5 chip you can open.
   //
   // Folded only when the PARENT is also visible in this tab and filter. A subtask whose
-  // parent is filtered away stands on its own with a crumb back — the alternative is
+  // parent is filtered away stands on its own with a crumb back: the alternative is
   // work vanishing from a board because of where its parent happens to sit, which is
   // exactly the bug this is meant to avoid.
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
@@ -163,7 +163,7 @@ export default function TicketBoard({
     [visible, visibleIds],
   )
 
-  // Group by status only when the tab holds more than one — beh's rule exactly.
+  // Group by status only when the tab holds more than one: beh's rule exactly.
   const groups = useMemo(() => {
     const present = TICKET_STATUSES.filter(s => rows.some(t => (t.status || 'Open') === s))
     if (present.length <= 1) return [{ status: '', rows: rows.slice().sort(byPriority) }]
@@ -218,10 +218,10 @@ export default function TicketBoard({
       .finally(() => setBusy(false))
   }
 
-  const dash = <span className="muted">—</span>
+  const dash = <span className="muted">-</span>
 
   /**
-   * One row of the table — a top-level ticket, or one of its subtasks indented under it.
+   * One row of the table: a top-level ticket, or one of its subtasks indented under it.
    *
    * The same renderer for both so a subtask is visibly the same KIND of thing as its
    * parent: same columns, same status control, its own link. That is the whole claim
@@ -231,7 +231,7 @@ export default function TicketBoard({
     const est = t.estHours
     const logged = t.loggedHours || 0
     const over = est !== null && est > 0 && logged > est
-    // A subtask rendered on its own — parent filtered out of this view — says whose it
+    // A subtask rendered on its own, parent filtered out of this view: says whose it
     // is, so it never reads as an unrelated ticket that happens to be small.
     const strayFrom = !child && t.isSubtask && t.parentNumber !== null ? t.parentNumber : null
 
@@ -244,7 +244,7 @@ export default function TicketBoard({
       >
         <td className="tickets__num">
           {t.ticketNumber === null
-            ? <span className="muted">—</span>
+            ? <span className="muted">-</span>
             : <Link className="tnum tnum--link" to={ticketPath(t)}>#{t.ticketNumber}</Link>}
         </td>
         <th scope="row">
@@ -299,7 +299,7 @@ export default function TicketBoard({
             <span className="tvs" data-over={over ? '' : undefined}>
               {logged ? formatHours(logged) : '0h'}
               <span className="tvs__sep">/</span>
-              <span className="tvs__est">{est === null ? '—' : formatHours(est)}</span>
+              <span className="tvs__est">{est === null ? '-' : formatHours(est)}</span>
             </span>
           ) : dash}
         </td>

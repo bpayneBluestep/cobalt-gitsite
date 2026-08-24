@@ -8,11 +8,11 @@ import { useSession } from '../session'
 import { todayISO, whenLabel } from '../lib/time'
 
 /*
- * Home — what today asks of you.
+ * Home: what today asks of you.
  *
  * An inbox, not a dashboard. The CRM already has a dashboard and Reports will be more of
  * one; if this page grows charts and company totals it becomes a worse copy of a page that
- * exists. So there are no charts here, no company-wide figures and no trends — every line
+ * exists. So there are no charts here, no company-wide figures and no trends: every line
  * is something to act on, and most of them can be acted on without leaving.
  *
  * Three things this page does deliberately:
@@ -20,7 +20,7 @@ import { todayISO, whenLabel } from '../lib/time'
  *   1. **It composes itself from what you have, not the role you hold.** Every block
  *      renders only when its list has something in it. An engineer owns no deals, so the
  *      deals block is absent; Accounting owns no tickets, so that one is. Six roles, one
- *      layout, no role checks — and it stays right for someone holding several.
+ *      layout, no role checks, and it stays right for someone holding several.
  *
  *   2. **It can be empty, and empty reads as success.** "Nothing owed" is a real answer
  *      and the page is allowed to be short. A page that always looks busy gets ignored
@@ -38,7 +38,7 @@ type State =
 const LOGIN_URL = '/shared/login/login.jsp?desturl=' +
   encodeURIComponent(window.location.pathname + window.location.search)
 
-/** "2h 15m" — how long a timer has been running. */
+/** "2h 15m": how long a timer has been running. */
 function mins(total: number): string {
   const n = Math.max(0, Math.round(total))
   if (n < 60) return `${n}m`
@@ -122,30 +122,30 @@ export default function Home() {
 
   /*
    * Clearing a line without leaving the page. The follow-up queue proved this pattern
-   * works — a list you have to navigate away from to act on is a list people stop
-   * working — so Home inherits it.
+   * works: a list you have to navigate away from to act on is a list people stop
+   * working, so Home inherits it.
    */
   function clear(o: OwedItem) {
     const id = `${o.kind}:${o.entryId || o.companyId}`
     if (o.kind === 'deal') {
-      run(id, completeFollowUp(o.companyId!, o.entryId, {}), `${o.title} — done.`)
+      run(id, completeFollowUp(o.companyId!, o.entryId, {}), `${o.title}: done.`)
       return
     }
     if (o.kind === 'prospect') {
       // A prospect has no deal to log against, so "done" is the pair of writes
       // Prospecting makes: touched today, nothing scheduled next.
       run(id, updateCompany(o.companyId!, { lastTouch: todayISO(), nextFollowUp: '' }),
-        `${o.title} — marked touched.`)
+        `${o.title}: marked touched.`)
       return
     }
-    // A ticket is not "done" from here — that is a status change with consequences, and
+    // A ticket is not "done" from here. That is a status change with consequences, and
     // guessing at it from an inbox is exactly the sort of shortcut that loses work.
   }
 
   const firstName = (session?.fullName || '').split(/[,\s]+/).filter(Boolean)[0] || ''
 
   /*
-   * Nothing pointed at this person at all — as opposed to nothing pointed at them TODAY.
+   * Nothing pointed at this person at all: as opposed to nothing pointed at them TODAY.
    * The two need different words in both places they appear, or the headline reassures
    * while the panel below it says the opposite.
    */
@@ -225,7 +225,7 @@ export default function Home() {
                 <h2>Owed</h2>
                 <span className="panel__n">{d.owed.length}</span>
                 <span className="panel__note">
-                  Deals, prospects and tickets together — because what you want is what is late.
+                  Deals, prospects and tickets together, because what you want is what is late.
                 </span>
               </header>
               <ul className="hlist">
@@ -269,18 +269,18 @@ export default function Home() {
               </ul>
               <p className="panel__foot">
                 <Link className="inlink" to="/crm/follow-ups">Work the follow-up queue</Link>
-                {' — it has the snooze options and the contact details.'}
+                {'. It has the snooze options and the contact details.'}
               </p>
             </section>
           ) : (
             /*
-             * Nothing owed — the state the page is built to be able to reach. Stated
+             * Nothing owed: the state the page is built to be able to reach. Stated
              * plainly and not dressed up as a congratulation: it is a status, and its
              * value is that it is trustworthy.
              *
              * But "you have cleared your work" and "nothing has been assigned to you"
              * are opposite facts that look identical from here, and getting them
-             * confused matters most for the person it happens to first — someone new,
+             * confused matters most for the person it happens to first. Someone new,
              * on their first sign-in, being told they are all caught up. So the two are
              * distinguished by whether the caller holds ANYTHING at all.
              */
@@ -288,7 +288,7 @@ export default function Home() {
               <section className="hclear" data-new="">
                 <p className="hclear__head">Nothing is assigned to you yet</p>
                 <p>
-                  This page fills in as work becomes yours — tickets where you are the
+                  This page fills in as work becomes yours: tickets where you are the
                   engineer or the one answerable, deals you own, and the follow-ups on
                   them. It is empty because there is nothing pointed at you, not because
                   you are finished.
@@ -457,7 +457,7 @@ export default function Home() {
 
           <p className="panel__foot">
             Built from {d.listsScanned} list{d.listsScanned === 1 ? '' : 's'} and{' '}
-            {d.companiesScanned} compan{d.companiesScanned === 1 ? 'y' : 'ies'} in one pass —
+            {d.companiesScanned} compan{d.companiesScanned === 1 ? 'y' : 'ies'} in one pass,
             tickets and deals are form entries, so there is no global query over either.
           </p>
         </>

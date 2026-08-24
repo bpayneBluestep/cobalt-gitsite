@@ -9,7 +9,7 @@ import { isPhoneOk } from '../lib/phone'
 /*
  * The people at one company.
  *
- * A multi-entry form rather than person records — these are individuals in the
+ * A multi-entry form rather than person records. These are individuals in the
  * context of this company, and a separate record per person would mean a second
  * identity to keep in step for no gain.
  *
@@ -110,7 +110,7 @@ export default function ContactsPanel({ companyId, onMirror }: {
     run('save', updateContact(companyId, saved.entryId, diff), 'Contact saved.')
   }
 
-  const dash = <span className="muted">—</span>
+  const dash = <span className="muted">-</span>
 
   return (
     <section className="tsec">
@@ -146,7 +146,7 @@ export default function ContactsPanel({ companyId, onMirror }: {
             <p className="note">
               {editing === 'new' && data && data.total === 0
                 ? 'The first contact at a company becomes the primary automatically.'
-                : 'Type phone numbers as digits — they format themselves.'}
+                : 'Type phone numbers as digits. They format themselves.'}
             </p>
           </div>
           <div className="efgrid">
@@ -169,7 +169,7 @@ export default function ContactsPanel({ companyId, onMirror }: {
               <label htmlFor="ct-role">Deal role</label>
               <select id="ct-role" value={draft.role}
                 onChange={e => setDraft(d => ({ ...d, role: e.target.value }))}>
-                <option value="">—</option>
+                <option value="">-</option>
                 {CONTACT_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
             </div>

@@ -6,7 +6,7 @@ import type { Capability } from '../api'
  * The tab strip on a company.
  *
  * Each tab is a real child route under /clients/<id>, so all of them render inside the
- * company's own shell — the name, the facts and this strip stay put while the panel
+ * company's own shell: the name, the facts and this strip stay put while the panel
  * below changes. Tickets used to be a page of its own and lost that header, which made
  * it feel like leaving the record rather than moving around inside it.
  *
@@ -19,13 +19,13 @@ import type { Capability } from '../api'
  *     upsells, which is where most growth comes from and which previously had nowhere
  *     to live except the shared pipeline board.
  *
- * A Former Client keeps Tickets — the history of what was done for them is exactly what
+ * A Former Client keeps Tickets: the history of what was done for them is exactly what
  * you want when they come back, and hiding it would lose it.
  *
  * Two independent tests, and a tab needs to pass both. `when` asks what the company IS;
  * `needs` asks what the VIEWER may see. Success is the first tab where they differ: an
  * engineer has every reason to open a client record and no business reading its account
- * health, so the tab is not offered to them — the same rule the section nav follows.
+ * health, so the tab is not offered to them: the same rule the section nav follows.
  */
 
 interface Tab {

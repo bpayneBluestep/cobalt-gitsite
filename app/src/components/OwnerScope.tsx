@@ -15,11 +15,11 @@ import type { User } from '../api'
  * one click each. Picking a named colleague is the rarer, more deliberate act, so it
  * gets the slower control.
  *
- * The whole thing hides when there is only one person who owns anything — a select with
+ * The whole thing hides when there is only one person who owns anything: a select with
  * one name in it is a control that cannot do anything.
  *
  * `store` picks which memory the control reads and writes. Client Success keeps its own,
- * because it opens on Everyone where the CRM opens on Mine — see lib/scope.ts.
+ * because it opens on Everyone where the CRM opens on Mine. See lib/scope.ts.
  */
 
 /** Read the shared scope and re-render when anything else changes it. */
@@ -52,7 +52,7 @@ export default function OwnerScope({
   const myId = session?.recordId || ''
   const mine = isMine(scope, myId)
   const everyone = scope === 'everyone'
-  // Whatever is selected that is neither Mine nor Everyone — a named colleague.
+  // Whatever is selected that is neither Mine nor Everyone: a named colleague.
   const namedId = mine || everyone ? '' : scope
 
   const others = users.filter(u => u.id !== myId)
@@ -116,7 +116,7 @@ export function ScopeNote({
     if (!myId) {
       return (
         <p className="scope__note" role="status">
-          Your login has no staff record behind it, so “Mine” cannot be worked out —
+          Your login has no staff record behind it, so “Mine” cannot be worked out,
           these are everyone’s.
         </p>
       )

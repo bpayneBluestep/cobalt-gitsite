@@ -2,15 +2,15 @@ import { NavLink } from 'react-router-dom'
 import { useSession } from '../session'
 
 /*
- * Client Success's own pages — the same sub-nav shape the CRM uses.
+ * Client Success's own pages: the same sub-nav shape the CRM uses.
  *
  * The Queue is first and is the point of the section: it answers "who do I ring today".
  * Surveys and Quarter are both looking backwards, one at what clients said and one at
  * what we did about it, and neither is a screen anyone opens on a Monday morning.
  *
  * Surveys is hidden without `viewSurveys` rather than shown-and-refused. It is the one
- * page in the section that a role holding `viewCs` may genuinely not reach — Accounting
- * can see health, not the words a client typed — so offering the tab would be offering
+ * page in the section that a role holding `viewCs` may genuinely not reach: Accounting
+ * can see health, not the words a client typed, so offering the tab would be offering
  * a NoAccess screen.
  */
 

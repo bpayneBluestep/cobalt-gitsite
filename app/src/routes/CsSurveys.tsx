@@ -10,13 +10,13 @@ import CsNav from '../components/CsNav'
  * What clients actually said.
  *
  * Numbers and tables, no chart. At nine or twenty-three responses a trend line is
- * decoration — it draws a shape out of noise and invites a conclusion the data cannot
+ * decoration. It draws a shape out of noise and invites a conclusion the data cannot
  * support. So every figure here carries its n, and an empty dimension renders as an em
  * dash rather than a reassuring zero.
  *
  * Responses are identified on purpose: anonymity and actionability are mutually
  * exclusive, and with a hundred high-touch accounts a name is worth more than a trend.
- * Which is why the words are behind `viewSurveys` — this whole page is.
+ * Which is why the words are behind `viewSurveys`. This whole page is.
  */
 
 type State =
@@ -43,7 +43,7 @@ function Kpi({ label, value, note, tone }: {
 
 /** A score as a pill, bucketed the way NPS buckets: 9-10 promoter, 7-8 passive, else detractor. */
 function Score({ value }: { value: number | null }) {
-  if (value === null || value === undefined) return <span className="muted">—</span>
+  if (value === null || value === undefined) return <span className="muted">-</span>
   const tone = value >= 9 ? 'good' : value >= 7 ? 'warn' : 'bad'
   return <span className="pill" data-tone={tone}>{value}</span>
 }
@@ -76,7 +76,7 @@ export default function CsSurveys() {
         <p className="eyebrow">Client Success</p>
         <h1>Surveys</h1>
         <p className="page__sub-text">
-          Four questions, four times a year, answered with a name attached — so a 3/10 is
+          Four questions, four times a year, answered with a name attached, so a 3/10 is
           a phone call tomorrow rather than a dot on a chart.
         </p>
       </header>
@@ -125,7 +125,7 @@ export default function CsSurveys() {
                 <Kpi
                   key={dim.key}
                   label={dim.label}
-                  value={nps === null ? '—' : `NPS ${nps > 0 ? '+' : ''}${nps}`}
+                  value={nps === null ? '-' : `NPS ${nps > 0 ? '+' : ''}${nps}`}
                   note={`n=${n}`}
                   tone={npsTone(nps)}
                 />
@@ -153,7 +153,7 @@ export default function CsSurveys() {
                       out and none have come back yet. Nothing is wrong until a quarter closes
                       with a response rate near zero.</>
                   : <>No invites have been sent. Copy one from the{' '}
-                      <Link className="inlink" to="/cs">queue</Link> — Cobalt writes the email
+                      <Link className="inlink" to="/cs">queue</Link>: Cobalt writes the email
                       and you send it.</>}
               </p>
             </div>
@@ -199,7 +199,7 @@ export default function CsSurveys() {
                         <Fragment key={r.entryId}>
                           <tr className="rowlink">
                             <th scope="row" className="nowrap">
-                              {(r.submittedAt || '').slice(0, 10) || '—'}
+                              {(r.submittedAt || '').slice(0, 10) || '-'}
                             </th>
                             <td>
                               {r.companyId
@@ -256,7 +256,7 @@ export default function CsSurveys() {
               </header>
               <p className="panel__note">
                 Recorded when the invite was copied. An invite copied and never sent still
-                counts — the response rate is what exposes that.
+                counts: the response rate is what exposes that.
               </p>
               <div className="tablewrap">
                 <table className="fields compact">
@@ -271,7 +271,7 @@ export default function CsSurveys() {
                   <tbody>
                     {d.invites.map(i => (
                       <tr key={i.entryId}>
-                        <th scope="row" className="nowrap">{i.sentAt || '—'}</th>
+                        <th scope="row" className="nowrap">{i.sentAt || '-'}</th>
                         <td>
                           {i.companyId
                             ? <Link className="rowlink__a" to={`/clients/${i.companyId}/success`}>
@@ -283,7 +283,7 @@ export default function CsSurveys() {
                           {i.contactName || <span className="muted">unnamed</span>}
                           {i.sentTo ? ` · ${i.sentTo}` : ''}
                         </td>
-                        <td>{i.sentBy || <span className="muted">—</span>}</td>
+                        <td>{i.sentBy || <span className="muted">-</span>}</td>
                       </tr>
                     ))}
                   </tbody>

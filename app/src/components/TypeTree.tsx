@@ -15,7 +15,7 @@ function TypeRow({ t, depth }: { t: RecordType; depth: number }) {
         <span className="typerow__mark" aria-hidden="true" />
         <span className="typerow__name">{t.displayName}</span>
         {!t.inList && (
-          <span className="tag tag--warn" title="Exists, but the platform's record-type list omits it — no base form wired yet">
+          <span className="tag tag--warn" title="Exists, but the platform's record-type list omits it: no base form wired yet">
             unwired
           </span>
         )}

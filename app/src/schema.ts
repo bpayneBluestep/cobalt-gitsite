@@ -37,7 +37,7 @@ export interface RecordType {
   displayOrder: number
   parents: string[]
   subTypes: string[]
-  /** The type's identity form. Not a parent/child link — read separately. */
+  /** The type's identity form. Not a parent/child link. Read separately. */
   baseFormId: string | null
   /** Label of the field used as the record's title. */
   displayFieldLabel: string | null
@@ -45,7 +45,7 @@ export interface RecordType {
   optionalForms: string[]
   /** Forms linked to this type whose requirement the platform wouldn't report. */
   attachedForms: string[]
-  /** False when the type exists but list_record_types omits it — the signature of
+  /** False when the type exists but list_record_types omits it: the signature of
    *  a record type with no base form wired yet. */
   inList: boolean
   status: 'ok' | 'partial'
@@ -80,7 +80,7 @@ const byName = (a: { displayName: string }, b: { displayName: string }) =>
 
 export const baseTypes = schema.recordTypes.filter(t => t.baseType).sort(byName)
 
-/** Categories whose parent link never resolved — the platform lookup failed for
+/** Categories whose parent link never resolved: the platform lookup failed for
  *  them or for their base type, so we cannot place them in the tree. Surfaced in
  *  the UI rather than hidden, so the gap is visible instead of looking like
  *  "this org has no staff type". */

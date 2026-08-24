@@ -14,7 +14,7 @@ import { useSession } from '../session'
  * Create or edit one deal.
  *
  * Used from both the Pipeline board and Prospecting's "Start a deal", because they
- * are the same act at different moments — the second is just the first deal against
+ * are the same act at different moments: the second is just the first deal against
  * a company that had none.
  *
  * Won and Lost are separate buttons rather than two more entries in the phase
@@ -22,7 +22,7 @@ import { useSession } from '../session'
  * a loss reason when lost, and it is the one change people want to be sure about
  * before it lands.
  *
- * The history and the follow-up are NOT fields here — they live in `DealActivity`
+ * The history and the follow-up are NOT fields here. They live in `DealActivity`
  * below, and they save themselves. A note is not a draft: you do not write "spoke to
  * Sarah" and then decide whether to keep it, and holding it in an unsaved form is how
  * it gets lost when the card closes.
@@ -34,12 +34,12 @@ import { useSession } from '../session'
 type WriteKey = DealFieldKey
 
 /**
- * The fields the FORM edits — narrower than `DealFieldKey` on purpose:
+ * The fields the FORM edits: narrower than `DealFieldKey` on purpose:
  *
  *   * `nextStep` / `nextFollowUp` belong to the follow-up control below. Two controls
  *     for one value drift the moment both are on screen.
  *   * `closed` is owned by the Won / Lost / Reopen buttons. Not a checkbox, because
- *     closing a deal is not the same kind of act as editing one — a loss needs its
+ *     closing a deal is not the same kind of act as editing one: a loss needs its
  *     reason, and it is the change people want to be sure about before it lands.
  */
 type EditableKey = Exclude<DealFieldKey, 'nextStep' | 'nextFollowUp' | 'closed'>
@@ -81,12 +81,12 @@ function changedFields(draft: Draft, saved: Deal): Partial<Record<EditableKey, s
 }
 
 /**
- * "23 days · 23 in phase" — whether the deal is progressing.
+ * "23 days · 23 in phase", whether the deal is progressing.
  *
  * Two numbers because they answer different questions, and the second one is the one
  * that matters: a deal can be young and stuck, or old and moving steadily. "at least"
  * appears when the phase entry date is the same as the open date, which means either it
- * never moved or the entry predates the field — both true, neither precise.
+ * never moved or the entry predates the field. Both true, neither precise.
  */
 function AgeLine({ deal }: { deal: Deal }) {
   if (deal.ageDays === null) return null
@@ -126,20 +126,20 @@ export default function DealEditor({
 }) {
   const isNew = !deal
   const [draft, setDraft] = useState<Draft>(() =>
-    deal ? draftOf(deal) : { ...EMPTY, title: `${companyName} — ` })
+    deal ? draftOf(deal) : { ...EMPTY, title: `${companyName} - ` })
   const [busy, setBusy] = useState('')
   const [failure, setFailure] = useState('')
   const [closing, setClosing] = useState<'' | 'Won' | 'Lost'>('')
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   useEffect(() => {
-    setDraft(deal ? draftOf(deal) : { ...EMPTY, title: `${companyName} — ` })
+    setDraft(deal ? draftOf(deal) : { ...EMPTY, title: `${companyName} - ` })
     setFailure(''); setClosing(''); setConfirmDelete(false)
   }, [deal ? deal.entryId : 'new', companyId])
 
   /*
-   * Accounting and Client Success can SEE deals — they need to know what a client bought
-   * and what it bills — but only Leadership and Sales may change one. Rather than a second
+   * Accounting and Client Success can SEE deals. They need to know what a client bought
+   * and what it bills, but only Leadership and Sales may change one. Rather than a second
    * read-only component, the same card goes inert: the fields disable together and the
    * buttons that write are not rendered at all.
    */
@@ -186,8 +186,8 @@ export default function DealEditor({
    * Close the deal. A loss needs its reason, which is why this is its own step.
    *
    * `closed: 'true'` matters as much as the phase, and its absence was a real bug: phase
-   * and `closed` are separate fields on purpose — the phase records how far a deal got,
-   * the boolean records that it is over — and setting only the first left twenty deals
+   * and `closed` are separate fields on purpose: the phase records how far a deal got,
+   * the boolean records that it is over, and setting only the first left twenty deals
    * that were plainly finished still sitting in the forecast, on no board column, and
    * absent from the won/lost log. Both, together, always.
    *
@@ -199,7 +199,7 @@ export default function DealEditor({
   function closeDeal(outcome: 'Won' | 'Lost') {
     if (!deal || busy) return
     if (outcome === 'Lost' && !draft.lossReason) {
-      setFailure('Pick a loss reason — a lost deal with no reason teaches nobody anything.')
+      setFailure('Pick a loss reason: a lost deal with no reason teaches nobody anything.')
       return
     }
     const fields: Partial<Record<WriteKey, string>> = { closed: 'true' }
@@ -212,8 +212,8 @@ export default function DealEditor({
    * Put a decided deal back on the board.
    *
    * Clearing `closed` is enough for a LOST deal: it kept the phase it reached, so it
-   * reappears exactly where it stopped. A WON deal has no such phase to return to — Won
-   * is not a board column — so it also needs one, and Agreements is the honest answer
+   * reappears exactly where it stopped. A WON deal has no such phase to return to: Won
+   * is not a board column, so it also needs one, and Agreements is the honest answer
    * rather than a guess: it is by definition the stage a deal is at immediately before
    * being won.
    */
@@ -236,10 +236,10 @@ export default function DealEditor({
   return (
     <div className="editcard dealcard">
       <div className="editcard__head">
-        <h2>{isNew ? `New deal — ${companyName}` : draft.title || 'Deal'}</h2>
+        <h2>{isNew ? `New deal: ${companyName}` : draft.title || 'Deal'}</h2>
         <p className="note">
           {isNew
-            ? 'It inherits the company’s source and owner unless you set them here — and falls back to you.'
+            ? 'It inherits the company’s source and owner unless you set them here, and falls back to you.'
             : `${companyName}${deal!.createdAt ? ` · opened ${deal!.createdAt}` : ''}` +
               `${deal!.closedAt ? ` · closed ${deal!.closedAt}` : ''}`}
         </p>
@@ -252,7 +252,7 @@ export default function DealEditor({
         <div className="callout callout--plain dealcard__decided">
           <p>
             <strong>{deal!.isWon ? 'Won' : `Lost at ${deal!.phase}`}</strong>
-            {deal!.isLost && deal!.lossReason ? ` — ${deal!.lossReason}` : ''}
+            {deal!.isLost && deal!.lossReason ? `: ${deal!.lossReason}` : ''}
             {deal!.closedAt ? ` · ${deal!.closedAt}` : ''}
             {'. '}It is out of the forecast and off the board.
           </p>
@@ -268,7 +268,7 @@ export default function DealEditor({
 
       {/*
         Not closed, but sitting at a phase no board column holds. The pipeline counts it
-        and cannot show it, so the fix belongs wherever the deal is open — here included.
+        and cannot show it, so the fix belongs wherever the deal is open. Here included.
       */}
       {!isNew && deal!.isOpen && deal!.phase === 'Won' && (
         <div className="callout callout--warn">
@@ -290,7 +290,7 @@ export default function DealEditor({
 
       {!mayEdit && (
         <p className="callout callout--plain">
-          Read-only — deals are visible to your role but only Leadership or Sales can change
+          Read-only: deals are visible to your role but only Leadership or Sales can change
           them.
         </p>
       )}
@@ -363,7 +363,7 @@ export default function DealEditor({
         <div className="ef">
           <label htmlFor="d-source">Lead source</label>
           <select id="d-source" value={draft.leadSource} onChange={e => edit('leadSource', e.target.value)}>
-            <option value="">—</option>
+            <option value="">-</option>
             {sources.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>

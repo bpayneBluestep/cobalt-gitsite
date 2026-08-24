@@ -5,19 +5,19 @@ import ThemeToggle from '../components/ThemeToggle'
 /*
  * The sign-in screen. Nothing else in Cobalt renders until this succeeds.
  *
- * Ported from the Program Portal's gate, with the same mechanism — a same-origin form
- * POST to the platform's login handler, then an authoritative re-probe of the session —
+ * Ported from the Program Portal's gate, with the same mechanism: a same-origin form
+ * POST to the platform's login handler, then an authoritative re-probe of the session,
  * and three things it did not have:
  *
  *   1. Microsoft and Google. The platform's own login page offers them; a gate that
  *      omitted them would just be a slower route to the same page. They are full-page
  *      redirects to the OAuth broker, because that is what an external identity provider
- *      requires — there is no in-page version of it.
+ *      requires. There is no in-page version of it.
  *   2. A working sign-out. The reference used `/shared/login/logout`, which 404s.
  *   3. The theme toggle, so the first screen is not the one place the app ignores it.
  *
  * The password is posted to this same BlueStep host and nowhere else. It is not sent to
- * the Maestro, not logged, and not held after the request — the two `useState` values are
+ * the Maestro, not logged, and not held after the request: the two `useState` values are
  * gone with the component.
  */
 
@@ -36,7 +36,7 @@ export default function LoginGate({ onAuthenticated }: { onAuthenticated: () => 
    * Kept apart from `error` because it is not a form error and retrying cannot clear it:
    * the credentials were right, and the account simply has no way into this app. Showing
    * it in the red "check your typing" slot would send someone hunting for a typo that
-   * isn't there — which is exactly what happened before this existed.
+   * isn't there, which is exactly what happened before this existed.
    */
   const [blocked, setBlocked] = useState('')
 
@@ -141,7 +141,7 @@ export default function LoginGate({ onAuthenticated }: { onAuthenticated: () => 
           {PROVIDERS.map(p => (
             <a className="login__provider" key={p.id} href={ssoLoginUrl(p.id)}>
               {/* The provider's own favicon, which is what the platform's login page
-                  uses. Decorative — the label already names it. */}
+                  uses. Decorative: the label already names it. */}
               <img src={p.favicon} alt="" width={16} height={16} />
               <span>Continue with {p.label}</span>
             </a>

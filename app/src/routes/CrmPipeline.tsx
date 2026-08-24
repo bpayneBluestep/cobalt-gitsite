@@ -10,7 +10,7 @@ import OwnerScope, { ScopeNote, useScope } from '../components/OwnerScope'
 import { useSession } from '../session'
 
 /*
- * The pipeline board — one column per open phase.
+ * The pipeline board: one column per open phase.
  *
  * Columns rather than a table because a phase is a position, and position is what a
  * board shows and a table hides. Each column carries its own count, MRR and weighted
@@ -38,7 +38,7 @@ const LOGIN_URL = '/shared/login/login.jsp?desturl=' +
  * Recompute a column's totals from the rows it now holds.
  *
  * Correct rather than approximate, and cheap: every deal in a column shares that
- * column's probability, so the weighted figure is just the column's MRR times it — which
+ * column's probability, so the weighted figure is just the column's MRR times it, which
  * is exactly what the server would return. A redacted column (money hidden for this
  * role) stays entirely null; summing zeros there would invent a total of nothing.
  */
@@ -65,7 +65,7 @@ function recount(col: PipelineColumn): PipelineColumn {
  * Move a deal between columns without waiting for the server.
  *
  * The card has to land where it was dropped immediately or the drag feels broken. The
- * server is still the authority — the reply replaces this — but a board that visibly
+ * server is still the authority, the reply replaces this, but a board that visibly
  * snaps back and then forward again reads as a bug even when it worked.
  */
 function moveLocally(data: Pipeline, deal: Deal, toPhase: string): Pipeline {
@@ -130,7 +130,7 @@ export default function CrmPipeline() {
   /*
    * Search filters what is already loaded rather than asking the server again.
    *
-   * The open pipeline is tens of deals, not thousands — it all arrived in one call. A
+   * The open pipeline is tens of deals, not thousands. It all arrived in one call. A
    * round trip per keystroke would make typing feel worse and would re-walk every
    * company server-side to answer a question the browser can already answer instantly.
    */
@@ -165,7 +165,7 @@ export default function CrmPipeline() {
     return null
   }, [d, openDeal])
 
-  /** Move a deal's phase — from the select, or from a drop. */
+  /** Move a deal's phase: from the select, or from a drop. */
   const movePhase = useCallback((deal: Deal, phase: string) => {
     if (busy || !mayEdit || phase === deal.phase) return
     setBusy(deal.entryId); setFailure(''); setNotice('')
@@ -195,7 +195,7 @@ export default function CrmPipeline() {
         <p className="eyebrow">CRM</p>
         <h1>Pipeline</h1>
         <p className="page__sub-text">
-          Open deals by phase. Weighted figures are MRR × the phase’s probability —
+          Open deals by phase. Weighted figures are MRR × the phase’s probability,
           a forecast, not a total.
         </p>
       </header>
@@ -256,14 +256,14 @@ export default function CrmPipeline() {
 
           {/*
             Named rather than quietly excluded. These deals are not closed, so they are
-            still in every forecast, and they are invisible on the board — the worst of
+            still in every forecast, and they are invisible on the board: the worst of
             both. Saying so is the only way anyone fixes them.
           */}
           {d.unplacedTotal > 0 && (
             <p className="board2__notice" role="status">
               {d.unplacedTotal} deal{d.unplacedTotal === 1 ? '' : 's'} sit{d.unplacedTotal === 1 ? 's' : ''} at{' '}
               {d.unplacedPhases.map(p => `${p.phase} (${p.count})`).join(', ')} without being
-              marked closed, so {d.unplacedTotal === 1 ? 'it has' : 'they have'} no column here —
+              marked closed, so {d.unplacedTotal === 1 ? 'it has' : 'they have'} no column here,
               and {d.unplacedTotal === 1 ? 'is' : 'are'} still counted in the forecast. Open{' '}
               {d.unplacedTotal === 1 ? 'it' : 'them'} from{' '}
               <Link className="inlink" to="/crm/closed">Won &amp; lost</Link> and tick the outcome.
@@ -272,7 +272,7 @@ export default function CrmPipeline() {
 
           {!maySeeMoney && (
             <p className="board2__notice" role="status">
-              Deal values are hidden — showing revenue needs Sales or Accounting. Everything
+              Deal values are hidden: showing revenue needs Sales or Accounting. Everything
               else on this board is what you would normally see.
             </p>
           )}
@@ -384,7 +384,7 @@ export default function CrmPipeline() {
                       {/*
                         Age on the card, because "is this moving" is the question a board
                         is for and the dates alone do not answer it. `≥` when the phase
-                        entry date is the deal's open date — either it never moved or the
+                        entry date is the deal's open date. Either it never moved or the
                         entry predates the field, and both are honestly "at least".
                       */}
                       <p className="dcard__age">
@@ -431,7 +431,7 @@ export default function CrmPipeline() {
                       <div className="dcard__move">
                         {/*
                           The accessible route to the same move as a drag. Not a fallback
-                          for a broken feature — a keyboard user has no other way to do
+                          for a broken feature: a keyboard user has no other way to do
                           the primary action on this page.
                         */}
                         <select
@@ -451,7 +451,7 @@ export default function CrmPipeline() {
           )}
 
           <p className="panel__foot">
-            Walked {d.companiesScanned} compan{d.companiesScanned === 1 ? 'y' : 'ies'} to build this —
+            Walked {d.companiesScanned} compan{d.companiesScanned === 1 ? 'y' : 'ies'} to build this,
             deals are form entries, so there is no global query over them.
             {mayEdit && ' Drag a card between columns, or use the select on it.'}
           </p>

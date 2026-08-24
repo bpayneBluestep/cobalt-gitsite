@@ -36,7 +36,7 @@ import UserMenu from './components/UserMenu'
  * A route nobody without the capability may open.
  *
  * Both halves matter. Hiding the nav item alone leaves the URL working, and a bookmarked
- * or pasted link is exactly how someone arrives at a page they should not see — so the
+ * or pasted link is exactly how someone arrives at a page they should not see, so the
  * route is checked too, not just the menu.
  *
  * This is presentation. The endpoint runs as the caller against the platform's form ACLs,
@@ -149,7 +149,7 @@ function Shell() {
 
         <div className="topbar__end">
           {can('viewSchema') && <ToolsMenu />}
-          {/* Identity, display mode and the way out, all behind one control — the same
+          {/* Identity, display mode and the way out, all behind one control: the same
               shape as the eccrm CRM's account menu. The standalone theme button that used
               to sit here moved inside it; the sign-in screen still has one, because you
               cannot open an account menu before you have an account. */}
@@ -159,7 +159,7 @@ function Shell() {
 
       <main>
         {/*
-          Signed in but holding no roles is not an error and not a login problem — it is a
+          Signed in but holding no roles is not an error and not a login problem. It is a
           real, correct state with its own answer, and the only one left to handle here now
           that the gate and the boot states are above.
         */}
@@ -200,7 +200,7 @@ function Shell() {
             <Route path="/crm/closed" element={<Guarded needs="viewDeals" what="Won and lost deals"><CrmClosed /></Guarded>} />
             {/*
                 Client Success. Every page needs `viewCs` except Surveys, which needs the
-                narrower `viewSurveys` — Accounting can see that an account is unhappy
+                narrower `viewSurveys`: Accounting can see that an account is unhappy
                 without reading the words the client typed, and that boundary is the
                 endpoint's, enforced again here so the app never offers a screen it
                 cannot fill.
@@ -216,7 +216,7 @@ function Shell() {
                 Home has it, and is reached from Home and from CRM.
 
                 A company record is a LAYOUT: its name, facts, stage control and tab strip
-                are rendered once, and each section below is a child route — so the header
+                are rendered once, and each section below is a child route, so the header
                 stays put whichever tab you are on, tickets included. */}
             <Route path="/clients" element={<Guarded needs="viewClients" what="Clients"><Clients /></Guarded>} />
             <Route
@@ -225,7 +225,7 @@ function Shell() {
             >
               <Route index element={<CompanyInfo />} />
               {/*
-                Deals on every company, lead and client alike — a client's deals are
+                Deals on every company, lead and client alike: a client's deals are
                 upsells. Tickets stay routed for everyone even though the TAB is hidden
                 for a lead: a link from elsewhere should still resolve rather than fall
                 through to the catch-all, and the board says plainly when there is
@@ -235,7 +235,7 @@ function Shell() {
               <Route path="tickets" element={<ClientTickets />} />
               <Route path="contacts" element={<CompanyContacts />} />
               {/* The client's CS history. Routed for every company even though the TAB is
-                  hidden for a lead, so a link from the queue always resolves — and a
+                  hidden for a lead, so a link from the queue always resolves, and a
                   Former Client keeps the record of how it went. Guarded in its own right:
                   the parent route only asks for `viewClients`, and account health is a
                   narrower read than a company's name. */}
@@ -264,7 +264,7 @@ function Shell() {
             <Route path="/clients/:clientId/request" element={<Intake />} />
             <Route path="/request" element={<Intake />} />
 
-            {/* The schema explorer is a tool, not a section — reached from the
+            {/* The schema explorer is a tool, not a section: reached from the
                 Tools menu. Its deep links live under /schema so they stay
                 bookmarkable. */}
             <Route path="/tickets" element={<Guarded needs="viewTickets" what="Tickets"><Tickets /></Guarded>} />
@@ -289,7 +289,7 @@ function Shell() {
 export default function App() {
   /*
    * The provider wraps the shell rather than sitting in main.tsx, so the header can gate
-   * its own nav from the same session the routes use — one fetch for the whole app.
+   * its own nav from the same session the routes use: one fetch for the whole app.
    */
   return (
     <SessionProvider>

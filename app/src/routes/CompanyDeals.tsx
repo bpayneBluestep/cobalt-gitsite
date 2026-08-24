@@ -12,7 +12,7 @@ import { useSession } from '../session'
  *
  * On every company, lead and client alike. A lead's deals are the reason it is a lead;
  * a client's deals are upsells, which is where most revenue growth actually comes from
- * and which had nowhere to live — the only way to see a client's deals was to find them
+ * and which had nowhere to live: the only way to see a client's deals was to find them
  * on the pipeline board among everyone else's.
  *
  * Open deals first, then decided ones, because the open ones are the work. Both are
@@ -176,7 +176,7 @@ export default function CompanyDeals() {
               <p className="empty">
                 Nothing open here.{' '}
                 {mayEdit
-                  ? 'An upsell to an existing client is a deal like any other — open one.'
+                  ? 'An upsell to an existing client is a deal like any other. Open one.'
                   : 'Only Leadership and Sales can open a deal.'}
               </p>
             ) : (

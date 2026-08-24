@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 
 /*
- * The org's unit tree, in a modal — ported from the eccrm CRM's Locations Map.
+ * The org's unit tree, in a modal: ported from the eccrm CRM's Locations Map.
  *
  * `POST /getNavTree` is the platform's own navigation source, the same one the native
  * chrome's location switcher reads. It needs no arguments and no ids, which is why this
@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react'
  * there is no page object involved.
  *
  * Each node's `text` is HTML with an inline SVG icon in front of the label, so it has to
- * be stripped — rendering it raw would mean trusting server HTML into the DOM, and
+ * be stripped: rendering it raw would mean trusting server HTML into the DOM, and
  * showing it unstripped puts a wall of markup on screen. The label is extracted as TEXT
  * and inserted as text; nothing here uses innerHTML.
  */
@@ -24,14 +24,14 @@ interface NavNode {
  * The visible label for a node.
  *
  * The SVG is removed first, then the remainder is decoded as text via the DOM's own
- * parser — which handles entities without this having to know the list — and the result
+ * parser, which handles entities without this having to know the list, and the result
  * is used as a string, never as markup.
  */
 function cleanLabel(text: unknown): string {
   const raw = String(text ?? '').replace(/<svg[\s\S]*?<\/svg>/gi, '')
   const holder = document.createElement('div')
   holder.innerHTML = raw
-  return (holder.textContent || '').replace(/\s+/g, ' ').trim() || '—'
+  return (holder.textContent || '').replace(/\s+/g, ' ').trim() || '-'
 }
 
 function Branch({ nodes, depth }: { nodes: NavNode[]; depth: number }) {
@@ -81,7 +81,7 @@ export default function LocationsMap({ onClose }: { onClose: () => void }) {
   return (
     <div
       className="locmap"
-      // Only a click that both starts and ends on the backdrop dismisses — otherwise a
+      // Only a click that both starts and ends on the backdrop dismisses: otherwise a
       // text selection that happens to finish outside the card closes it and loses the
       // place the user was reading.
       onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}

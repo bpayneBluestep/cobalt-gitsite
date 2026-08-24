@@ -2,8 +2,8 @@ import { NavLink } from 'react-router-dom'
 
 /*
  * The CRM's own pages. A sub-nav rather than five top-level items: they are one job seen
- * five ways — what you owe today, the numbers, the open deals, the people not yet in a
- * deal, and what already happened — and promoting them to the main nav would bury the
+ * five ways: what you owe today, the numbers, the open deals, the people not yet in a
+ * deal, and what already happened, and promoting them to the main nav would bury the
  * other sections.
  *
  * Follow-ups is first, and deliberately not the Dashboard. The dashboard answers "how is

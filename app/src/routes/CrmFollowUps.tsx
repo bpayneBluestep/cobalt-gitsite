@@ -14,11 +14,11 @@ import { useSession } from '../session'
  * This is the page a business-development person should be able to open first thing and
  * work straight down. Everything else in the CRM answers "what is the state of things";
  * this answers "what am I doing today", which is a different question and was previously
- * unanswerable — follow-ups existed only as a date on a company, visible on one table
+ * unanswerable: follow-ups existed only as a date on a company, visible on one table
  * that by definition excluded everything in the pipeline.
  *
  * Deal and company follow-ups are one list. To the person doing the work they are the
- * same job — call somebody — and splitting them across two screens is exactly how one of
+ * same job, call somebody, and splitting them across two screens is exactly how one of
  * them stops getting read.
  *
  * Every row can be finished from here without opening anything. A queue you have to
@@ -33,7 +33,7 @@ type State =
 const LOGIN_URL = '/shared/login/login.jsp?desturl=' +
   encodeURIComponent(window.location.pathname + window.location.search)
 
-/** Add days to a yyyy-mm-dd date, in local time — snooze arithmetic. */
+/** Add days to a yyyy-mm-dd date, in local time: snooze arithmetic. */
 function plusDays(iso: string, days: number): string {
   const base = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? new Date(`${iso}T12:00:00`) : new Date()
   base.setDate(base.getDate() + days)
@@ -126,17 +126,17 @@ export default function CrmFollowUps() {
     if (r.kind === 'deal') {
       run(id, completeFollowUp(r.companyId, r.entryId, {
         ...(logText.trim() ? { text: logText.trim(), kind: logKind } : {}),
-      }), `${r.title} — done.`)
+      }), `${r.title}: done.`)
       return
     }
     /*
      * A company follow-up has no deal to log against, so "done" is the same pair of
      * writes the Prospecting page makes: touched today, and nothing scheduled next.
-     * Clearing the date is what takes it out of this queue — without that it would be
+     * Clearing the date is what takes it out of this queue: without that it would be
      * marked done and still be sitting here tomorrow.
      */
     run(id, updateCompany(r.companyId, { lastTouch: snoozeTo(0), nextFollowUp: '' }),
-      `${r.companyName} — marked touched.`)
+      `${r.companyName}: marked touched.`)
   }
 
   function snooze(r: FollowUp, days: number) {
@@ -158,7 +158,7 @@ export default function CrmFollowUps() {
         <p className="eyebrow">CRM</p>
         <h1>Follow-ups</h1>
         <p className="page__sub-text">
-          Everything you owe somebody, soonest first — deals and prospects together,
+          Everything you owe somebody, soonest first: deals and prospects together,
           because they are the same job.
         </p>
       </header>
@@ -252,7 +252,7 @@ export default function CrmFollowUps() {
                                 whoever picks it up. Said plainly rather than shown as
                                 somebody's, which is how it would get quietly dropped. */}
                             {r.unassigned && (
-                              <span className="flag flag--warn" title="No deal, so no owner — open one to take it">
+                              <span className="flag flag--warn" title="No deal, so no owner. Open one to take it">
                                 unassigned
                               </span>
                             )}
@@ -366,7 +366,7 @@ export default function CrmFollowUps() {
 
           <p className="panel__foot">
             Walked {d.companiesScanned} compan{d.companiesScanned === 1 ? 'y' : 'ies'} to build this.
-            A company only appears in its own right when it has no open deal — otherwise the
+            A company only appears in its own right when it has no open deal: otherwise the
             deal’s follow-up is the live one.
           </p>
         </>

@@ -3,10 +3,10 @@ import { useSearchParams } from 'react-router-dom'
 import { maestroGet, ApiError } from '../api'
 
 /*
- * Tickets — the "ClickUp killer" board, scoped to a company record.
+ * Tickets: the "ClickUp killer" board, scoped to a company record.
  *
  * Reads `action=tickets` from the Maestro. The Maestro is live, but this action is
- * not built yet — there is no ticket schema on the org — so the page shows an
+ * not built yet, there is no ticket schema on the org, so the page shows an
  * honest failure state rather than pretending.
  *
  * `?demo=1` renders sample rows instead, so the layout and interactions can be
@@ -72,7 +72,7 @@ export default function Tickets() {
         <p className="eyebrow">Engineering</p>
         <h1>Tickets</h1>
         <p className="page__sub-text">
-          Work tracked against a company record — the internal replacement for ClickUp.
+          Work tracked against a company record: the internal replacement for ClickUp.
           Grouped by status, ordered by priority.
         </p>
       </header>
@@ -86,7 +86,7 @@ export default function Tickets() {
           </p>
           <p>{state.error.message}</p>
           <p>
-            The board itself is built. The Maestro is live — it just has no{' '}
+            The board itself is built. The Maestro is live. It just has no{' '}
             <code>tickets</code> action yet, because the ticket schema hasn't been
             created. Once both land, this fills in with no further work here.
           </p>

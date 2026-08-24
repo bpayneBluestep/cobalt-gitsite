@@ -23,7 +23,7 @@ import UserPicker from '../components/UserPicker'
  * A page rather than a drawer, for one reason that outweighs keeping the board in
  * view: a ticket is the unit of work people talk about, and talking about it means
  * sending someone the link. `/tickets/8` is short enough to paste into Teams, survives
- * a forward, and opens the same thing for whoever clicks it — a drawer has no address.
+ * a forward, and opens the same thing for whoever clicks it: a drawer has no address.
  * Ticket numbers are org-wide, so the number alone resolves; an entry id works too, so
  * an unnumbered ticket is still reachable.
  *
@@ -36,7 +36,7 @@ import UserPicker from '../components/UserPicker'
  *     with an explicit Save, sending only what changed
  *   * the two owners, time, the roadblock, attachments and components write IMMEDIATELY
  *     through their own actions, because each is a discrete act with a real-world moment
- *     attached — you stop a timer when you stop working, not when you get round to saving
+ *     attached. You stop a timer when you stop working, not when you get round to saving
  *
  * Sprint is READ-ONLY here. It is planned on the sprint board, where the roster and the
  * week's capacity are in front of you; typing it on the ticket was a way to fill a week
@@ -71,7 +71,7 @@ function draftOf(t: Ticket): Draft {
 /** A blank row for the "add a component" form. */
 const EMPTY_COMPONENT = { name: '', kind: 'Endpoint', change: 'Edit', url: '' }
 
-const dash = <span className="muted">—</span>
+const dash = <span className="muted">-</span>
 
 function savedValue(t: Ticket, key: TicketFieldKey): string {
   if (key === 'estHours') return t.estHours === null || t.estHours === undefined ? '' : String(t.estHours)
@@ -109,7 +109,7 @@ function toBase64(file: File): Promise<string> {
  *
  * Deliberately a briefing and not a dump. Claude Code opens with this org's MCP tools
  * and `b6p` already available, so it can read anything it needs from the platform
- * itself — what it cannot do is know WHICH ticket you were looking at. So this sends
+ * itself: what it cannot do is know WHICH ticket you were looking at. So this sends
  * the identifying facts, the description, and the components already touched, and
  * leaves the fetching to the session. That also keeps it far inside Claude Desktop's
  * ~14,000-character ceiling for every ticket we have.
@@ -119,12 +119,12 @@ function toBase64(file: File): Promise<string> {
 function claudePrompt(t: Ticket, ehrLink: string): string {
   const number = t.ticketNumber === null ? t.entryId : `#${t.ticketNumber}`
   const lines = [
-    `I'm working on Cobalt ticket ${number} — ${t.title || 'untitled'}.`,
+    `I'm working on Cobalt ticket ${number}: ${t.title || 'untitled'}.`,
     '',
     `Client: ${t.clientName || t.listName || 'internal'}`,
   ]
 
-  // The client's own BlueStep org — the single most useful thing in here, because it
+  // The client's own BlueStep org: the single most useful thing in here, because it
   // tells the session WHERE the work actually lands. Omitted rather than sent empty:
   // a ticket on an internal list has no client, and a handful of clients have no org
   // recorded in beh, and a blank label reads as a broken lookup.
@@ -133,20 +133,20 @@ function claudePrompt(t: Ticket, ehrLink: string): string {
   lines.push(
     `Status: ${t.status || 'Open'} · Priority: ${t.priority || 'Normal'}` +
       (t.sprint ? ` · Sprint ${t.sprint}` : ' · unplanned'),
-    `Accountable: ${t.accountableName || '—'} · Responsible: ${t.responsibleName || '—'}`,
+    `Accountable: ${t.accountableName || '-'} · Responsible: ${t.responsibleName || '-'}`,
   )
 
   if (t.dueDate) lines.push(`Due: ${t.dueDate}`)
   if (t.estHours !== null) lines.push(`Estimate: ${t.estHours}h · Logged: ${t.loggedHours || 0}h`)
   if (t.roadblocked) lines.push(`ROADBLOCKED: ${t.roadblockReason || 'no reason given'}`)
-  if (t.parentNumber !== null) lines.push(`Subtask of #${t.parentNumber} — ${t.parentTitle}`)
+  if (t.parentNumber !== null) lines.push(`Subtask of #${t.parentNumber}: ${t.parentTitle}`)
 
   const details = htmlToText(t.details)
   if (details) lines.push('', 'Description:', details)
 
   if (t.components.length) {
     lines.push('', 'Components already touched:')
-    for (const c of t.components) lines.push(`- ${c.kind} · ${c.change} · ${c.name} — ${c.url}`)
+    for (const c of t.components) lines.push(`- ${c.kind} · ${c.change} · ${c.name}: ${c.url}`)
   }
 
   lines.push(
@@ -166,8 +166,8 @@ export default function TicketPage() {
   const [notice, setNotice] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [copied, setCopied] = useState(false)
-  // Set on an "Open in Claude Code" click. The handler gives us no success signal —
-  // an uninstalled scheme is indistinguishable from a working one — so the label says
+  // Set on an "Open in Claude Code" click. The handler gives us no success signal,
+  // an uninstalled scheme is indistinguishable from a working one, so the label says
   // what we actually know: the prompt is on the clipboard either way.
   const [handedOff, setHandedOff] = useState(false)
 
@@ -263,7 +263,7 @@ export default function TicketPage() {
 
   function remove() {
     if (!ticket || busy) return
-    // Cascade only because the confirmation names the subtasks it is about to take —
+    // Cascade only because the confirmation names the subtasks it is about to take,
     // the endpoint refuses a silent one, and this is the screen that earns the right.
     const cascade = ticket.subtaskCount > 0
     setBusy('delete'); setFailure('')
@@ -276,7 +276,7 @@ export default function TicketPage() {
   // -- subtasks -------------------------------------------------------------
   //
   // A subtask action changes a DIFFERENT ticket, so the reply is that ticket, not this
-  // one — `run` would swap the page out from under you. These re-read the ticket being
+  // one - `run` would swap the page out from under you. These re-read the ticket being
   // looked at instead, by entry id so the endpoint skips its cross-list scan.
 
   function runOnFamily(label: string, work: Promise<unknown>, message: string, after?: () => void) {
@@ -298,7 +298,7 @@ export default function TicketPage() {
   function submitComment() {
     if (!ticket || !comment.trim() || busy) return
     const text = comment.trim()
-    // Cleared on success only — a failed post must not eat what someone just wrote.
+    // Cleared on success only: a failed post must not eat what someone just wrote.
     run('comment', addComment(on, text), () => { setComment(''); setNotice('Comment added.') })
   }
 
@@ -329,13 +329,13 @@ export default function TicketPage() {
   }
 
   /*
-   * The org link lives on the COMPANY, not the ticket, so it takes a second read —
+   * The org link lives on the COMPANY, not the ticket, so it takes a second read,
    * done here on click rather than with the ticket, because most people who open a
    * ticket never press this and every page view would pay for it.
    *
    * Awaiting before following the link is safe: a browser only lets an external
    * scheme launch while the click's user activation is still live, and that lasts
-   * seconds — far longer than one API call. A failed or missing lookup is not worth
+   * seconds: far longer than one API call. A failed or missing lookup is not worth
    * blocking on, so the prompt simply goes without the line.
    */
   async function openInClaude() {
@@ -389,7 +389,7 @@ export default function TicketPage() {
     if (!ticket || !files || !files.length || busy) return
     const on = { listId: ticket.listId, entryId: ticket.entryId }
     const file = files[0]
-    // Video gets the bigger ceiling, matching the endpoint — a screen recording dropped
+    // Video gets the bigger ceiling, matching the endpoint: a screen recording dropped
     // on a ticket is the same proposition as one Wesley captured.
     const ceiling = ceilingFor(file.type)
     if (file.size > ceiling) {
@@ -502,7 +502,7 @@ export default function TicketPage() {
             {handedOff ? 'Sent to Claude' : 'Open in Claude Code'}
           </button>
           <Link className="btn btn--ghost btn--sm" to={boardPath}>Back to board</Link>
-          {/* Roadblock and delete are actions, not sections — a button each, next to
+          {/* Roadblock and delete are actions, not sections: a button each, next to
               the others, with their one question asked inline underneath. */}
           {ticket.roadblocked ? (
             <button type="button" className="linkbtn" disabled={!!busy}
@@ -653,12 +653,12 @@ export default function TicketPage() {
           </section>
 
           {/* Subtasks.
-              Only on a top-level ticket — one level deep is the rule, and a page that
+              Only on a top-level ticket: one level deep is the rule, and a page that
               offered to nest further would be promising something the endpoint refuses.
 
               Each row is a real ticket with its own page; what is inline here is the one
               thing you do from the parent, which is move a chunk along. Everything else
-              — time, attachments, the description — is a click away on its own page. */}
+              time, attachments, the description: is a click away on its own page. */}
           {!ticket.isSubtask && (
             <section className="tcard">
               <div className="tcard__head">
@@ -722,7 +722,7 @@ export default function TicketPage() {
                 <p className="subs__roll muted">
                   {formatHours(ticket.subtaskEstHours)} estimated across the subtasks
                   {ticket.subtaskLoggedHours > 0 && `, ${formatHours(ticket.subtaskLoggedHours)} logged`}
-                  {' — '}separate from this ticket&rsquo;s own {formatHours(est || 0)}.
+                  {'-'}separate from this ticket&rsquo;s own {formatHours(est || 0)}.
                 </p>
               )}
 
@@ -811,7 +811,7 @@ export default function TicketPage() {
           {/* The interview this request came from.
               Collapsed by default: an engineer wants the synthesized description, and
               only reaches for the raw conversation when they suspect something was lost
-              in the writing of it — which is exactly when having it kept matters. */}
+              in the writing of it, which is exactly when having it kept matters. */}
           {ticket.conversation && ticket.conversation.turns.length > 0 && (
             <section className="tcard">
               <details className="wes-history">
@@ -838,7 +838,7 @@ export default function TicketPage() {
           )}
 
           {/* Components: what this ticket actually changed on the platform.
-              Separate from the description on purpose — the description says what
+              Separate from the description on purpose: the description says what
               happened, this says what to look at if it breaks, or what to repeat when
               the same change has to go into another org. */}
           <section className="tcard">
@@ -965,7 +965,7 @@ export default function TicketPage() {
           </section>
 
 
-          {/* Activity — the ticket's history, oldest first, with the comment box at the
+          {/* Activity: the ticket's history, oldest first, with the comment box at the
               bottom where the newest line is. Events and comments interleave because the
               question people ask is "what happened to this", and splitting them into two
               lists makes that question take two reads to answer. */}
@@ -1034,7 +1034,7 @@ export default function TicketPage() {
               <textarea
                 value={comment}
                 rows={2}
-                placeholder="Add a comment — what you found, what you are waiting on, what you decided."
+                placeholder="Add a comment: what you found, what you are waiting on, what you decided."
                 aria-label="Add a comment"
                 onChange={e => setComment(e.target.value)}
                 onKeyDown={e => {
@@ -1101,7 +1101,7 @@ export default function TicketPage() {
               />
               <p className="ef__hint">The PM answerable to the client for it happening.</p>
             </div>
-            {/* Only shown when it has something to say — an old ticket that predates
+            {/* Only shown when it has something to say: an old ticket that predates
                 the split still names whoever it was filed against. */}
             {ticket.assignee && !ticket.responsibleId && (
               <p className="ef__hint">
@@ -1124,7 +1124,7 @@ export default function TicketPage() {
             <div className="ef">
               <label htmlFor="tp-est">Estimate (hours)</label>
               <input id="tp-est" type="number" min="0" step="0.25" value={draft.estHours}
-                placeholder="—" onChange={e => edit('estHours', e.target.value)} />
+                placeholder="-" onChange={e => edit('estHours', e.target.value)} />
             </div>
 
             <div className="tpage__save">
@@ -1155,7 +1155,7 @@ export default function TicketPage() {
               <span className="muted">
                 {est === null || est === 0
                   ? ' logged, no estimate'
-                  : ` of ${formatHours(est)}${overBudget ? ' — over' : ''}`}
+                  : ` of ${formatHours(est)}${overBudget ? ', over' : ''}`}
               </span>
             </p>
 
@@ -1167,7 +1167,7 @@ export default function TicketPage() {
                   onClick={() => run('timer', stopTimer(on, timeNote), fresh => {
                     setTimeNote('')
                     setNotice(fresh.loggedMinutes > 0
-                      ? `Stopped — logged ${formatMinutes(fresh.loggedMinutes)}.`
+                      ? `Stopped: logged ${formatMinutes(fresh.loggedMinutes)}.`
                       : 'Stopped. Under a minute, so nothing was logged.')
                   })}>
                   {busy === 'timer' ? 'Stopping…' : 'Stop'}

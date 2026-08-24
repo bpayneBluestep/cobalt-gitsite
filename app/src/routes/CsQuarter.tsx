@@ -10,8 +10,8 @@ import { useSession } from '../session'
 /*
  * The quarter, on one page you can hand to somebody.
  *
- * Health is reconstructible as of any date — every input is dated and nothing is
- * stored — so this can honestly answer "where were we in July" as well as "where are we
+ * Health is reconstructible as of any date: every input is dated and nothing is
+ * stored, so this can honestly answer "where were we in July" as well as "where are we
  * now", which is the only way the good-standing number means anything. Start against
  * end, with counts, is the whole argument.
  *
@@ -42,7 +42,7 @@ function Kpi({ label, value, note, tone }: {
 }
 
 /** A percentage that might not exist. Null is not zero and never renders as it. */
-const pct = (v: number | null) => (v === null || v === undefined ? '—' : `${v}%`)
+const pct = (v: number | null) => (v === null || v === undefined ? '-' : `${v}%`)
 
 export default function CsQuarter() {
   const { can } = useSession()
@@ -74,7 +74,7 @@ export default function CsQuarter() {
     <section className="page">
       <header className="page__head">
         <p className="eyebrow">Client Success</p>
-        <h1>Quarter review{d ? ` — ${d.quarter}` : ''}</h1>
+        <h1>Quarter review{d ? `: ${d.quarter}` : ''}</h1>
         <p className="page__sub-text">
           Who is healthy, who is at risk and who owns them, what we did about every
           detractor and how fast, and whether the number moved.
@@ -144,7 +144,7 @@ export default function CsQuarter() {
             />
             <Kpi
               label="Movement"
-              value={moved === null ? '—' : `${moved > 0 ? '+' : ''}${moved} pts`}
+              value={moved === null ? '-' : `${moved > 0 ? '+' : ''}${moved} pts`}
               note={moved === null
                 ? 'not measurable across this quarter'
                 : moved > 0 ? 'better than it started' : moved < 0 ? 'worse than it started' : 'flat'}
@@ -172,7 +172,7 @@ export default function CsQuarter() {
             </header>
             <p className="panel__note">
               Counted at {d.endDate}. Good standing is a fresh Green reading inside the
-              account's own cadence — nothing else counts.
+              account's own cadence. Nothing else counts.
             </p>
             <dl className="stats">
               <div><dt>Green</dt><dd>{d.counts.green}</dd></div>
@@ -211,7 +211,7 @@ export default function CsQuarter() {
                         <th scope="row">{dim.label}</th>
                         <td className="num">
                           {nps === null
-                            ? <span className="muted">—</span>
+                            ? <span className="muted">-</span>
                             : <span className="pill" data-tone={npsTone(nps)}>
                                 {nps > 0 ? `+${nps}` : nps}
                               </span>}
@@ -287,7 +287,7 @@ export default function CsQuarter() {
               <span className="panel__n">{d.redAccounts.length}</span>
             </header>
             <p className="panel__note">
-              Each one with an owner, a next step and a date — because a Red with none of
+              Each one with an owner, a next step and a date, because a Red with none of
               those is the failure this system exists to prevent.
             </p>
 
@@ -331,7 +331,7 @@ export default function CsQuarter() {
 
           <p className="panel__foot">
             Walked {d.companiesScanned} compan{d.companiesScanned === 1 ? 'y' : 'ies'} and
-            recomputed every account's health twice — once as of {d.startDate}, once as of{' '}
+            recomputed every account's health twice: once as of {d.startDate}, once as of{' '}
             {d.endDate}. No health figure on this page was read from a stored field.
           </p>
         </>

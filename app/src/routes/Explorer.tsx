@@ -34,14 +34,14 @@ function TypeDetail({ t }: { t: RecordType }) {
                 ? <Link to={`/schema/form/${encodeURIComponent(t.baseFormId)}`} className="inlink">
                     {formById.get(t.baseFormId)!.displayName}
                   </Link>
-                : <span className="muted">none — this type has no identity form</span>}
+                : <span className="muted">none. This type has no identity form</span>}
             </dd>
           </div>
         )}
         {t.displayFieldLabel && (
           <div>
             <dt>Display field</dt>
-            <dd><code>{t.displayFieldLabel}</code> <span className="muted">— the record’s title</span></dd>
+            <dd><code>{t.displayFieldLabel}</code> <span className="muted">· the record’s title</span></dd>
           </div>
         )}
         {parents.length > 0 && (
@@ -67,7 +67,7 @@ function TypeDetail({ t }: { t: RecordType }) {
           <p className="callout__title">No base form wired yet</p>
           <p>
             <strong>{t.displayName}</strong> exists, but the platform's own record-type
-            list leaves it out — the signature of a type with no base form set. It was
+            list leaves it out: the signature of a type with no base form set. It was
             recovered from the relationship graph, which is where everything in this
             tree comes from. Set a base form and display field on it in Relate admin and
             it will appear normally.
@@ -81,7 +81,7 @@ function TypeDetail({ t }: { t: RecordType }) {
           <p>
             The platform threw rather than returning this type's form list, so its forms
             are shown as <strong>attached</strong> without saying which are required. The
-            links themselves are accurate — they come from the relationship graph, not
+            links themselves are accurate. They come from the relationship graph, not
             from this call. It throws for any type with no required form, including the
             built-in Individual and Organization.
           </p>
@@ -136,7 +136,7 @@ function Overview() {
           </p>
           <p>
             Where a platform call refused to answer, the structure was read from the
-            relationship graph instead — so the tree and the form links are complete.
+            relationship graph instead, so the tree and the form links are complete.
             These say what had to be worked around.
           </p>
           <ul className="callout__list">

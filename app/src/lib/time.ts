@@ -2,7 +2,7 @@
  * Duration parsing and the live clock.
  *
  * Logging time is the thing people skip when it's fiddly, so the input takes what
- * anyone would actually type — `90`, `90m`, `1.5h`, `1h30m` — rather than making
+ * anyone would actually type - `90`, `90m`, `1.5h`, `1h30m`, rather than making
  * them pick a unit from a dropdown first.
  */
 
@@ -27,7 +27,7 @@ export function parseDuration(input: string): number | null {
     return total > 0 ? total : null
   }
 
-  // A bare number is minutes — the unit people mean when they don't say.
+  // A bare number is minutes: the unit people mean when they don't say.
   const bare = /^(\d+(?:\.\d+)?)$/.exec(s)
   if (bare) {
     const total = Math.round(Number(bare[1]))
@@ -58,7 +58,7 @@ export function todayISO(): string {
 }
 
 /**
- * "just now" / "14 min ago" / "3 hours ago" / "9 Aug, 14:32" — how an activity line
+ * "just now" / "14 min ago" / "3 hours ago" / "9 Aug, 14:32", how an activity line
  * is stamped.
  *
  * Relative for the recent past because that is how people talk about a ticket they are

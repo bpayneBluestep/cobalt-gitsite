@@ -11,24 +11,24 @@ import UserPicker, { loadUsers } from '../components/UserPicker'
 import { useSession } from '../session'
 
 /*
- * The sprint board — beh's Sprint Organizer, ported.
+ * The sprint board: beh's Sprint Organizer, ported.
  *
  * A column per engineer, each measuring the estimates committed to them against their
  * capacity, plus the unsprinted backlog to pull work from. The point of the layout is
  * that over-commitment is visible before the sprint starts rather than discovered
  * halfway through it.
  *
- * A sprint is a plain NUMBER — 1, 2, 3 — the way the team says it out loud, and the way
+ * A sprint is a plain NUMBER, 1, 2, 3: the way the team says it out loud, and the way
  * beh has always numbered them. It used to be an ISO week (2026-W33): that reads like a
  * date, sorts nicely, and nobody ever said it in a sentence.
  *
  * The roster is PER SPRINT. Capacity moves week to week and people take leave, so each
  * sprint owns its own roster and starting a new one copies the previous forward. Editing
  * next sprint therefore cannot reach back and rewrite the history of a sprint that has
- * already happened — which is exactly what a single shared roster did.
+ * already happened, which is exactly what a single shared roster did.
  *
  * An engineer IS a platform user. The roster holds the user id, picked from the user
- * list, and the name shown is that user's own — so a ticket's `responsibleId` lands in
+ * list, and the name shown is that user's own, so a ticket's `responsibleId` lands in
  * the right column with nothing to match on. Rows added before the roster held ids are
  * matched by name instead and cannot be given work until somebody re-picks them, which
  * this page says out loud rather than leaving the column mysteriously empty.
@@ -69,9 +69,9 @@ export default function Sprints() {
    * Two different rights on one page, and conflating them would be wrong in both
    * directions:
    *
-   *   planning  — putting a ticket into a sprint, or taking it out — is a Tickets write,
+   *   planning, putting a ticket into a sprint, or taking it out: is a Tickets write,
    *               so engineers and Client Success do it. That is the daily work.
-   *   the roster — who is on the team, their capacity, starting a sprint — is an Engineers
+   *   the roster, who is on the team, their capacity, starting a sprint: is an Engineers
    *               write, and belongs to Leadership. Capacity is a management decision.
    */
   const { can } = useSession()
@@ -80,7 +80,7 @@ export default function Sprints() {
   const [params, setParams] = useSearchParams()
   const urlSprint = params.get('sprint') || ''
 
-  // '' means "not decided yet" — the first load picks the latest sprint that has a
+  // '' means "not decided yet": the first load picks the latest sprint that has a
   // roster, so landing on this page shows the sprint being worked rather than sprint 1.
   const [sprint, setSprintState] = useState(isSprintKey(urlSprint) ? urlSprint : '')
   const [state, setState] = useState<State>({ phase: 'loading' })
@@ -101,7 +101,7 @@ export default function Sprints() {
 
   useEffect(() => { loadUsers().then(setUsers).catch(() => setUsers([])) }, [])
 
-  // Decide which sprint to show, once, before the first board fetch — otherwise the
+  // Decide which sprint to show, once, before the first board fetch: otherwise the
   // page loads sprint 1 and then jumps, which reads as a bug.
   useEffect(() => {
     if (sprint) return
@@ -148,7 +148,7 @@ export default function Sprints() {
    * Who can be assigned this sprint: the roster, which already holds user ids.
    *
    * A legacy row with no id falls back to matching its name against the user list, so an
-   * old roster keeps working. It is kept in the list but not selectable — the fix is to
+   * old roster keeps working. It is kept in the list but not selectable: the fix is to
    * edit the row and pick the person, and hiding it would just make an engineer quietly
    * disappear from the board with no clue why.
    */
@@ -206,10 +206,10 @@ export default function Sprints() {
   function startSprint() {
     if (!mayRoster) return
     run('start', createSprint(sprint).then(t => { setTeam(t); return t }),
-      `${sprintLabel(sprint)} started — the previous roster was copied forward.`)
+      `${sprintLabel(sprint)} started: the previous roster was copied forward.`)
   }
 
-  const dash = <span className="muted">—</span>
+  const dash = <span className="muted">-</span>
   const templateRoster = !!board?.rosterIsTemplate
 
   /** A select of this sprint's engineers, used from three places. */
@@ -287,7 +287,7 @@ export default function Sprints() {
           <p className="callout__title">{sprintLabel(sprint)} has not been started</p>
           <p>
             It is showing the default roster as a preview. Start it to copy the previous
-            sprint's roster forward — after that, changing who is on it, or their hours,
+            sprint's roster forward, after that, changing who is on it, or their hours,
             affects this sprint only.
           </p>
           <p className="callout__actions">
@@ -310,7 +310,7 @@ export default function Sprints() {
           <p>
             {unresolved.map(a => a.name).join(', ')} cannot be given work: a ticket stores
             the engineer as a user, and these rows hold a name with no user behind it.
-            Edit each one and pick the person — or add them under Settings if they have no
+            Edit each one and pick the person, or add them under Settings if they have no
             Cobalt login yet.
           </p>
         </div>
@@ -345,7 +345,7 @@ export default function Sprints() {
                 <h2>{engEditing === 'new' ? 'New engineer' : 'Edit engineer'}</h2>
                 <p className="note">
                   An engineer is somebody with a Cobalt login. Pick them and their name
-                  and email come from their own record — which is how a ticket's
+                  and email come from their own record, which is how a ticket's
                   responsible engineer finds their column.
                 </p>
               </div>
@@ -632,7 +632,7 @@ export default function Sprints() {
 
             {board.backlog.length === 0 ? (
               <p className="muted tsec__empty">
-                Nothing unplanned — every open ticket already belongs to a sprint.
+                Nothing unplanned: every open ticket already belongs to a sprint.
               </p>
             ) : (
               <div className="tablewrap">
@@ -685,7 +685,7 @@ export default function Sprints() {
           <p className="panel__foot">
             Walked {board.listsScanned} list{board.listsScanned === 1 ? '' : 's'} to build this.
             A ticket with no estimate counts as zero hours, so it plans in without moving
-            the bar — set one on the ticket to make the sprint honest.
+            the bar. Set one on the ticket to make the sprint honest.
           </p>
         </>
       )}
