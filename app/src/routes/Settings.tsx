@@ -102,10 +102,21 @@ export default function Settings() {
     [d],
   )
 
-  function run(label: string, work: Promise<unknown>, said: string) {
+  /*
+   * `said` is what we expected to happen; a function gets to say what DID.
+   *
+   * Creating a person is the case that needs it: the endpoint returns a sentence listing
+   * what it could not finish, and this screen used to throw that away and print a canned
+   * success line instead.
+   */
+  function run(label: string, work: Promise<unknown>, said: string | ((result: any) => string)) {
     setBusy(label); setFailure(''); setNotice('')
     work
-      .then(() => { setNotice(said); setEditing(null); load(includeFormer) })
+      .then(result => {
+        setNotice(typeof said === 'function' ? said(result) : said)
+        setEditing(null)
+        load(includeFormer)
+      })
       .catch(err => setFailure(err instanceof ApiError ? err.message : String(err)))
       .finally(() => setBusy(''))
   }
@@ -128,7 +139,8 @@ export default function Settings() {
         return
       }
       run('save', createUser({ ...fields, firstName: first, lastName: last }),
-        `${first} ${last} added — remember they still need a login.`)
+        // The endpoint's own account of what landed and what did not, not ours.
+        made => `${first} ${last} added. ${made?.note || 'They still need a login.'}`)
       return
     }
     run('save', updateEmployee(editing as string, fields), 'Employee details saved.')

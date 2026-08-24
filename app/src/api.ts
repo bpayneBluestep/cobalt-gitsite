@@ -1982,14 +1982,24 @@ export const setSupervisor = (id: string, supervisorId: string): Promise<User> =
  * accept a single `name` and split it on the last space, but that fallback guesses which
  * words are the surname, so this app never uses it.
  *
- * The response reports what actually landed: `categoriesAttached` is read back from the
- * record, and `needsStaffCategory` is true only if Staff genuinely failed to attach.
+ * The response reports what actually landed, every part of it read back off a fresh
+ * record rather than inferred from a write that did not throw: `categoriesAttached`,
+ * `needsStaffCategory` (true only if Staff genuinely failed to attach), and `nameForm`,
+ * which is what the platform's own Name and E-mail form holds afterwards.
+ *
+ * `note` is the sentence listing whatever is still to do by hand. SHOW IT. This screen
+ * used to replace it with a cheerful canned message, which is how a person could be
+ * created with an entirely blank name form and nothing on screen said so.
  */
 export const createUser = (
   fields: EmployeeWrite & { firstName: string; lastName: string },
 ): Promise<User & {
   loginCreated: boolean
   nameWritten: boolean
+  /** What the platform's Name and E-mail form holds now — not what was requested. */
+  nameForm: { firstName: string; lastName: string; email: string }
+  /** False means the name did not reach the platform's own form; `note` says so too. */
+  nameFormWritten: boolean
   categoriesAttached: string[]
   needsStaffCategory: boolean
   note: string
