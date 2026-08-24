@@ -455,6 +455,14 @@ export interface Company {
   owner: string
   /** The staff record id behind `owner`. Empty on rows imported with a name only. */
   ownerId: string
+  /**
+   * Set by the `company` action when the contact details were read off the Contacts
+   * form because Company Info's mirror was empty, which is the case for everything
+   * imported from beh. `contactIsPrimary` is false when nobody is flagged primary and
+   * the first contact was used instead.
+   */
+  contactDerived?: boolean
+  contactIsPrimary?: boolean
   leadSource: string
   leadStatus: string
   beds: number | null

@@ -5,6 +5,7 @@ import {
   type Home as HomeData, type HomeTicket, type OwedItem,
 } from '../api'
 import { useSession } from '../session'
+import { greeting } from '../lib/greeting'
 import { todayISO, whenLabel } from '../lib/time'
 
 /*
@@ -156,7 +157,7 @@ export default function Home() {
     <section className="page home">
       <header className="page__head">
         <p className="eyebrow">Cobalt</p>
-        <h1>{firstName ? `Morning, ${firstName}` : 'Your day'}</h1>
+        <h1>{greeting(firstName)}</h1>
         {d && (
           <p
             className="home__headline"
