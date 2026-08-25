@@ -184,9 +184,14 @@ export default function CompanyAgreements() {
                 Envelopes of one or more PDF documents sent for e-signature.
               </p>
             </div>
-            {canEdit && (
-              <button type="button" className="btn" onClick={() => setShowNew(true)}>+ New envelope</button>
-            )}
+            <span className="env-head-acts">
+              {can('manageAgreementTemplates') && (
+                <Link className="btn btn--ghost" to="/agreements/templates">Templates</Link>
+              )}
+              {canEdit && (
+                <button type="button" className="btn" onClick={() => setShowNew(true)}>+ New envelope</button>
+              )}
+            </span>
           </div>
           {rows && rows.length === 0 && (
             <div className="callout">

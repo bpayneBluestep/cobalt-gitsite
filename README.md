@@ -145,3 +145,21 @@ curl -sk https://cobalt.bluestep.net/spa/assets/index-<hash>.js               # 
 
 `index.html` is served `no-cache`, other files `public, max-age=300`, so the hashed
 filenames are load-bearing for a deploy to actually be visible.
+
+## Agreements (e-signature)
+
+Two pages, one repo. The app carries the Agreements tab (envelopes, packet wizard,
+send, correct/resend/verify), the per-unit template libraries at
+`/agreements/templates`, the field-placement designer, and in-app signing.
+`app/sign.html` is a **second Vite entry** — its own bundle, no React — served at
+`/spa/sign.html` for external signers with no session; it talks only to the public
+`/b/agreementSign` endpoint and shares the signview/signing/pdf modules with the
+in-app page, which is what keeps the two surfaces identical.
+
+`app/public/vendor/` carries pdf.js (`pdf.min.mjs` + worker, loaded at runtime from
+`/spa/vendor/`, never bundled) and `pdf-lib.js` (fetched by the SERVER-side stamper
+in Cobalt Maestro/AgreementSign — removing it breaks completion, not this app).
+
+Server side: `U142140/Cobalt Maestro` (envelope + template actions, as-caller),
+`U142140/Cobalt AgreementSign` (public runAsSuper, token-gated), and the
+`Cobalt Agreement Sweep` formula (reminders + expiry, 30 min).
