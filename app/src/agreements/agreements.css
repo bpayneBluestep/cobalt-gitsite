@@ -103,7 +103,10 @@
 .env-correct-note { display: flex; align-items: center; gap: 8px; background: color-mix(in srgb, #b7791f 12%, var(--bg-panel));
   border: 1px solid color-mix(in srgb, #b7791f 35%, var(--line)); color: #8a5a00; border-radius: var(--r-lg);
   padding: 9px 13px; margin-bottom: 12px; font-size: 13px }
-.env-signed-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px }
+/* display:contents so the signed-doc links sit in the header's own flex row —
+   a nested flex with its own margin put them at a different height than the
+   sibling buttons. */
+.env-signed-list { display: contents }
 .env-hand { text-align: center; padding: 34px 26px }
 .env-hand h2 { margin: 0 0 6px; font-size: 19px }
 .env-hand-acts { margin-top: 18px; display: flex; gap: 10px; justify-content: center }

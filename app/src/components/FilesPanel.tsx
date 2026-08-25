@@ -56,8 +56,22 @@ export default function FilesPanel({ companyId }: { companyId: string }) {
 
   const load = useCallback(() => {
     setLoading(true); setError('')
+    // Dot-prefixed folders are system storage (Agreements/.sources holds an envelope's
+    // original unsigned PDFs) — filtered once at load so the whole panel, counts and
+    // pickers included, agrees they don't exist.
+    const hidden = (p: string) => (p || '').split('/').some(seg => seg.charAt(0) === '.')
     getFiles(companyId)
-      .then(setData)
+      .then(d => {
+        const rows = (d.rows || []).filter(r => !hidden(r.folder || ''))
+        const real = rows.filter(r => !r.isMarker)
+        setData({
+          ...d,
+          folders: (d.folders || []).filter(f => !hidden(f)),
+          rows,
+          total: real.length,
+          totalBytes: real.reduce((n, r) => n + ((r.file && r.file.size) || 0), 0),
+        })
+      })
       .catch(err => setError(err instanceof ApiError ? err.message : String(err)))
       .finally(() => setLoading(false))
   }, [companyId])

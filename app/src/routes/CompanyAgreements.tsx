@@ -9,7 +9,7 @@ import {
   listAgreementTemplates, fileToBase64, bufToBase64, randomTabId,
   type Envelope, type EnvelopeListRow, type EnvRecipient, type AgreementTemplate, type VerifyResult,
 } from '../agreements/api'
-import { getContacts, type Company } from '../api'
+import { getContacts, getUsers, type Company } from '../api'
 import { pdfOpen, pdfRenderPage, geoScale, geoApplyTabRect } from '../agreements/pdf'
 import '../agreements/agreements.css'
 
@@ -114,10 +114,21 @@ export default function CompanyAgreements() {
 
   useEffect(() => { setRows(null); setOpen(null); load() }, [load])
 
-  // Contacts feed the recipient pickers — loaded once per company visit.
+  // Contacts + current staff feed the recipient pickers — loaded once per company
+  // visit. Contacts sign externally (email link); any current staff user can be the
+  // in-app signer, so they all appear as “signs in-app” options.
   useEffect(() => {
     let dead = false
-    getContacts(company.id).then(cl => {
+    // Staff names arrive platform-ordered (“Last, First”) — a signature reads the
+    // other way around.
+    const signerName = (n: string) => {
+      const m = (n || '').match(/^([^,]+),\s*(.+)$/)
+      return m ? (m[2] + ' ' + m[1]).trim() : (n || '').trim()
+    }
+    Promise.all([
+      getContacts(company.id),
+      getUsers().catch(() => null),
+    ]).then(([cl, ul]) => {
       if (dead) return
       const sorted = (cl.rows || []).slice().sort((a, b) => Number(!!b.primary) - Number(!!a.primary))
       const out: PickOpt[] = sorted
@@ -129,7 +140,12 @@ export default function CompanyAgreements() {
           email: ct.email || '', kind: 'external',
         }))
       if (fullName) out.push({ label: fullName + ' — me, signs in-app', name: fullName, email: '', kind: 'consultant' })
-      setPicks(out)
+      const staff = ((ul && ul.rows) || [])
+        .map(u => signerName(u.name))
+        .filter(n => n && n !== fullName)
+        .sort((a, b) => a.localeCompare(b))
+        .map(n => ({ label: n + ' — staff, signs in-app', name: n, email: '', kind: 'consultant' }))
+      setPicks(out.concat(staff))
     }).catch(() => { /* picker just stays empty */ })
     return () => { dead = true }
   }, [company.id, fullName])
@@ -667,9 +683,9 @@ function EnvelopeDetail({
           {env.status === 'Completed' && (
             <span className="env-signed-list">
               {signedDocs.map((d: any) => (
-                <a key={d.id} className="btn btn--ghost btn--sm" href={d.signedUrl} target="_blank" rel="noopener noreferrer">{d.name} — signed</a>
+                <a key={d.id} className="btn btn--ghost" href={d.signedUrl} target="_blank" rel="noopener noreferrer">{d.name} — signed</a>
               ))}
-              {env.signedPdf && <a className="btn btn--sm" href={env.signedPdf} target="_blank" rel="noopener noreferrer">Certificate of completion</a>}
+              {env.signedPdf && <a className="btn" href={env.signedPdf} target="_blank" rel="noopener noreferrer">Certificate of completion</a>}
             </span>
           )}
           {env.status !== 'Draft' && (

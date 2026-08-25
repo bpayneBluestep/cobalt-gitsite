@@ -42,6 +42,35 @@ const SIG_FONTS: { label: string; css: string }[] = [
   { label: 'Caveat', css: "'Caveat', cursive" },
 ]
 
+/* The script faces are Google webfonts. sign.html links them statically, but the
+   in-app SPA does not (three cursive fonts on every CRM page would be waste), so
+   the modal loads them on first open. Without this every face renders in the same
+   cursive fallback and the three options look identical. */
+const SIG_FONTS_HREF = 'https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600&family=Great+Vibes&family=Caveat:wght@600&display=swap'
+
+function sigEnsureFonts(): void {
+  const links = document.querySelectorAll('link[rel="stylesheet"]')
+  let present = false
+  for (let i = 0; i < links.length; i++) {
+    if (((links[i] as HTMLLinkElement).href || '').indexOf('family=Dancing+Script') >= 0) { present = true; break }
+  }
+  if (!present) {
+    const l = document.createElement('link')
+    l.rel = 'stylesheet'
+    l.href = SIG_FONTS_HREF
+    document.head.appendChild(l)
+  }
+  // Re-paint the previews once the faces are really available — a canvas/preview
+  // rendered before the font arrives sits in the fallback forever otherwise.
+  try {
+    const d = document as any
+    if (d.fonts) {
+      Promise.all(SIG_FONTS.map(f => d.fonts.load('64px ' + f.css, 'Ag')))
+        .then(() => sigRenderFaces()).catch(() => { /* previews stay in fallback */ })
+    }
+  } catch { /* previews stay in fallback */ }
+}
+
 let SIG_MODAL_PAD: SigPad | null = null
 let SIG_MODAL_PAD_INI: SigPad | null = null
 let SIG_MODAL_FONT = 0
@@ -80,6 +109,7 @@ export function sigClickSign(): void {
   document.body.appendChild(wrap)
   wrap.addEventListener('mousedown', function (e) { if (e.target === wrap) sigCloseModal() })
   sigRenderFaces()
+  sigEnsureFonts()
   const n = document.getElementById('__sgName') as HTMLInputElement | null
   if (n) { n.focus() }
 }
