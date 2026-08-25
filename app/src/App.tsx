@@ -26,6 +26,10 @@ import Sprints from './routes/Sprints'
 import Settings from './routes/Settings'
 import TicketPage from './routes/TicketPage'
 import Intake from './routes/Intake'
+import CompanyAgreements from './routes/CompanyAgreements'
+import AgreementTemplates from './routes/AgreementTemplates'
+import DesignerPage from './routes/DesignerPage'
+import EnvelopeSignPage from './routes/EnvelopeSignPage'
 import { SECTIONS } from './sections'
 import { logoutUrl, type Capability } from './api'
 import { SessionProvider, useSession } from './session'
@@ -91,6 +95,9 @@ const CAPABILITY_LABELS: Record<Capability, string> = {
   editCs: 'Leadership, Sales or Client Success',
   viewSurveys: 'Leadership, Sales or Client Success',
   adminCs: 'Leadership',
+  viewAgreements: 'any role',
+  editAgreements: 'Leadership, Sales or Client Success',
+  manageAgreementTemplates: 'Leadership or Sales',
 }
 
 function Shell() {
@@ -244,7 +251,30 @@ function Shell() {
                 element={<Guarded needs="viewCs" what="This client’s success record"><CompanySuccess /></Guarded>}
               />
               <Route path="files" element={<CompanyFiles />} />
+              {/* Agreements: e-signature envelopes on this company. Routed for
+                  every company (a lead is exactly who gets sent a contract). */}
+              <Route path="agreements" element={<CompanyAgreements />} />
             </Route>
+
+            {/* The field-placement designer and the in-app signing page live
+                OUTSIDE the record layout: both own the full viewport and neither
+                wants the record header re-rendering above a pdf.js canvas. */}
+            <Route
+              path="/clients/:id/agreements/:entryId/design"
+              element={<Guarded needs="editAgreements" what="The field designer"><DesignerPage mode="env" /></Guarded>}
+            />
+            <Route
+              path="/clients/:id/agreements/:entryId/sign/:rid"
+              element={<Guarded needs="viewAgreements" what="In-app signing"><EnvelopeSignPage /></Guarded>}
+            />
+            <Route
+              path="/agreements/templates"
+              element={<Guarded needs="viewAgreements" what="Agreement templates"><AgreementTemplates /></Guarded>}
+            />
+            <Route
+              path="/agreements/templates/:entryId/design"
+              element={<Guarded needs="manageAgreementTemplates" what="The template designer"><DesignerPage mode="tpl" /></Guarded>}
+            />
 
             {/* A ticket is a page of its own, addressed by its org-wide number, so the
                 link can be pasted into a chat and opened by whoever gets it. An entry id

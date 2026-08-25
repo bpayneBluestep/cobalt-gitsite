@@ -1,0 +1,52 @@
+/* =====================================================================
+   signpage.css — the external signer's page chrome (/spa/sign.html).
+
+   Self-contained and literal-coloured on purpose: this bundle does NOT include
+   the app's tokens, because the page is opened by a signer with no session, no
+   theme preference and no stored mode, and a legal document should look the same
+   for every recipient on every device. The signing surface itself (sv-/sg-)
+   comes from agreements/signview.css, shared with the in-app page.
+   ===================================================================== */
+
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: #f4f6f9;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: #1a1a1a;
+  -webkit-text-size-adjust: 100%;
+}
+
+.sg-wrap { max-width: 900px; margin: 0 auto; padding: 20px 16px 60px; }
+.sg-head { text-align: center; padding: 8px 0 18px; border-bottom: 1px solid #e6e9ef; margin-bottom: 22px; }
+.sg-org { font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: #7a869a; font-weight: 600; }
+.sg-head h1 { font-size: 22px; margin: 6px 0 4px; color: #12325a; }
+.sg-hi { color: #55606e; font-size: 14px; margin: 0; }
+
+/* ── gate + done screens ── */
+.sg-msg { max-width: 560px; margin: 60px auto; text-align: center; padding: 30px 24px; background: #fff; border: 1px solid #e2e6ec; border-radius: 10px; }
+.sg-msg h2 { color: #12325a; margin: 0 0 8px; }
+.sg-msg p { color: #55606e; font-size: 15px; line-height: 1.5; margin: 0 0 8px; }
+.sg-done { max-width: 560px; margin: 60px auto; text-align: center; padding: 30px 24px; background: #fff; border: 1px solid #e2e6ec; border-radius: 10px; }
+.sg-done h1 { color: #12325a; margin: 0 0 8px; }
+.sg-done p { color: #55606e; font-size: 15px; line-height: 1.5; }
+
+/* decline / withdraw lines */
+.sg-declinerow { text-align: center; margin: 8px 0 26px; }
+.sg-declineline { background: none; border: 0; color: #9aa3ad; text-decoration: underline; cursor: pointer; font-size: 12.5px; }
+.sg-declineline:hover { color: #b3261e; }
+
+/* disclosure + access code */
+.sg-disclosure { white-space: pre-wrap; font: 13.5px/1.6 Georgia, serif; background: #fff; border: 1px solid #e2e4e8;
+  border-radius: 10px; padding: 22px 26px; max-width: 720px; margin: 0 auto 18px; max-height: 52vh; overflow: auto; }
+.sg-disc-acts { text-align: center; margin: 14px 0 6px; }
+.sg-code-input { font: 16px/1.2 inherit; padding: 9px 12px; border: 1.5px solid #cfd4da; border-radius: 8px; width: 200px; text-align: center; }
+.sg-code-bad { color: #b3261e; font-size: 13px; }
+
+/* completed-envelope download list (split output) */
+.sg-dl-list { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; align-items: center; }
+.sg-dl-list .sg-btn { width: auto; }
+
+@media (max-width: 600px) {
+  .sg-head h1 { font-size: 19px; }
+}

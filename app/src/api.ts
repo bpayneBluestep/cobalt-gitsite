@@ -172,6 +172,13 @@ export type Capability =
   | 'viewCs' | 'editCs'
   | 'viewSurveys'
   | 'adminCs'
+  /*
+   * Agreements (e-signature envelopes). `viewAgreements` opens the tab;
+   * `editAgreements` gates creating/sending/voiding; `manageAgreementTemplates`
+   * gates the per-unit template libraries and the template designer.
+   */
+  | 'viewAgreements' | 'editAgreements'
+  | 'manageAgreementTemplates'
 
 /**
  * Who is signed in and what they may do.

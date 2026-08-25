@@ -36,5 +36,14 @@ export default defineConfig(({ command }) => ({
     // scripts/clean-artifact.mjs removes stale output before each build.
     outDir: resolve(repoRoot),
     emptyOutDir: false,
+    // Two pages: the app, and the anonymous e-signature page. sign.html is a
+    // real second entry (its own bundle, no React) served at /spa/sign.html --
+    // external signers have no session, so it must not ride the app shell.
+    rollupOptions: {
+      input: {
+        main: resolve(repoRoot, 'app/index.html'),
+        sign: resolve(repoRoot, 'app/sign.html'),
+      },
+    },
   },
 }))

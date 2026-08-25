@@ -52,6 +52,11 @@ const TABS: Tab[] = [
   { seg: 'success', label: 'Success', when: isClientish, needs: 'viewCs' },
   { seg: 'contacts', label: 'Contacts' },
   { seg: 'files', label: 'Files' },
+  /*
+   * Agreements on every company: a lead is exactly who gets sent a contract, and
+   * a client's agreements are renewals and addenda.
+   */
+  { seg: 'agreements', label: 'Agreements', needs: 'viewAgreements' },
 ]
 
 export default function RecordTabs({
