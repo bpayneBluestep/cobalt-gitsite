@@ -9,7 +9,7 @@ import { dirname, resolve } from 'node:path'
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 // Only build outputs. Adding paths here is safe; never add "app".
-const artifacts = ['index.html', 'assets']
+const artifacts = ['index.html', 'assets', 'vendor']
 
 for (const name of artifacts) {
   await rm(resolve(repoRoot, name), { recursive: true, force: true })
