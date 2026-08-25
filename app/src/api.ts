@@ -604,9 +604,15 @@ export const getOutlookConnection = (): Promise<OutlookConnection> =>
  *
  * The state is committed server-side before this returns, so the link handed back is
  * always one whose callback can succeed.
+ *
+ * `returnTo` is where we would like to land afterwards. Microsoft always redirects to
+ * the ONE URI registered in the app, which is not necessarily the host you started on,
+ * and those hosts do not always serve the same build. The server stores this alongside
+ * the state and only honours https origins under bluestep.net, so proposing it here is
+ * a preference, not a decision.
  */
 export const getOutlookConnectUrl = (): Promise<{ url: string; expiresIn: number }> =>
-  maestroPost('outlookConnectUrl')
+  maestroPost('outlookConnectUrl', { returnTo: window.location.origin })
 
 /** Forget the stored token. Local only: it does not revoke the grant at Microsoft. */
 export const outlookDisconnect = (): Promise<{
