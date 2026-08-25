@@ -1,10 +1,100 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, Outlet, useLocation, useOutletContext, useParams } from 'react-router-dom'
 import {
-  ApiError, getCompany, setCategory,
-  COMPANY_CATEGORIES, type Company,
+  ApiError, getCompany, setCategory, getUnits, setUnit,
+  COMPANY_CATEGORIES, type Company, type RecordUnit,
 } from '../api'
 import RecordTabs from '../components/RecordTabs'
+import { useSession } from '../session'
+
+/*
+ * Which unit a record sits in, and a way to change it.
+ *
+ * It matters and nothing showed it: eight seeded companies sit in the top-level Cobalt
+ * unit while every imported client sits in Behavioral, and the only way to tell was to
+ * ask the database. The unit decides which queries see a record and which site serves
+ * it, so it belongs in the header next to the record id.
+ *
+ * Reads as text until you click it, because this is a fact you look at far more often
+ * than you change, and a select sitting open in a header invites an accident.
+ */
+function UnitPicker({ company, onMoved }: {
+  company: Company
+  onMoved: (c: Company) => void
+}) {
+  const { can } = useSession()
+  const mayMove = can('editClients')
+  const [editing, setEditing] = useState(false)
+  const [units, setUnits] = useState<RecordUnit[]>([])
+  const [busy, setBusy] = useState(false)
+  const [failure, setFailure] = useState('')
+  const [note, setNote] = useState('')
+
+  useEffect(() => {
+    if (!editing) return
+    getUnits()
+      .then(d => setUnits(d.rows || []))
+      .catch(() => setFailure('Could not read the unit list.'))
+  }, [editing])
+
+  const current = company.unit
+  const label = current?.name || 'unknown'
+
+  function move(unitId: string) {
+    if (!unitId || unitId === current?.id) { setEditing(false); return }
+    setBusy(true)
+    setFailure('')
+    setNote('')
+    setUnit(company.id, unitId)
+      .then(r => {
+        onMoved(r.company)
+        // The endpoint reads the move back. If it did not land, say so here rather
+        // than showing the new name and letting the next reload contradict it.
+        if (r.moved) setEditing(false)
+        else setNote(r.note || 'The move did not take effect.')
+      })
+      .catch(err => setFailure(err instanceof ApiError ? err.message : String(err)))
+      .finally(() => setBusy(false))
+  }
+
+  if (!editing) {
+    return (
+      <>
+        {mayMove ? (
+          <button type="button" className="linkbtn" onClick={() => setEditing(true)}>
+            {label}
+          </button>
+        ) : <span>{label}</span>}
+        {!current && <span className="muted"> (could not be read)</span>}
+      </>
+    )
+  }
+
+  return (
+    <>
+      <select
+        className="minisel"
+        aria-label="Unit"
+        defaultValue={current?.id || ''}
+        disabled={busy}
+        onChange={e => move(e.target.value)}
+      >
+        <option value="">{units.length ? 'Move to...' : 'Loading...'}</option>
+        {units.map(u => (
+          <option key={u.id} value={u.id}>{u.name}{u.id === current?.id ? ' (current)' : ''}</option>
+        ))}
+      </select>{' '}
+      <button type="button" className="linkbtn" disabled={busy} onClick={() => setEditing(false)}>
+        Cancel
+      </button>
+      {failure && <p className="editcard__err" role="alert">{failure}</p>}
+      {note && <p className="note">{note}</p>}
+      <p className="ef__hint">
+        Only units already in use are listed. There is no API that enumerates them.
+      </p>
+    </>
+  )
+}
 
 /*
  * The company record: the shell every one of its sections renders inside.
@@ -161,6 +251,15 @@ export default function CompanyRecord() {
                 <dd>
                   {[company.street, company.city, company.state, company.postalCode]
                     .filter(Boolean).join(', ') || <span className="muted">-</span>}
+                </dd>
+              </div>
+              <div>
+                <dt>Unit</dt>
+                <dd>
+                  <UnitPicker
+                    company={company}
+                    onMoved={c => setState({ phase: 'ready', company: c })}
+                  />
                 </dd>
               </div>
               <div>

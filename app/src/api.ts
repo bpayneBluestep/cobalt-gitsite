@@ -470,6 +470,11 @@ export interface Company {
    */
   contactDerived?: boolean
   contactIsPrimary?: boolean
+  /**
+   * The unit this record lives in. Present only on the single-company read: reading it
+   * once per row on every table would cost more than it tells you.
+   */
+  unit?: RecordUnit | null
   leadSource: string
   leadStatus: string
   beds: number | null
@@ -515,6 +520,32 @@ export interface NewCompany {
   /** Set when a client was created but its list wasn't: the client still exists. */
   listError: string | null
 }
+
+export interface RecordUnit {
+  id: string
+  name: string
+}
+
+/**
+ * The org's units.
+ *
+ * Discovered rather than enumerated: no API lists them, so the endpoint collects the
+ * units companies are already in and walks their parents and children. A unit that
+ * holds nothing and is unrelated to one that does will not be here.
+ */
+export const getUnits = (): Promise<{ total: number; rows: RecordUnit[] }> =>
+  maestroGet('units')
+
+/**
+ * Move a company into another unit.
+ *
+ * `moved` is read back from the record, not assumed. The platform can accept the write
+ * and decline to persist it, in which case `note` says so and the company is unchanged.
+ */
+export const setUnit = (
+  id: string, unitId: string,
+): Promise<{ company: Company; unit: RecordUnit | null; moved: boolean; note: string }> =>
+  maestroPost('setUnit', { id, unitId })
 
 /** Kept for the Clients screen, which was written against this name. */
 export type NewClient = NewCompany
