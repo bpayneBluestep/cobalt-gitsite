@@ -1,4 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
+import {
+  ApiError, getOutlookConnection, getOutlookConnectUrl, outlookDisconnect,
+  type OutlookConnection,
+} from '../api'
 import { setTheme, THEMES } from '../lib/theme'
 import useTheme from './useTheme'
 import { useSession } from '../session'
@@ -37,6 +41,56 @@ export default function UserMenu() {
   const [leaving, setLeaving] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
   const btnRef = useRef<HTMLButtonElement>(null)
+
+  /*
+   * The Outlook connection is loaded when the menu is FIRST opened, not on mount.
+   * Every signed-in page renders this component, and a connection nobody is looking at
+   * is not worth a request on every navigation.
+   */
+  const [conn, setConn] = useState<OutlookConnection | null>(null)
+  const [connErr, setConnErr] = useState('')
+  const [connBusy, setConnBusy] = useState('')
+  const loadedRef = useRef(false)
+
+  function loadConn() {
+    setConnErr('')
+    getOutlookConnection()
+      .then(setConn)
+      .catch(err => setConnErr(err instanceof ApiError ? err.message : String(err)))
+  }
+
+  useEffect(() => {
+    if (!open || loadedRef.current) return
+    loadedRef.current = true
+    loadConn()
+  }, [open])
+
+  function connect() {
+    if (connBusy) return
+    setConnBusy('connect'); setConnErr('')
+    getOutlookConnectUrl()
+      // A full page navigation, not a popup: the consent screen refuses to render in a
+      // frame, and a popup here would be the thing the browser blocks.
+      .then(r => { window.location.href = r.url })
+      .catch(err => {
+        setConnErr(err instanceof ApiError ? err.message : String(err))
+        setConnBusy('')
+      })
+  }
+
+  function disconnect() {
+    if (connBusy) return
+    if (!window.confirm(
+      'Forget your stored Outlook token?\n\n' +
+      'Cobalt will stop sending mail as you. This does not withdraw the permission at ' +
+      'Microsoft: do that in your Microsoft account if you want it fully revoked.',
+    )) return
+    setConnBusy('disconnect'); setConnErr('')
+    outlookDisconnect()
+      .then(r => setConn(r.connection))
+      .catch(err => setConnErr(err instanceof ApiError ? err.message : String(err)))
+      .finally(() => setConnBusy(''))
+  }
 
   // Same dismissal contract as ToolsMenu: outside click, and Escape returns focus to
   // the button that opened it.
@@ -100,6 +154,60 @@ export default function UserMenu() {
             <span className="tools__label">My Account</span>
             <span className="tools__note">password &amp; profile</span>
           </a>
+
+          {/*
+            Connecting your mailbox belongs here rather than in Settings: Settings holds
+            the UNIT's app registration, which is a Leadership concern, while this is your
+            own account and everyone with a mailbox has one.
+          */}
+          <div className="usermenu__group">
+            <p className="tools__heading">Outlook</p>
+            {!conn && !connErr && <p className="tools__note">Checking…</p>}
+            {connErr && <p className="tools__note usermenu__err">{connErr}</p>}
+            {conn && conn.connected && !conn.stale && (
+              <>
+                <p className="tools__note">
+                  Connected{conn.mailbox ? ' as ' : ''}
+                  {conn.mailbox && <strong>{conn.mailbox}</strong>}
+                </p>
+                <button
+                  type="button"
+                  className="tools__item usermenu__out"
+                  role="menuitem"
+                  disabled={!!connBusy}
+                  onClick={disconnect}
+                >
+                  <span className="tools__label">
+                    {connBusy === 'disconnect' ? 'Disconnecting…' : 'Disconnect Outlook'}
+                  </span>
+                </button>
+              </>
+            )}
+            {conn && conn.stale && (
+              <p className="tools__note usermenu__err">
+                Half connected: no token was stored. Connect again.
+              </p>
+            )}
+            {conn && (!conn.connected || conn.stale) && (
+              conn.canConnect ? (
+                <button
+                  type="button"
+                  className="tools__item"
+                  role="menuitem"
+                  disabled={!!connBusy}
+                  onClick={connect}
+                >
+                  <span className="tools__label">
+                    {connBusy === 'connect' ? 'Opening Microsoft…' : 'Connect Outlook'}
+                  </span>
+                  <span className="tools__note">send mail as you</span>
+                </button>
+              ) : (
+                /* Why it is unavailable, rather than a button that fails on click. */
+                <p className="tools__note">{conn.reason || 'Not available yet.'}</p>
+              )
+            )}
+          </div>
 
           <div className="usermenu__group">
             <p className="tools__heading">Display mode</p>

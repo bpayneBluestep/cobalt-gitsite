@@ -574,6 +574,45 @@ export const saveOutlookSettings = (
 ): Promise<{ saved: boolean; org: string; settings: OutlookSettings }> =>
   maestroPost('saveOutlookSettings', { orgId, fields, clearSecret })
 
+/*
+ * One person's own Outlook connection.
+ *
+ * As with the app secret, the token is absent by construction: the endpoint sends
+ * `hasRefreshToken` and never the value, so there is no field here to leak.
+ */
+export interface OutlookConnection {
+  connected: boolean
+  mailbox: string
+  scope: string
+  connectedAt: string
+  hasRefreshToken: boolean
+  /** Claims connected but has no token: a half-finished exchange. */
+  stale?: boolean
+  /** Whether the Connect button can do anything, and why not when it cannot. */
+  canConnect: boolean
+  reason: string
+  formReachable: boolean
+  unit?: string
+}
+
+/** The caller's own connection. No capability needed: it is about your own mailbox. */
+export const getOutlookConnection = (): Promise<OutlookConnection> =>
+  maestroGet('outlookConnection')
+
+/**
+ * Mint a one-time state and get the Microsoft authorize URL.
+ *
+ * The state is committed server-side before this returns, so the link handed back is
+ * always one whose callback can succeed.
+ */
+export const getOutlookConnectUrl = (): Promise<{ url: string; expiresIn: number }> =>
+  maestroPost('outlookConnectUrl')
+
+/** Forget the stored token. Local only: it does not revoke the grant at Microsoft. */
+export const outlookDisconnect = (): Promise<{
+  disconnected: boolean; was: string; connection: OutlookConnection; note: string
+}> => maestroPost('outlookDisconnect')
+
 export interface RecordUnit {
   id: string
   name: string

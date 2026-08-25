@@ -5217,3 +5217,44 @@ input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) opacit
     text-decoration: none;
   }
 }
+
+/* ── The Outlook round trip's result banner ──────────────────────────
+   Sits between the topbar and <main> rather than floating: the thing it reports
+   is the outcome of a full page navigation the user just came back from, so it
+   should be part of the page they landed on, not an overlay they might miss.
+   Tinted the same way .callout is, so success and failure read as the same kind
+   of object in two states rather than as two different components. */
+.oreturn {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-m);
+  margin: var(--s-m) auto 0;
+  max-width: 76rem;
+  padding: var(--s-m) var(--s-l);
+  background: color-mix(in srgb, var(--good) 8%, var(--bg-panel));
+  border: 1px solid color-mix(in srgb, var(--good) 30%, transparent);
+  border-left: 3px solid var(--good);
+  border-radius: var(--r-lg);
+  color: var(--text);
+}
+.oreturn--bad {
+  background: color-mix(in srgb, var(--danger) 8%, var(--bg-panel));
+  border-color: color-mix(in srgb, var(--danger) 30%, transparent);
+  border-left-color: var(--danger);
+}
+.oreturn__text { margin: 0; flex: 1 1 auto; font-size: 0.85rem; line-height: 1.45; }
+.oreturn__x {
+  flex: 0 0 auto;
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0.1rem 0.3rem;
+  cursor: pointer;
+  border-radius: var(--r);
+}
+.oreturn__x:hover { color: var(--text); }
+
+/* A failure inside the account menu, where there is no room for a callout. */
+.usermenu__err { color: var(--danger); }

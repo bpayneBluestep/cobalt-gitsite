@@ -34,6 +34,7 @@ import { SECTIONS } from './sections'
 import { logoutUrl, type Capability } from './api'
 import { SessionProvider, useSession } from './session'
 import ToolsMenu from './components/ToolsMenu'
+import OutlookReturn from './components/OutlookReturn'
 import UserMenu from './components/UserMenu'
 
 /*
@@ -163,6 +164,9 @@ function Shell() {
           <UserMenu />
         </div>
       </header>
+
+      {/* The tail of the Outlook round trip, shown wherever the callback drops you. */}
+      <OutlookReturn />
 
       <main>
         {/*
