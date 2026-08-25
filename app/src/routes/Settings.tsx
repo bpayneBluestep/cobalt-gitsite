@@ -4,6 +4,7 @@ import {
   DEPARTMENTS, EMPLOYMENT_TYPES, STAFF_ROLES,
   type User, type UserList, type EmployeeFieldKey, type EmployeeWrite,
 } from '../api'
+import OutlookSettingsPanel from '../components/OutlookSettingsPanel'
 import PhoneInput from '../components/PhoneInput'
 import { isPhoneOk } from '../lib/phone'
 import { useSession } from '../session'
@@ -71,6 +72,14 @@ export default function Settings() {
   const { can } = useSession()
   const mayEdit = can('editStaff')
   const mayGrant = can('grantRoles')
+
+  /*
+    * Which section is showing. Outlook is Leadership-only in the same way the write
+    * controls are: the endpoint refuses the read outright, so showing the tab to anyone
+    * else would only offer them an error. Not a second permission, just the one already
+    * being asked - the settings form's own ACL is Leadership too.
+    */
+  const [tab, setTab] = useState<'users' | 'outlook'>('users')
 
   const [state, setState] = useState<State>({ phase: 'loading' })
   const [includeFormer, setIncludeFormer] = useState(true)
@@ -169,8 +178,26 @@ export default function Settings() {
       </header>
 
       <nav className="subnav" aria-label="Settings sections">
-        <button type="button" className="subnav__btn" data-on="" aria-current="true">Users</button>
+        <button type="button" className="subnav__btn"
+          data-on={tab === 'users' ? '' : undefined}
+          aria-current={tab === 'users' ? 'true' : undefined}
+          onClick={() => setTab('users')}>
+          Users
+        </button>
+        {mayEdit && (
+          <button type="button" className="subnav__btn"
+            data-on={tab === 'outlook' ? '' : undefined}
+            aria-current={tab === 'outlook' ? 'true' : undefined}
+            onClick={() => setTab('outlook')}>
+            Outlook
+          </button>
+        )}
       </nav>
+
+      {tab === 'outlook' && <OutlookSettingsPanel />}
+
+      {tab === 'users' && (
+        <>
 
       {state.phase === 'loading' && <p className="empty">Loading users…</p>}
 
@@ -430,6 +457,8 @@ export default function Settings() {
             separate step in the platform’s account tooling, which no script can do.
             Roles take effect on the platform as soon as they are saved.
           </p>
+        </>
+      )}
         </>
       )}
     </section>

@@ -521,6 +521,59 @@ export interface NewCompany {
   listError: string | null
 }
 
+/*
+ * The Microsoft Entra app, per unit.
+ *
+ * NOTE WHAT IS NOT HERE: `azureClientSecret`. The endpoint never returns it, only
+ * `secretSet`, so there is no field on this type to accidentally render, log, or round
+ * trip back on a save. Replacing a secret is a write with no matching read.
+ */
+export interface OutlookSettings {
+  orgId: string
+  orgName: string
+  unit: RecordUnit | null
+  azureClientId: string
+  azureTenant: string
+  azureRedirectUri: string
+  azureScope: string
+  outlookConnectEnabled: boolean
+  outlookNotes: string
+  /** Whether a client secret is stored. The value itself is never sent. */
+  secretSet: boolean
+  /** Field keys still empty. Lets the form point at the specific box. */
+  missing: string[]
+  configured: boolean
+  /** Set only when the settings form could not be read at all. */
+  readError?: string
+}
+
+export interface OutlookSettingsList {
+  total: number
+  rows: OutlookSettings[]
+  /** Suggestions for empty boxes. Nothing here is stored until it is saved. */
+  defaults: { azureTenant: string; azureRedirectUri: string; azureScope: string }
+  /** The exact string to register in the Entra app. Microsoft matches it literally. */
+  redirectUri: string
+}
+
+/** Every unit's Outlook app settings. Leadership only. */
+export const getOutlookSettings = (): Promise<OutlookSettingsList> =>
+  maestroGet('outlookSettings')
+
+/**
+ * Save one unit's settings.
+ *
+ * Leave `azureClientSecret` out (or empty) to keep the stored one: an empty box means
+ * "I did not touch this", never "delete the credential". Pass `clearSecret` to blank it.
+ */
+export const saveOutlookSettings = (
+  orgId: string,
+  fields: Partial<Omit<OutlookSettings, 'orgId' | 'orgName' | 'unit' | 'secretSet' | 'missing' | 'configured' | 'readError'>>
+    & { azureClientSecret?: string },
+  clearSecret = false,
+): Promise<{ saved: boolean; org: string; settings: OutlookSettings }> =>
+  maestroPost('saveOutlookSettings', { orgId, fields, clearSecret })
+
 export interface RecordUnit {
   id: string
   name: string
