@@ -1003,6 +1003,17 @@ main { flex: 1; min-height: 0; display: flex; }
 }
 
 .facts dd { margin: 0; min-width: 0; font-size: 0.82rem; }
+
+/*
+ * A linkbtn that IS the value, rather than an action tacked on after one.
+ *
+ * `.linkbtn` carries `margin-left` and a smaller size because it normally follows
+ * something: "Delete" at the end of a row, "Add a contact" after a name. Standing alone
+ * in a fact's value slot, that margin indents it out of the column the other values
+ * line up in, and the smaller size drops it off their baseline. Both are undone here so
+ * Unit sits exactly where Address and Record id sit.
+ */
+.facts dd > .linkbtn:first-child { margin-left: 0; font-size: inherit; }
 .facts__wrap { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 
 .inlink {
