@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   getClients, createClient, ApiError,
@@ -28,6 +28,17 @@ export default function Clients() {
   const [saving, setSaving] = useState(false)
   const [failure, setFailure] = useState('')
 
+  /*
+   * Filtering happens here, not at the endpoint: `clients` returns every Company in the
+   * category in one call and the list is small enough to hold, so a round trip per
+   * keystroke would buy nothing and cost the responsiveness that makes a search feel
+   * like a search.
+   *
+   * Matched against name, website and the address parts, because "the one in Provo" is
+   * how people actually look for a client they cannot spell.
+   */
+  const [search, setSearch] = useState('')
+
   const load = useCallback(() => {
     setState({ phase: 'loading' })
     getClients()
@@ -39,6 +50,14 @@ export default function Clients() {
   }, [])
 
   useEffect(load, [load])
+
+  const rows = state.phase === 'ready' ? state.rows : []
+  const shown = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return rows
+    return rows.filter(r => [r.name, r.website, r.city, r.state, r.postalCode]
+      .some(v => String(v || '').toLowerCase().includes(q)))
+  }, [rows, search])
 
   function openPanel() {
     setDraft(EMPTY)
@@ -87,11 +106,26 @@ export default function Clients() {
             <p className="eyebrow">Companies</p>
             <h1>Clients</h1>
           </div>
-          {!open && (
-            <button type="button" className="btn" onClick={openPanel}>
-              <span aria-hidden="true">+</span> New client
-            </button>
-          )}
+          <div className="page__head-tools">
+            {state.phase === 'ready' && rows.length > 0 && (
+              <div className="ef ef--narrow">
+                <label htmlFor="cl-search">Search</label>
+                <input
+                  id="cl-search"
+                  type="search"
+                  value={search}
+                  autoComplete="off"
+                  placeholder="Name, website, city…"
+                  onChange={e => setSearch(e.target.value)}
+                />
+              </div>
+            )}
+            {!open && (
+              <button type="button" className="btn" onClick={openPanel}>
+                <span aria-hidden="true">+</span> New client
+              </button>
+            )}
+          </div>
         </div>
         <p className="page__sub-text">
           Every Company record in the <code>Client</code> category, served by the Maestro.
@@ -133,7 +167,7 @@ export default function Clients() {
 
           <div className="editcard__foot">
             <span className="editcard__status">
-              {saving ? 'Creating…' : 'A name is required. Records cannot be deleted, so check it before creating.'}
+              {saving ? 'Creating…' : 'A name is required. Check it before creating — deleting a company later takes its deals, agreements and tickets with it.'}
             </span>
             <button type="button" className="btn btn--ghost" onClick={closePanel} disabled={saving}>
               Cancel
@@ -171,10 +205,24 @@ export default function Clients() {
         </div>
       )}
 
-      {state.phase === 'ready' && state.rows.length > 0 && (
+      {state.phase === 'ready' && rows.length > 0 && shown.length === 0 && (
+        <div className="callout callout--plain">
+          <p className="callout__title">No match</p>
+          <p>
+            No client matches “{search.trim()}”.{' '}
+            <button type="button" className="linkbtn" onClick={() => setSearch('')}>
+              Clear the search
+            </button>.
+          </p>
+        </div>
+      )}
+
+      {state.phase === 'ready' && shown.length > 0 && (
         <>
           <p className="page__count">
-            {state.rows.length} client{state.rows.length === 1 ? '' : 's'}
+            {search.trim()
+              ? `${shown.length} of ${rows.length} client${rows.length === 1 ? '' : 's'}`
+              : `${rows.length} client${rows.length === 1 ? '' : 's'}`}
           </p>
           <div className="tablewrap">
             <table className="fields">
@@ -189,7 +237,7 @@ export default function Clients() {
                 </tr>
               </thead>
               <tbody>
-                {state.rows.map(row => (
+                {shown.map(row => (
                   <tr key={row.id} className="rowlink">
                     <th scope="row">
                       {/* A real link, so the row is keyboard-reachable and opens in a

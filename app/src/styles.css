@@ -533,6 +533,14 @@ main { flex: 1; min-height: 0; display: flex; }
 
 .page__head { margin-bottom: 1.25rem; }
 
+/* The right-hand cluster of a page header: a search field and the primary action.
+ * Baseline-aligned rather than centred, so the input sits on the same line as the
+ * button despite carrying a label above it. Wraps before it squeezes on narrow. */
+.page__head-tools {
+  display: flex; align-items: flex-end; gap: var(--s-s); flex-wrap: wrap;
+}
+.page__head-tools .ef { margin: 0; }
+
 .page__head h1 {
   margin: 0 0 var(--s-xs);
   font-family: var(--font-display);
@@ -4968,6 +4976,13 @@ input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) opacit
 .confirm__label { display: block; font-size: var(--t-caption1); font-weight: 600; margin-bottom: 4px; }
 .confirm__foot { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 .confirm__status { flex: 1; font-size: var(--t-caption1); color: var(--danger); }
+
+/* An icon-only button: square, so a lone glyph is not stranded in button padding
+ * shaped for a word. Sized to sit level with the worded buttons beside it. */
+.btn--icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0; width: 2rem; height: 2rem; line-height: 0;
+}
 
 .btn--del { color: var(--danger); }
 .btn--del:hover {
