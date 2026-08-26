@@ -35,6 +35,7 @@ import { logoutUrl, type Capability } from './api'
 import { SessionProvider, useSession } from './session'
 import ToolsMenu from './components/ToolsMenu'
 import OutlookReturn from './components/OutlookReturn'
+import StaffRecord from './routes/StaffRecord'
 import UserMenu from './components/UserMenu'
 
 /*
@@ -222,6 +223,9 @@ function Shell() {
 
             <Route path="/sprints" element={<Guarded needs="viewSprints" what="Sprints"><Sprints /></Guarded>} />
             <Route path="/settings" element={<Guarded needs="viewStaff" what="Settings"><Settings /></Guarded>} />
+            {/* A person gets a page of their own, the same as a company. Same gate as the
+                directory it opens from; the write paths keep their own stricter ones. */}
+            <Route path="/staff/:id" element={<Guarded needs="viewStaff" what="Staff records"><StaffRecord /></Guarded>} />
 
             {/* Clients is live. It sits under /clients rather than the root now that
                 Home has it, and is reached from Home and from CRM.

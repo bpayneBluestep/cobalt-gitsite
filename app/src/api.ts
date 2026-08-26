@@ -580,6 +580,40 @@ export const saveOutlookSettings = (
  * As with the app secret, the token is absent by construction: the endpoint sends
  * `hasRefreshToken` and never the value, so there is no field here to leak.
  */
+/** A person's whole record: what `staff` returns. */
+export interface Staff extends Omit<User, 'directReports'> {
+  /**
+   * Cobalt's own copy of the name, on Employee Info.
+   *
+   * It lives there because the platform's real name fields carry no Field Identifier and
+   * BSJS could not address them; `nameForm` below is that real one, kept in step on save.
+   */
+  firstName: string
+  lastName: string
+  /** The platform's own Name and E-mail form, which is not where Cobalt keeps the name. */
+  nameForm: { firstName: string; lastName: string; email: string }
+  /**
+   * Online Profile, credentials excluded. Username identifies the account; password,
+   * password answer and remote user key are never read.
+   */
+  login: { username: string; reachable: boolean }
+  unit: RecordUnit | null
+  /** Who reports to this person. The directory sends a count; a record sends the people. */
+  directReports: Array<{ id: string; name: string }>
+  /** Everyone else, for the supervisor picker: saves a second round trip. */
+  people: Array<{ id: string; name: string }>
+  outlook: OutlookConnection & { formReachable: boolean }
+  departments: string[]
+  employmentTypes: string[]
+  staffRoles: string[]
+  isSelf: boolean
+  /** Only set when you are looking at your own record: nobody can change another's password. */
+  accountToolingUrl: string
+}
+
+/** One person's whole record. Needs viewStaff, same as the directory it opens from. */
+export const getStaff = (id: string): Promise<Staff> => maestroGet('staff', { id })
+
 export interface OutlookConnection {
   connected: boolean
   mailbox: string
@@ -2126,7 +2160,7 @@ export type EmployeeFieldKey =
  * Sending `roles: []` clears every role. Omitting the key leaves them untouched.
  */
 export type EmployeeWrite =
-  Partial<Record<EmployeeFieldKey, string> & { roles: string[] }>
+  Partial<Record<EmployeeFieldKey | 'firstName' | 'lastName', string> & { roles: string[] }>
 
 export const getUsers = (includeFormer = false): Promise<UserList> =>
   maestroGet('users', includeFormer ? { includeFormer: 'true' } : {})

@@ -4,6 +4,7 @@ import {
   DEPARTMENTS, EMPLOYMENT_TYPES, STAFF_ROLES,
   type User, type UserList, type EmployeeFieldKey, type EmployeeWrite,
 } from '../api'
+import { Link } from 'react-router-dom'
 import OutlookSettingsPanel from '../components/OutlookSettingsPanel'
 import PhoneInput from '../components/PhoneInput'
 import { isPhoneOk } from '../lib/phone'
@@ -381,7 +382,11 @@ export default function Settings() {
                 {rows.map(u => (
                   <tr key={u.id} data-off={u.hasEmployeeInfo && !u.employed ? '' : undefined}>
                     <th scope="row">
-                      {u.name || <span className="muted">(unnamed)</span>}
+                      {/* The name opens the person's own record: the table is a directory,
+                          and everything you might want to KNOW about someone lives there. */}
+                      <Link className="inlink" to={`/staff/${u.id}`}>
+                        {u.name || <span className="muted">(unnamed)</span>}
+                      </Link>
                       <span className="rowmarks">
                         {u.hasEmployeeInfo && !u.employed && <span className="mark">left</span>}
                         {!u.hasEmployeeInfo && <span className="mark">no details yet</span>}
@@ -437,12 +442,16 @@ export default function Settings() {
                     </td>
                     <td className="leads__act">
                       {mayEdit ? (
-                        <button type="button" className="linkbtn" disabled={!!busy}
-                          onClick={() => { setEditing(u.id); setDraft(draftOf(u)) }}>
-                          Edit
-                        </button>
+                        <>
+                          <button type="button" className="linkbtn" disabled={!!busy}
+                            onClick={() => { setEditing(u.id); setDraft(draftOf(u)) }}>
+                            Edit
+                          </button>
+                          {/* Quick edits stay inline; Open is for the whole record. */}
+                          <Link className="linkbtn" to={`/staff/${u.id}`}>Open</Link>
+                        </>
                       ) : (
-                        <span className="muted">{dash}</span>
+                        <Link className="linkbtn" to={`/staff/${u.id}`}>Open</Link>
                       )}
                     </td>
                   </tr>
