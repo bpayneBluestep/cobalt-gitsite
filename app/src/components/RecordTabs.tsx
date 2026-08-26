@@ -42,8 +42,8 @@ const isClientish = (categories: string[]) =>
 
 const TABS: Tab[] = [
   { seg: '', label: 'Info' },
-  { seg: 'deals', label: 'Deals' },
-  { seg: 'tickets', label: 'Tickets', when: isClientish },
+  { seg: 'deals', label: 'Deals', needs: 'viewDeals' },
+  { seg: 'tickets', label: 'Tickets', when: isClientish, needs: 'viewTickets' },
   /*
    * Success is clientish for the same reason Tickets is: a lead has no relationship to
    * keep healthy yet, and a Former Client's history is exactly what you want in front of

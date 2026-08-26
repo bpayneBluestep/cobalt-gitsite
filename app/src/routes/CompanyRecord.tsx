@@ -1,11 +1,128 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, Outlet, useLocation, useOutletContext, useParams } from 'react-router-dom'
 import {
-  ApiError, getCompany, setCategory, getUnits, setUnit,
+  Link, Outlet, useLocation, useNavigate, useOutletContext, useParams,
+} from 'react-router-dom'
+import {
+  ApiError, getCompany, setCategory, getUnits, setUnit, deleteCompany,
   COMPANY_CATEGORIES, type Company, type RecordUnit,
 } from '../api'
 import RecordTabs from '../components/RecordTabs'
 import { useSession } from '../session'
+
+/*
+ * Deleting a company.
+ *
+ * Sits in the header beside the stage buttons because that is where the other
+ * whole-record actions live, and styled with `btn--del` — danger on the text, not a red
+ * fill, so it is findable without competing with the thing people actually came to do.
+ *
+ * Two brakes, because the record takes a lot with it:
+ *
+ *   1. The dialog LISTS what dies (deals, agreements, contacts, files, and the ticket
+ *      list with its tickets) instead of asking a bare "are you sure?". Most people
+ *      cannot name what hangs off a company from memory, and the tickets are the part
+ *      that surprises.
+ *   2. The person types YES. A yes/no prompt gets a reflex; typing costs a beat of
+ *      reading. The same string goes to the server, which demands it independently — the
+ *      dialog is a courtesy, the endpoint is the gate.
+ *
+ * Only rendered with `deleteCompanies` (Leadership). A hidden button is not security —
+ * the endpoint refuses regardless — it just avoids offering a door that will not open.
+ */
+function DeleteCompany({ company }: { company: Company }) {
+  const { can } = useSession()
+  const navigate = useNavigate()
+  const [open, setOpen] = useState(false)
+  const [typed, setTyped] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [failure, setFailure] = useState('')
+
+  if (!can('deleteCompanies')) return null
+
+  const armed = typed.trim().toUpperCase() === 'YES'
+
+  const close = () => {
+    if (busy) return
+    setOpen(false); setTyped(''); setFailure('')
+  }
+
+  const run = () => {
+    if (!armed || busy) return
+    setBusy(true); setFailure('')
+    // The typed value is what goes over the wire, not a literal: the server check has to
+    // be testing the person's input or it is testing nothing.
+    deleteCompany(company.id, typed.trim().toUpperCase())
+      .then(() => { navigate('/clients', { replace: true }) })
+      .catch((e: unknown) => {
+        setBusy(false)
+        setFailure(e instanceof ApiError ? e.message : 'Could not delete the company.')
+      })
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        className="btn btn--ghost btn--del"
+        onClick={() => setOpen(true)}
+        title={`Delete ${company.name}`}
+      >
+        Delete
+      </button>
+
+      {open && (
+        <div
+          className="confirm-back"
+          onMouseDown={e => { if (e.target === e.currentTarget) close() }}
+        >
+          <div className="confirm" role="dialog" aria-modal="true" aria-labelledby="del-h">
+            <h2 id="del-h">Delete this company?</h2>
+            <p>
+              <span className="confirm__name">{company.name}</span> and everything on it
+              will be permanently removed:
+            </p>
+            <ul>
+              <li>Deals, and their history</li>
+              <li>Agreements, including signed documents</li>
+              <li>Contacts, files, and Client Success touchpoints</li>
+              <li>Its ticket list, and every ticket on it</li>
+            </ul>
+            <p>This cannot be undone.</p>
+
+            <label className="confirm__label" htmlFor="del-yes">
+              Type YES to confirm
+            </label>
+            <input
+              id="del-yes"
+              className="input"
+              value={typed}
+              autoFocus
+              autoComplete="off"
+              disabled={busy}
+              onChange={e => setTyped(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && armed) run() }}
+            />
+
+            <div className="confirm__foot">
+              <span className="confirm__status">{failure}</span>
+              <button type="button" className="btn btn--ghost" onClick={close} disabled={busy}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn--danger"
+                onClick={run}
+                disabled={!armed || busy}
+              >
+                {busy ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
 
 /*
  * Which unit a record sits in, and a way to change it.
@@ -286,6 +403,7 @@ export default function CompanyRecord() {
                   </button>
                 )
               })}
+              <DeleteCompany company={company} />
             </div>
           </div>
 

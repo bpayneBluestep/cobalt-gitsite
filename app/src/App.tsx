@@ -75,7 +75,7 @@ function Guarded({
 const CAPABILITY_LABELS: Record<Capability, string> = {
   viewClients: 'any role',
   editClients: 'Leadership, Sales or Client Success',
-  viewDeals: 'Leadership, Accounting, Sales or Client Success',
+  viewDeals: 'Leadership, Accounting or Sales',
   editDeals: 'Leadership or Sales',
   viewMoney: 'Sales or Accounting',
   viewContacts: 'any role',
@@ -84,7 +84,7 @@ const CAPABILITY_LABELS: Record<Capability, string> = {
   editFiles: 'any role except Accounting',
   viewOwner: 'any role',
   editOwner: 'Leadership, Sales or Client Success',
-  viewTickets: 'any role',
+  viewTickets: 'Leadership, Relate Engineer, Infra Engineer or Client Success',
   editTickets: 'Leadership, Relate Engineer, Infra Engineer or Client Success',
   viewSprints: 'Leadership, Relate Engineer, Infra Engineer or Client Success',
   editSprints: 'Leadership',
@@ -93,12 +93,13 @@ const CAPABILITY_LABELS: Record<Capability, string> = {
   grantRoles: 'Leadership',
   viewReports: 'Leadership or Accounting',
   viewSchema: 'Leadership, Relate Engineer or Infra Engineer',
+  deleteCompanies: 'Leadership',
   viewCs: 'Leadership, Accounting or Client Success',
   editCs: 'Leadership or Client Success',
   viewSurveys: 'Leadership or Client Success',
   adminCs: 'Leadership',
-  viewAgreements: 'any role',
-  editAgreements: 'Leadership, Sales or Client Success',
+  viewAgreements: 'Leadership, Accounting or Sales',
+  editAgreements: 'Leadership or Sales',
   manageAgreementTemplates: 'Leadership or Sales',
 }
 
@@ -241,13 +242,26 @@ function Shell() {
               <Route index element={<CompanyInfo />} />
               {/*
                 Deals on every company, lead and client alike: a client's deals are
-                upsells. Tickets stay routed for everyone even though the TAB is hidden
-                for a lead: a link from elsewhere should still resolve rather than fall
-                through to the catch-all, and the board says plainly when there is
+                upsells. Tickets stay routed for every CATEGORY even though the TAB is
+                hidden for a lead: a link from elsewhere should still resolve rather than
+                fall through to the catch-all, and the board says plainly when there is
                 nothing on it.
+
+                Both are guarded on their own capability, like `success` below. The
+                parent route only asks for `viewClients`, and since 2026-08-26 neither of
+                these is a read every role holds: deals are Sales/Accounting/Leadership,
+                tickets are engineering/CS/Leadership. Without the guard a rep following
+                an old ticket link gets the screen and then a raw API failure, instead of
+                the panel that explains who the page is for.
               */}
-              <Route path="deals" element={<CompanyDeals />} />
-              <Route path="tickets" element={<ClientTickets />} />
+              <Route
+                path="deals"
+                element={<Guarded needs="viewDeals" what="This company’s deals"><CompanyDeals /></Guarded>}
+              />
+              <Route
+                path="tickets"
+                element={<Guarded needs="viewTickets" what="This client’s tickets"><ClientTickets /></Guarded>}
+              />
               <Route path="contacts" element={<CompanyContacts />} />
               {/* The client's CS history. Routed for every company even though the TAB is
                   hidden for a lead, so a link from the queue always resolves, and a

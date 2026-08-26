@@ -161,6 +161,9 @@ export type Capability =
   | 'viewSprints' | 'editSprints'
   | 'viewStaff' | 'editStaff'
   | 'grantRoles'
+  /** Deleting a Company record outright. Leadership only, and its own capability
+   *  because it is the one action here nothing can undo. */
+  | 'deleteCompanies'
   | 'viewReports'
   | 'viewSchema'
   /*
@@ -2242,6 +2245,19 @@ export const COMPANY_CATEGORIES = ['Lead', 'Client', 'Former Client'] as const
 /** Move a company to exactly one category. */
 export const setCategory = (id: string, category: string): Promise<Company> =>
   maestroPost('setCategory', { id, category })
+
+/*
+ * Delete a company outright. Irreversible: the record, every form entry on it, and its
+ * ticket List (with its tickets) go together.
+ *
+ * `confirm` is sent verbatim and the endpoint demands the literal string "YES". The UI
+ * makes the person type it, so this argument is that typing — never a constant supplied
+ * by the caller, or the server-side brake becomes decoration.
+ */
+export const deleteCompany = (
+  id: string, confirm: string,
+): Promise<{ deleted: string; name: string; listsDeleted: number }> =>
+  maestroPost('deleteCompany', { id, confirm })
 
 // ------------------------------------------------------------- client success
 /*

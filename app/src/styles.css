@@ -4938,6 +4938,37 @@ input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) opacit
  * Info's "Revert" button red: same position, opposite meaning.
  * ------------------------------------------------------------------------- */
 
+/* ---------------------------------------------------------------------------
+ * Confirm-by-typing dialog
+ *
+ * For the actions where "are you sure?" is not enough, because the honest answer to a
+ * yes/no prompt is a reflex. Typing YES costs three seconds and buys the half-second of
+ * reading that a click does not.
+ *
+ * Local to this one use rather than a shared primitive: cobalt has no modal system, and
+ * inventing one for a single dialog would be the larger change. The agreements section
+ * carries its own for the same reason.
+ * ------------------------------------------------------------------------- */
+
+.confirm-back {
+  position: fixed; inset: 0; z-index: 900; background: rgb(7 12 23 / .55);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.confirm {
+  width: min(480px, 94vw); max-height: 92vh; overflow: auto;
+  background: var(--bg-panel); color: var(--text);
+  border: 1px solid var(--line); border-radius: var(--r-xl); box-shadow: var(--el-28);
+  padding: 18px 20px;
+}
+.confirm h2 { margin: 0 0 6px; font-size: var(--t-subtitle2); }
+.confirm p { margin: 0 0 10px; font-size: var(--t-caption1); color: var(--text-dim); }
+.confirm ul { margin: 0 0 12px; padding-left: 1.1rem; font-size: var(--t-caption1); color: var(--text-dim); }
+.confirm li { margin: 2px 0; }
+.confirm__name { color: var(--text); font-weight: 600; }
+.confirm__label { display: block; font-size: var(--t-caption1); font-weight: 600; margin-bottom: 4px; }
+.confirm__foot { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.confirm__status { flex: 1; font-size: var(--t-caption1); color: var(--danger); }
+
 .btn--del { color: var(--danger); }
 .btn--del:hover {
   color: var(--danger);
