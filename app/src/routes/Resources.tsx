@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { getArtifacts, ApiError, type ArtifactCard } from '../api'
+import { Link, useNavigate } from 'react-router-dom'
+import { getArtifacts, createArtifact, ApiError, type ArtifactCard } from '../api'
 
 /*
  * The Resources library: every artifact as a card.
@@ -19,8 +19,91 @@ type State =
 const LOGIN_URL = '/shared/login/login.jsp?desturl=' +
   encodeURIComponent(window.location.pathname + window.location.search)
 
+
+/* Read chosen files as {path, dataBase64} rows — the exact payload Claude sends. */
+async function readFileRows(list: FileList | null): Promise<{ path: string; dataBase64: string }[]> {
+  if (!list) return []
+  const rows: { path: string; dataBase64: string }[] = []
+  for (const f of Array.from(list)) {
+    const buf = await f.arrayBuffer()
+    let bin = ''
+    const u8 = new Uint8Array(buf)
+    for (let i = 0; i < u8.length; i += 0x8000) bin += String.fromCharCode(...u8.subarray(i, i + 0x8000))
+    rows.push({ path: (f as any).webkitRelativePath || f.name, dataBase64: btoa(bin) })
+  }
+  return rows
+}
+
+/*
+ * The browser publish form. Second fiddle on purpose: Claude Code assembles better
+ * bundles (it can pull component source and write the explainer with you), but a
+ * form must exist so the library never depends on one tool being installed.
+ */
+function NewArtifact({ onDone, onClose }: { onDone: () => void; onClose: () => void }) {
+  const navigate = useNavigate()
+  const [title, setTitle] = useState('')
+  const [summary, setSummary] = useState('')
+  const [tags, setTags] = useState('')
+  const [explainer, setExplainer] = useState('')
+  const [files, setFiles] = useState<FileList | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [failure, setFailure] = useState('')
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (busy) return
+    setBusy(true); setFailure('')
+    try {
+      const rows = await readFileRows(files)
+      const full = await createArtifact({
+        title: title.trim(), summary: summary.trim(),
+        tags: tags.split(',').map(t => t.trim()).filter(Boolean),
+        explainer: explainer.trim(), files: rows,
+      })
+      onDone()
+      navigate(`/resources/${full.artifact.slug || full.artifact.id}`)
+    } catch (err) {
+      setBusy(false)
+      setFailure(err instanceof ApiError ? err.message : 'Could not publish the artifact.')
+    }
+  }
+
+  return (
+    <form className="editcard res-newform" onSubmit={submit}>
+      <div className="editcard__head">
+        <h2>New artifact</h2>
+        <p className="note">
+          Claude Code publishes richer bundles (it can pull component source and draft the
+          explainer with you) — but everything works from here too.
+        </p>
+      </div>
+      {failure && <p className="editcard__err" role="alert">{failure}</p>}
+      <div className="efgrid">
+        <div className="ef"><label htmlFor="na-title">Title<span className="ef__req" aria-hidden="true">*</span></label>
+          <input id="na-title" type="text" value={title} autoFocus autoComplete="off" onChange={e => setTitle(e.target.value)} /></div>
+        <div className="ef"><label htmlFor="na-tags">Tags (comma-separated)</label>
+          <input id="na-tags" type="text" value={tags} autoComplete="off" placeholder="migration, bestnotes" onChange={e => setTags(e.target.value)} /></div>
+      </div>
+      <div className="ef"><label htmlFor="na-sum">Summary</label>
+        <input id="na-sum" type="text" value={summary} autoComplete="off" placeholder="One sentence: what problem this solves" onChange={e => setSummary(e.target.value)} /></div>
+      <div className="ef"><label htmlFor="na-ex">Explainer<span className="ef__req" aria-hidden="true">*</span></label>
+        <textarea id="na-ex" rows={5} value={explainer}
+          placeholder="What this is, how it works, and what the next engineer needs to know. Markdown welcome."
+          onChange={e => setExplainer(e.target.value)} /></div>
+      <div className="ef"><label htmlFor="na-files">Files<span className="ef__req" aria-hidden="true">*</span></label>
+        <input id="na-files" type="file" multiple onChange={e => setFiles(e.target.files)} /></div>
+      <div className="editcard__foot">
+        <span className="editcard__status">{busy ? 'Publishing…' : 'Title, explainer and at least one file are required.'}</span>
+        <button type="button" className="btn btn--ghost" onClick={onClose} disabled={busy}>Cancel</button>
+        <button type="submit" className="btn" disabled={busy || !title.trim() || !explainer.trim() || !files || files.length === 0}>Publish v1</button>
+      </div>
+    </form>
+  )
+}
+
 export default function Resources() {
   const [state, setState] = useState<State>({ phase: 'loading' })
+  const [pubOpen, setPubOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [tag, setTag] = useState('')
   const [showArchived, setShowArchived] = useState(false)
@@ -64,6 +147,11 @@ export default function Resources() {
             <h1>Resources</h1>
           </div>
           <div className="page__head-tools">
+            {!pubOpen && (
+              <button type="button" className="btn" onClick={() => setPubOpen(true)}>
+                <span aria-hidden="true">+</span> New artifact
+              </button>
+            )}
             {rows.length > 0 && (
               <div className="ef ef--narrow">
                 <label htmlFor="res-search">Search</label>
@@ -86,6 +174,8 @@ export default function Resources() {
           <code>pull the &lt;name&gt; artifact</code>.
         </p>
       </header>
+
+      {pubOpen && <NewArtifact onDone={load} onClose={() => setPubOpen(false)} />}
 
       {state.phase === 'loading' && <p className="empty">Loading artifacts…</p>}
 

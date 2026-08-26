@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import {
   ApiError, getArtifact, getArtifactFile, getArtifactProposals, decideArtifactProposal,
+  publishArtifactVersion, proposeArtifactVersion,
   type ArtifactFull, type ArtifactProposal, type ManifestRow,
 } from '../api'
 import { useSession } from '../session'
@@ -197,6 +198,97 @@ function ProposalPanel({ full, reload }: { full: ArtifactFull; reload: () => voi
   )
 }
 
+
+/*
+ * The browser's version-submission form. One component, two meanings decided by
+ * ownership: the owner publishes the next version outright; anyone else submits a
+ * proposal the owner will judge. Same rule as the endpoint, stated on the button.
+ *
+ * All-or-nothing by design: the chosen files ARE the next version, not a patch —
+ * which is why the label says "complete file set" rather than "changes".
+ */
+function VersionForm({ full, reload }: { full: ArtifactFull; reload: () => void }) {
+  const { session } = useSession()
+  const [open, setOpen] = useState(false)
+  const [explainer, setExplainer] = useState('')
+  const [files, setFiles] = useState<FileList | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [failure, setFailure] = useState('')
+  const [proposed, setProposed] = useState(false)
+
+  const isOwner = !!session && String(session.userId) === String(full.artifact.ownerId)
+  if (full.artifact.status === 'Archived') return null
+
+  const readAll = async (): Promise<{ path: string; dataBase64: string }[]> => {
+    const rows: { path: string; dataBase64: string }[] = []
+    for (const f of Array.from(files || [])) {
+      const buf = await f.arrayBuffer()
+      let bin = ''
+      const u8 = new Uint8Array(buf)
+      for (let i = 0; i < u8.length; i += 0x8000) bin += String.fromCharCode(...u8.subarray(i, i + 0x8000))
+      rows.push({ path: (f as any).webkitRelativePath || f.name, dataBase64: btoa(bin) })
+    }
+    return rows
+  }
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (busy) return
+    setBusy(true); setFailure('')
+    try {
+      const rows = await readAll()
+      if (isOwner) {
+        await publishArtifactVersion({ id: full.artifact.id, explainer: explainer.trim(), files: rows })
+      } else {
+        await proposeArtifactVersion({ id: full.artifact.id, explainer: explainer.trim(), files: rows })
+        setProposed(true)
+      }
+      setOpen(false); setExplainer(''); setFiles(null)
+      reload()
+    } catch (err) {
+      setFailure(err instanceof ApiError ? err.message : 'Could not submit.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section className="res-panel">
+      {proposed && (
+        <p className="note">Proposal submitted — {full.artifact.ownerName} will see it here and decide.</p>
+      )}
+      {!open ? (
+        <button type="button" className="btn btn--ghost" onClick={() => setOpen(true)}>
+          {isOwner ? `Publish v${full.artifact.currentVersion + 1}…` : 'Propose a new version…'}
+        </button>
+      ) : (
+        <form className="editcard res-newform" onSubmit={submit}>
+          <div className="editcard__head">
+            <h2>{isOwner ? `Publish v${full.artifact.currentVersion + 1}` : 'Propose a new version'}</h2>
+            <p className="note">
+              All-or-nothing: the files you pick here are the COMPLETE next version, not a
+              patch. {isOwner ? 'It publishes immediately.' : `${full.artifact.ownerName} approves or rejects the whole thing.`}
+            </p>
+          </div>
+          {failure && <p className="editcard__err" role="alert">{failure}</p>}
+          <div className="ef"><label htmlFor="vf-ex">What changed, and why<span className="ef__req" aria-hidden="true">*</span></label>
+            <textarea id="vf-ex" rows={4} value={explainer} autoFocus
+              onChange={e => setExplainer(e.target.value)} /></div>
+          <div className="ef"><label htmlFor="vf-files">Complete file set<span className="ef__req" aria-hidden="true">*</span></label>
+            <input id="vf-files" type="file" multiple onChange={e => setFiles(e.target.files)} /></div>
+          <div className="editcard__foot">
+            <span className="editcard__status">{busy ? 'Submitting…' : ''}</span>
+            <button type="button" className="btn btn--ghost" onClick={() => setOpen(false)} disabled={busy}>Cancel</button>
+            <button type="submit" className="btn" disabled={busy || !explainer.trim() || !files || files.length === 0}>
+              {isOwner ? 'Publish' : 'Submit proposal'}
+            </button>
+          </div>
+        </form>
+      )}
+    </section>
+  )
+}
+
 export default function ArtifactPage() {
   const { id } = useParams()
   const [state, setState] = useState<State>({ phase: 'loading' })
@@ -306,6 +398,8 @@ export default function ArtifactPage() {
       </section>
 
       <ProposalPanel full={full} reload={load} />
+
+      <VersionForm full={full} reload={load} />
 
       <section className="res-panel">
         <h2>Versions</h2>
