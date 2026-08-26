@@ -161,6 +161,13 @@ export type Capability =
   | 'viewSprints' | 'editSprints'
   | 'viewStaff' | 'editStaff'
   | 'grantRoles'
+  /*
+   * Resources (engineering artifacts). Both are every-role today — Brandon's ruling:
+   * anyone reads, anyone publishes — but they exist as capabilities so a future
+   * narrowing is a data change, not a hunt. Owner-only transitions are enforced
+   * server-side against the artifact's ownerId, not by any capability.
+   */
+  | 'viewResources' | 'editResources'
   /** Deleting a Company record outright. Leadership only, and its own capability
    *  because it is the one action here nothing can undo. */
   | 'deleteCompanies'
@@ -2620,3 +2627,102 @@ export function npsTone(nps: number | null): 'good' | 'warn' | 'bad' | undefined
   if (nps >= 0) return 'warn'
   return 'bad'
 }
+
+// ---- artifacts (the Resources library) ----------------------------------------
+
+export interface ManifestRow {
+  path: string
+  name: string
+  size: number
+  sha256: string
+  fileEntryId: string
+  url: string
+}
+
+export interface ArtifactCard {
+  id: string
+  title: string
+  slug: string
+  summary: string
+  tags: string[]
+  kind: string
+  status: string
+  ownerId: string
+  ownerName: string
+  parentArtifactId: string
+  currentVersion: number
+  fileCount: number
+  updatedAt: string
+  openProposals: number
+}
+
+export interface ArtifactVersionRow {
+  versionNumber: number
+  explainer: string
+  authorName: string
+  contributorName: string
+  createdAt: string
+  fileCount: number
+}
+
+export interface ArtifactDiff {
+  added: string[]
+  changed: string[]
+  removed: string[]
+  unchanged: string[]
+}
+
+export interface ArtifactProposal {
+  entryId: string
+  status: string
+  explainer: string
+  proposerId: string
+  proposerName: string
+  baseVersion: number
+  manifest: ManifestRow[]
+  decisionComment: string
+  decidedAt: string
+  createdAt: string
+  diff?: ArtifactDiff
+}
+
+export interface ArtifactFull {
+  artifact: {
+    id: string; title: string; slug: string; summary: string; tags: string[]
+    kind: string; status: string; ownerId: string; ownerName: string
+    runsLive: { label: string; url: string }[]
+    related: Record<string, string>
+    parentArtifactId: string
+    currentVersion: number
+    history: { event: string; at: string; by: string; [k: string]: unknown }[]
+    createdBy: string; createdAt: string
+  }
+  versions: ArtifactVersionRow[]
+  version: number
+  manifest: ManifestRow[]
+  proposals: { entryId: string; status: string; proposerName: string; baseVersion: number; createdAt: string; decidedAt: string }[]
+}
+
+export const getArtifacts = (params: Record<string, string> = {}): Promise<{ rows: ArtifactCard[]; total: number }> =>
+  maestroGet('artifacts', params)
+
+export const getArtifact = (id: string, version?: number): Promise<ArtifactFull> =>
+  maestroGet('artifact', version ? { id, version: String(version) } : { id })
+
+export const getArtifactFile = (id: string, fileEntryId: string): Promise<{ path: string; dataBase64: string }> =>
+  maestroGet('artifactFile', { id, fileEntryId })
+
+export const createArtifact = (payload: Record<string, unknown>): Promise<ArtifactFull> =>
+  maestroPost('createArtifact', payload)
+
+export const publishArtifactVersion = (payload: Record<string, unknown>): Promise<ArtifactFull> =>
+  maestroPost('publishArtifactVersion', payload)
+
+export const proposeArtifactVersion = (payload: Record<string, unknown>): Promise<{ proposal: { entryId: string }; diff: ArtifactDiff }> =>
+  maestroPost('proposeArtifactVersion', payload)
+
+export const getArtifactProposals = (id: string): Promise<{ rows: ArtifactProposal[] }> =>
+  maestroGet('artifactProposals', { id })
+
+export const decideArtifactProposal = (id: string, entryId: string, approve: boolean, comment: string): Promise<ArtifactFull> =>
+  maestroPost('decideArtifactProposal', { id, entryId, approve, comment })

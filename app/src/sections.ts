@@ -136,12 +136,16 @@ export const SECTIONS: Section[] = [
     key: 'resources',
     path: '/resources',
     label: 'Resources',
-    purpose: 'The shared shelf, the documents everyone keeps re-finding or re-writing.',
+    built: true,
+    purpose:
+      'The engineering library: what we already solved, packaged so nobody solves it twice. ' +
+      'An artifact is a versioned bundle of scripts, explainers and component source with an ' +
+      'owner, an explainer on every change, and owner-approved merges.',
     planned: [
-      'Implementation runbooks and go-live checklists',
-      'Reusable form and report templates',
-      'Onboarding material for new staff',
-      'Links out to the platform docs that matter',
+      'Company material beyond engineering (handbook, org chart, links) — the model carries a kind for it',
+    ],
+    live: [
+      { to: '/resources', label: 'Artifacts', note: 'browse, search, pull' },
     ],
   },
   {

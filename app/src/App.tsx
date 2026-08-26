@@ -9,6 +9,8 @@ import CompanyFiles from './routes/CompanyFiles'
 import Tickets from './routes/Tickets'
 import Explorer from './routes/Explorer'
 import UnderConstruction from './routes/UnderConstruction'
+import Resources from './routes/Resources'
+import ArtifactPage from './routes/ArtifactPage'
 import NoAccess from './routes/NoAccess'
 import LoginGate from './routes/LoginGate'
 import CrmDashboard from './routes/CrmDashboard'
@@ -94,6 +96,8 @@ const CAPABILITY_LABELS: Record<Capability, string> = {
   viewReports: 'Leadership or Accounting',
   viewSchema: 'Leadership, Relate Engineer or Infra Engineer',
   deleteCompanies: 'Leadership',
+  viewResources: 'any role',
+  editResources: 'any role',
   viewCs: 'Leadership, Accounting or Client Success',
   editCs: 'Leadership or Client Success',
   viewSurveys: 'Leadership or Client Success',
@@ -320,6 +324,11 @@ function Shell() {
                 Tools menu. Its deep links live under /schema so they stay
                 bookmarkable. */}
             <Route path="/tickets" element={<Guarded needs="viewTickets" what="Tickets"><Tickets /></Guarded>} />
+
+            {/* Resources: the artifact library. Everyone can see it — the section's
+                value is that nobody has to wonder whether they're allowed to look. */}
+            <Route path="/resources" element={<Guarded needs="viewResources" what="Resources"><Resources /></Guarded>} />
+            <Route path="/resources/:id" element={<Guarded needs="viewResources" what="This artifact"><ArtifactPage /></Guarded>} />
             <Route path="/schema" element={<Guarded needs="viewSchema" what="The schema explorer"><Explorer /></Guarded>} />
             <Route
               path="/schema/type/:typeId"
