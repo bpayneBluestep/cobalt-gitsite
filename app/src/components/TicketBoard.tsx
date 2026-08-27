@@ -315,7 +315,7 @@ export default function TicketBoard({
         {/* Whose backlog this is. A client list links to the record; an internal one has
             no record to link to, so it reads as plain text rather than a dead link. */}
         {spansLists && (
-          <td className="tickets__list">
+          <td className="tickets__list" title={t.clientName || t.listName || ''}>
             {t.clientId
               ? <Link className="rowlink__a" to={`/clients/${t.clientId}/tickets`}>{t.clientName || t.listName}</Link>
               : <span className="muted">{t.listName || dash}</span>}

@@ -152,36 +152,43 @@ export default function Tickets() {
   )
 
   return (
-    <section className="stack">
+    /* `page` is what supplies the page's own padding - a bare wrapper puts the table
+       hard against the window edge. Same shell as Clients and Pipeline. */
+    <section className="page">
       <header className="page__head">
-        <div>
-          <h1 className="page__title">Tickets</h1>
-          <p className="page__sub">
-            {state.phase === 'ready'
-              ? spansLists
-                ? `${tickets.length} tickets across ${offered.length} lists, ${formatHours(hours)} logged`
-                : `${shown.length} tickets, ${formatHours(hours)} logged`
-              : 'Every board, client and internal.'}
-          </p>
-        </div>
-
-        {state.phase === 'ready' && (
-          <label className="field field--inline">
-            <span className="field__label">List</span>
-            <select value={selected} onChange={e => pick(e.target.value)}>
-              <option value={ALL}>All lists ({tickets.length})</option>
-              {grouped.map(g => (
-                <optgroup key={g.kind} label={g.kind}>
-                  {g.rows.map(l => (
-                    <option key={l.id} value={l.id}>
-                      {(l.clientName || l.listName)} ({counts[l.id] || 0})
-                    </option>
+        <div className="page__headrow">
+          <div>
+            <p className="eyebrow">Work</p>
+            <h1>Tickets</h1>
+          </div>
+          <div className="page__head-tools">
+            {state.phase === 'ready' && (
+              <div className="ef ef--narrow">
+                <label htmlFor="tk-list">List</label>
+                <select id="tk-list" value={selected} onChange={e => pick(e.target.value)}>
+                  <option value={ALL}>All lists ({tickets.length})</option>
+                  {grouped.map(g => (
+                    <optgroup key={g.kind} label={g.kind}>
+                      {g.rows.map(l => (
+                        <option key={l.id} value={l.id}>
+                          {(l.clientName || l.listName)} ({counts[l.id] || 0})
+                        </option>
+                      ))}
+                    </optgroup>
                   ))}
-                </optgroup>
-              ))}
-            </select>
-          </label>
-        )}
+                </select>
+              </div>
+            )}
+          </div>
+        </div>
+        <p className="page__sub-text">
+          {state.phase === 'ready'
+            ? spansLists
+              ? `${tickets.length} tickets across ${offered.length} lists, ${formatHours(hours)} logged. `
+                + 'Every board in one place, including the lists that are ours rather than a client’s.'
+              : `${shown.length} tickets, ${formatHours(hours)} logged.`
+            : 'Every board, client and internal.'}
+        </p>
       </header>
 
       {state.phase === 'loading' && <p className="empty">Loading tickets…</p>}

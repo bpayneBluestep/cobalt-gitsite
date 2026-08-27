@@ -1794,6 +1794,21 @@ select:hover:not(:focus) { border-color: var(--text-mute); }
 
 .tickets__num { width: 1%; white-space: nowrap; }
 
+/*
+ * The List column, on the all-lists board only.
+ *
+ * Capped rather than sized to content: "Aspen Grove Behavioral Hospital" next to
+ * "UVU" would otherwise set the column width for all 59 lists and squeeze the title,
+ * which is the column people actually read. Truncated with the full name on hover.
+ */
+.tickets__list {
+  max-width: 14ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.82rem;
+}
+
 /* --- row marks: blocked / timing / files ---------------------------------- */
 
 .rowmarks { display: inline-flex; flex-wrap: wrap; gap: 0.3rem; margin-left: 0.5rem; }
