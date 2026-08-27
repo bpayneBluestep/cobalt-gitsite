@@ -74,6 +74,25 @@ export const SECTIONS: Section[] = [
       'The list is live, and each record carries its info, contacts, files, account owner and tickets.',
   },
   {
+    key: 'tickets',
+    path: '/tickets',
+    label: 'Tickets',
+    built: true,
+    needs: 'viewTickets',
+    purpose: 'Every board in one place, scoped by list - including the lists that are ours.',
+    planned: [
+      'Cross-list filters that persist: mine, overdue, roadblocked',
+      'Saved views, once there are enough lists to want one',
+    ],
+    foundation:
+      'The same board a company record uses, over a list selector. A client board is also ' +
+      'reachable through its record; this is the only route to a non-client list, which is ' +
+      'what Product, Internal Dev and Platform Dev lists are.',
+    live: [
+      { to: '/tickets', label: 'All lists', note: 'every ticket, with its list named' },
+    ],
+  },
+  {
     key: 'sprints',
     path: '/sprints',
     label: 'Sprints',

@@ -57,13 +57,24 @@ function byPriority(a: Ticket, b: Ticket): number {
 }
 
 export default function TicketBoard({
-  list, tickets, onChanged, onTicket,
+  list, tickets, onChanged, onTicket, spansLists = false,
 }: {
   list: List
   tickets: Ticket[]
   onChanged: () => void
   /** Replace one ticket in the caller's copy, from an action's fresh reply. */
   onTicket: (t: Ticket) => void
+  /*
+   * True when `tickets` comes from more than one list, as on the all-lists board.
+   *
+   * Two things change. A List column appears, because "#1204 Med pass report" means
+   * nothing without knowing whose it is. And creating is withdrawn: a new ticket needs
+   * ONE target list, and picking it for you from a mixed board would be a guess about
+   * whose backlog just grew.
+   *
+   * Writes to an EXISTING ticket still work, because a ticket carries its own `listId`.
+   */
+  spansLists?: boolean
 }) {
   /*
    * Engineers, Client Success and Leadership work tickets. Sales and Accounting read them
@@ -208,11 +219,20 @@ export default function TicketBoard({
       .finally(() => setBusy(false))
   }
 
+  /**
+   * The list to write a ticket to: its OWN, not the board's.
+   *
+   * On a single-list board these are the same. On the all-lists board they are not, and
+   * using the board's id would move a status on the wrong list - silently, since the
+   * endpoint would simply not find that entry there.
+   */
+  const listIdOf = (t: Ticket): string => t.listId || list.id
+
   /** Move a ticket's status straight from its row, without opening it. */
   function quickStatus(t: Ticket, status: string) {
     if (busy || !mayEdit) return
     setBusy(true); setFailure(''); setNotice('')
-    updateTicket(list.id, t.entryId, { status })
+    updateTicket(listIdOf(t), t.entryId, { status })
       .then(fresh => { onTicket(fresh); setNotice(`Moved to ${status}.`) })
       .catch(err => setFailure(err instanceof ApiError ? err.message : String(err)))
       .finally(() => setBusy(false))
@@ -292,6 +312,15 @@ export default function TicketBoard({
             )}
           </span>
         </th>
+        {/* Whose backlog this is. A client list links to the record; an internal one has
+            no record to link to, so it reads as plain text rather than a dead link. */}
+        {spansLists && (
+          <td className="tickets__list">
+            {t.clientId
+              ? <Link className="rowlink__a" to={`/clients/${t.clientId}/tickets`}>{t.clientName || t.listName}</Link>
+              : <span className="muted">{t.listName || dash}</span>}
+          </td>
+        )}
         <td><span className="pill" data-prio={t.priority}>{t.priority || 'Normal'}</span></td>
         <td>{t.responsibleName || t.assignee || dash}</td>
         <td className="tickets__time">
@@ -345,7 +374,7 @@ export default function TicketBoard({
             report is broken" gets interviewed into a request an engineer can act on.
             Hidden when Wesley has no key, so it never offers something that will fail. */}
         <div className="board2__acts">
-          {wesleyAvailable && (
+          {wesleyAvailable && !spansLists && (
             <Link
               className="btn btn--iq"
               to={list.clientId ? `/clients/${list.clientId}/request` : `/request?listId=${list.id}`}
@@ -353,7 +382,7 @@ export default function TicketBoard({
               <span aria-hidden="true">✦</span> Ask Wesley
             </Link>
           )}
-          {mayEdit && (
+          {mayEdit && !spansLists && (
             <button type="button" className={wesleyAvailable ? 'btn btn--ghost' : 'btn'} onClick={openNew}>
               <span aria-hidden="true">+</span> New ticket
             </button>
@@ -522,6 +551,7 @@ export default function TicketBoard({
               <tr>
                 <th scope="col" className="tickets__num">#</th>
                 <th scope="col">Title</th>
+                {spansLists && <th scope="col">List</th>}
                 <th scope="col">Priority</th>
                 <th scope="col">Responsible</th>
                 <th scope="col">Time</th>
