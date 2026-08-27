@@ -1814,6 +1814,21 @@ select:hover:not(:focus) { border-color: var(--text-mute); }
  * "UVU" would otherwise set the column width for all 59 lists and squeeze the title,
  * which is the column people actually read. Truncated with the full name on hover.
  */
+/*
+ * The two people columns.
+ *
+ * Capped and truncated for the same reason as the List column: names are stored
+ * "Last, First" and run long, and two of them side by side would take the width the
+ * title needs. Full name on hover.
+ */
+.tickets__who {
+  max-width: 12ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.82rem;
+}
+
 .tickets__list {
   max-width: 14ch;
   overflow: hidden;

@@ -102,7 +102,20 @@ export default function TicketBoard({
   const [fStatus, setFStatus] = useState('')
   const [fPriority, setFPriority] = useState('')
   const [fResponsible, setFResponsible] = useState('')
-  const [showFilters, setShowFilters] = useState(false)
+  const [fAccountable, setFAccountable] = useState('')
+  const [fSprint, setFSprint] = useState('')
+  const [fRoadblock, setFRoadblock] = useState('')
+  const [fDue, setFDue] = useState('')
+  const [fTime, setFTime] = useState('')
+  /*
+   * Open by default on the all-lists board, closed on one client's.
+   *
+   * Those are different jobs. Across 59 lists you arrived to narrow something down, so
+   * hiding the controls behind a button costs a click every time. On one client's 23
+   * tickets you can see the whole board, and eight selects above it would be the biggest
+   * thing on the page.
+   */
+  const [showFilters, setShowFilters] = useState(spansLists)
 
   // Asked once per mount rather than assumed: an org with no integration key should
   // not be shown a door that opens onto an error.
@@ -127,7 +140,57 @@ export default function TicketBoard({
     return c
   }, [tickets])
 
-  const activeFilters = [fStatus, fPriority, fResponsible].filter(Boolean).length
+  /*
+   * Filter options come from the tickets ON THIS BOARD, not from a fixed list of staff.
+   *
+   * A roster would offer names with nothing behind them, so every empty result reads as a
+   * possible bug rather than an answered question. Built from the data, a filter can only
+   * ever narrow to something - and on the all-lists board that means the people who
+   * actually appear across 5,939 tickets, not the 9 who have Cobalt user records.
+   */
+  const people = useMemo(() => {
+    const acc = new Set<string>()
+    const res = new Set<string>()
+    for (const t of tickets) {
+      if (t.accountableName) acc.add(t.accountableName)
+      // The retired free-text owner counts as a responsible name here: on an imported
+      // ticket it is the only record of who had it.
+      const r = t.responsibleName || t.assignee
+      if (r) res.add(r)
+    }
+    const sort = (s: Set<string>) => [...s].sort((a, b) => a.localeCompare(b))
+    return { accountable: sort(acc), responsible: sort(res) }
+  }, [tickets])
+
+  /** Sprints present, highest first: the current one is the one you want at the top. */
+  const sprints = useMemo(() => {
+    const s = new Set<string>()
+    for (const t of tickets) if (t.sprint) s.add(t.sprint)
+    return [...s].sort((a, b) => Number(b) - Number(a))
+  }, [tickets])
+
+  const activeFilters = [
+    fStatus, fPriority, fResponsible, fAccountable, fSprint, fRoadblock, fDue, fTime,
+  ].filter(Boolean).length
+
+  const clearFilters = () => {
+    setFStatus(''); setFPriority(''); setFResponsible(''); setFAccountable('')
+    setFSprint(''); setFRoadblock(''); setFDue(''); setFTime('')
+  }
+
+  /** Today as yyyy-mm-dd, to compare against a stored date string without parsing it. */
+  const today = useMemo(() => {
+    const d = new Date()
+    const p2 = (n: number) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`
+  }, [])
+
+  const weekOut = useMemo(() => {
+    const d = new Date()
+    d.setDate(d.getDate() + 7)
+    const p2 = (n: number) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`
+  }, [])
 
   const visible = useMemo(() => {
     const q = search.toLowerCase().trim()
@@ -135,8 +198,36 @@ export default function TicketBoard({
       if (tabOf(t.status) !== tab) return false
       if (fStatus && t.status !== fStatus) return false
       if (fPriority && t.priority !== fPriority) return false
-      if (fResponsible === '__none' && t.responsibleName) return false
-      if (fResponsible && fResponsible !== '__none' && !t.responsibleName.toLowerCase().includes(fResponsible.toLowerCase())) return false
+
+      const resp = t.responsibleName || t.assignee
+      if (fResponsible === '__none' && resp) return false
+      if (fResponsible && fResponsible !== '__none' && resp !== fResponsible) return false
+
+      if (fAccountable === '__none' && t.accountableName) return false
+      if (fAccountable && fAccountable !== '__none' && t.accountableName !== fAccountable) return false
+
+      if (fSprint === '__none' && t.sprint) return false
+      if (fSprint && fSprint !== '__none' && t.sprint !== fSprint) return false
+
+      if (fRoadblock === 'yes' && !t.roadblocked) return false
+      if (fRoadblock === 'no' && t.roadblocked) return false
+
+      /*
+       * Dates compare as strings, deliberately: they are stored yyyy-mm-dd, which sorts
+       * lexicographically, so this needs no Date parsing and cannot pick up a timezone.
+       */
+      if (fDue === '__none' && t.dueDate) return false
+      if (fDue === 'overdue' && !(t.dueDate && t.dueDate < today)) return false
+      if (fDue === 'today' && t.dueDate !== today) return false
+      if (fDue === 'week' && !(t.dueDate && t.dueDate >= today && t.dueDate <= weekOut)) return false
+
+      const logged = Number(t.loggedHours) || 0
+      const est = t.estHours === null ? null : Number(t.estHours)
+      if (fTime === 'noest' && est !== null) return false
+      if (fTime === 'logged' && logged <= 0) return false
+      if (fTime === 'nologged' && logged > 0) return false
+      // Over estimate only means something when there IS one to be over.
+      if (fTime === 'over' && !(est !== null && est > 0 && logged > est)) return false
       if (!q) return true
       // Details is markup: search its text, so a query can't match a tag name. The
       // retired free-text assignee stays searchable so an old ticket still turns up
@@ -148,7 +239,10 @@ export default function TicketBoard({
       if (t.ticketNumber !== null) haystack.push(`#${t.ticketNumber}`)
       return haystack.some(v => (v || '').toLowerCase().includes(q))
     })
-  }, [tickets, tab, search, fStatus, fPriority, fResponsible])
+  }, [
+    tickets, tab, search, fStatus, fPriority, fResponsible, fAccountable,
+    fSprint, fRoadblock, fDue, fTime, today, weekOut,
+  ])
 
   // -- subtasks on the board ------------------------------------------------
   //
@@ -334,7 +428,15 @@ export default function TicketBoard({
           </td>
         )}
         <td><span className="pill" data-prio={t.priority}>{t.priority || 'Normal'}</span></td>
-        <td>{t.responsibleName || t.assignee || dash}</td>
+        {/* Both owners, side by side. The PM answerable to the client and the engineer
+            doing the work are different roles and frequently different people; showing
+            only one meant guessing which question a blank was answering. */}
+        <td className="tickets__who" title={t.accountableName || ''}>
+          {t.accountableName || dash}
+        </td>
+        <td className="tickets__who" title={t.responsibleName || t.assignee || ''}>
+          {t.responsibleName || t.assignee || dash}
+        </td>
         <td className="tickets__time">
           {logged || est !== null ? (
             <span className="tvs" data-over={over ? '' : undefined}>
@@ -406,7 +508,7 @@ export default function TicketBoard({
         <input
           type="text"
           className="board2__search"
-          placeholder="Search tickets…"
+          placeholder="Search number, title, people, sprint, details…"
           value={search}
           autoComplete="off"
           onChange={e => setSearch(e.target.value)}
@@ -431,6 +533,7 @@ export default function TicketBoard({
               {TICKET_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
+
           <div className="ef">
             <label htmlFor="f-priority">Priority</label>
             <select id="f-priority" value={fPriority} onChange={e => setFPriority(e.target.value)}>
@@ -438,33 +541,75 @@ export default function TicketBoard({
               {TICKET_PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
           </div>
+
+          {/* Two people, two filters. "Who owns the client relationship for this" and
+              "who is building it" are different questions, and on an imported backlog
+              they very often have different answers. */}
+          <div className="ef">
+            <label htmlFor="f-accountable">Accountable</label>
+            <select id="f-accountable" value={fAccountable} onChange={e => setFAccountable(e.target.value)}>
+              <option value="">Anyone</option>
+              <option value="__none">— nobody accountable —</option>
+              {people.accountable.map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </div>
+
           <div className="ef">
             <label htmlFor="f-responsible">Responsible</label>
-            <input
-              id="f-responsible"
-              type="text"
-              placeholder="Name contains…"
-              value={fResponsible === '__none' ? '' : fResponsible}
-              onChange={e => setFResponsible(e.target.value)}
-            />
+            <select id="f-responsible" value={fResponsible} onChange={e => setFResponsible(e.target.value)}>
+              <option value="">Anyone</option>
+              <option value="__none">— unassigned —</option>
+              {people.responsible.map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
           </div>
+
+          {sprints.length > 0 && (
+            <div className="ef">
+              <label htmlFor="f-sprint">Sprint</label>
+              <select id="f-sprint" value={fSprint} onChange={e => setFSprint(e.target.value)}>
+                <option value="">Any sprint</option>
+                <option value="__none">— unplanned —</option>
+                {sprints.map(s => <option key={s} value={s}>Sprint {s}</option>)}
+              </select>
+            </div>
+          )}
+
           <div className="ef">
-            <label htmlFor="f-unassigned">Unassigned only</label>
-            <label className="checkline">
-              <input
-                id="f-unassigned"
-                type="checkbox"
-                checked={fResponsible === '__none'}
-                onChange={e => setFResponsible(e.target.checked ? '__none' : '')}
-              />
-              <span>Hide tickets that already have an engineer</span>
-            </label>
+            <label htmlFor="f-roadblock">Roadblock</label>
+            <select id="f-roadblock" value={fRoadblock} onChange={e => setFRoadblock(e.target.value)}>
+              <option value="">Any</option>
+              <option value="yes">Roadblocked only</option>
+              <option value="no">Not roadblocked</option>
+            </select>
           </div>
+
+          <div className="ef">
+            <label htmlFor="f-due">Due</label>
+            <select id="f-due" value={fDue} onChange={e => setFDue(e.target.value)}>
+              <option value="">Any date</option>
+              <option value="overdue">Overdue</option>
+              <option value="today">Due today</option>
+              <option value="week">Due within 7 days</option>
+              <option value="__none">— no due date —</option>
+            </select>
+          </div>
+
+          <div className="ef">
+            <label htmlFor="f-time">Time</label>
+            <select id="f-time" value={fTime} onChange={e => setFTime(e.target.value)}>
+              <option value="">Any</option>
+              <option value="over">Over estimate</option>
+              <option value="noest">No estimate</option>
+              <option value="logged">Has hours logged</option>
+              <option value="nologged">No hours logged</option>
+            </select>
+          </div>
+
           {activeFilters > 0 && (
             <div className="ef">
               <label>&nbsp;</label>
-              <button type="button" className="btn btn--ghost" onClick={() => { setFStatus(''); setFPriority(''); setFResponsible('') }}>
-                Clear filters
+              <button type="button" className="btn btn--ghost" onClick={clearFilters}>
+                Clear {activeFilters} filter{activeFilters === 1 ? '' : 's'}
               </button>
             </div>
           )}
@@ -565,6 +710,7 @@ export default function TicketBoard({
                 <th scope="col">Title</th>
                 {spansLists && <th scope="col">List</th>}
                 <th scope="col">Priority</th>
+                <th scope="col">Accountable</th>
                 <th scope="col">Responsible</th>
                 <th scope="col">Time</th>
                 <th scope="col">Due</th>
@@ -576,7 +722,11 @@ export default function TicketBoard({
                 <Fragment key={g.status || '_all'}>
                   {g.status && (
                     <tr className="grouprow">
-                      <td colSpan={7}>
+                      {/* #, Title, (List), Priority, Accountable, Responsible, Time,
+                          Due, Move. The List column only exists on the all-lists board,
+                          and a group row that spans the wrong count leaves a visible
+                          notch in the table. */}
+                      <td colSpan={spansLists ? 9 : 8}>
                         <span className="pill" data-status={g.status.replace(/\s+/g, '')}>{g.status}</span>
                         <span className="grouprow__n">{g.rows.length}</span>
                       </td>
