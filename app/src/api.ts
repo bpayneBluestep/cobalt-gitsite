@@ -2644,7 +2644,6 @@ export interface ArtifactCard {
   title: string
   slug: string
   summary: string
-  tags: string[]
   kind: string
   status: string
   ownerId: string
@@ -2688,7 +2687,7 @@ export interface ArtifactProposal {
 
 export interface ArtifactFull {
   artifact: {
-    id: string; title: string; slug: string; summary: string; tags: string[]
+    id: string; title: string; slug: string; summary: string
     kind: string; status: string; ownerId: string; ownerName: string
     runsLive: { label: string; url: string }[]
     related: Record<string, string>

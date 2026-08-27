@@ -7,8 +7,7 @@ import { getArtifacts, createArtifact, ApiError, type ArtifactCard } from '../ap
  *
  * Filtering is client-side over the full card list — the same call Claude Code makes,
  * so what a person can find here and what an engineer's Claude can find are by
- * construction the same set. Tags double as one-click filters because engineers
- * think in topics ("migration", "e-signature") before they remember titles.
+ * construction the same set.
  */
 
 type State =
@@ -43,7 +42,6 @@ function NewArtifact({ onDone, onClose }: { onDone: () => void; onClose: () => v
   const navigate = useNavigate()
   const [title, setTitle] = useState('')
   const [summary, setSummary] = useState('')
-  const [tags, setTags] = useState('')
   const [explainer, setExplainer] = useState('')
   const [files, setFiles] = useState<FileList | null>(null)
   const [busy, setBusy] = useState(false)
@@ -57,7 +55,6 @@ function NewArtifact({ onDone, onClose }: { onDone: () => void; onClose: () => v
       const rows = await readFileRows(files)
       const full = await createArtifact({
         title: title.trim(), summary: summary.trim(),
-        tags: tags.split(',').map(t => t.trim()).filter(Boolean),
         explainer: explainer.trim(), files: rows,
       })
       onDone()
@@ -78,12 +75,8 @@ function NewArtifact({ onDone, onClose }: { onDone: () => void; onClose: () => v
         </p>
       </div>
       {failure && <p className="editcard__err" role="alert">{failure}</p>}
-      <div className="efgrid">
-        <div className="ef"><label htmlFor="na-title">Title<span className="ef__req" aria-hidden="true">*</span></label>
-          <input id="na-title" type="text" value={title} autoFocus autoComplete="off" onChange={e => setTitle(e.target.value)} /></div>
-        <div className="ef"><label htmlFor="na-tags">Tags (comma-separated)</label>
-          <input id="na-tags" type="text" value={tags} autoComplete="off" placeholder="migration, bestnotes" onChange={e => setTags(e.target.value)} /></div>
-      </div>
+      <div className="ef"><label htmlFor="na-title">Title<span className="ef__req" aria-hidden="true">*</span></label>
+        <input id="na-title" type="text" value={title} autoFocus autoComplete="off" onChange={e => setTitle(e.target.value)} /></div>
       <div className="ef"><label htmlFor="na-sum">Summary</label>
         <input id="na-sum" type="text" value={summary} autoComplete="off" placeholder="One sentence: what problem this solves" onChange={e => setSummary(e.target.value)} /></div>
       <div className="ef"><label htmlFor="na-ex">Explainer<span className="ef__req" aria-hidden="true">*</span></label>
@@ -105,7 +98,6 @@ export default function Resources() {
   const [state, setState] = useState<State>({ phase: 'loading' })
   const [pubOpen, setPubOpen] = useState(false)
   const [search, setSearch] = useState('')
-  const [tag, setTag] = useState('')
   const [showArchived, setShowArchived] = useState(false)
 
   const load = useCallback(() => {
@@ -122,21 +114,14 @@ export default function Resources() {
 
   const rows = state.phase === 'ready' ? state.rows : []
 
-  const allTags = useMemo(() => {
-    const seen: Record<string, number> = {}
-    for (const r of rows) for (const t of r.tags) seen[t] = (seen[t] || 0) + 1
-    return Object.keys(seen).sort((a, b) => seen[b] - seen[a])
-  }, [rows])
-
   const shown = useMemo(() => {
     const q = search.trim().toLowerCase()
     return rows.filter(r => {
-      if (tag && r.tags.indexOf(tag) < 0) return false
       if (!q) return true
-      return [r.title, r.summary, r.slug, r.ownerName, r.tags.join(' ')]
+      return [r.title, r.summary, r.slug, r.ownerName]
         .some(v => String(v || '').toLowerCase().includes(q))
     })
-  }, [rows, search, tag])
+  }, [rows, search])
 
   return (
     <div className="page">
@@ -160,7 +145,7 @@ export default function Resources() {
                   type="search"
                   value={search}
                   autoComplete="off"
-                  placeholder="Title, tag, owner…"
+                  placeholder="Title, owner…"
                   onChange={e => setSearch(e.target.value)}
                 />
               </div>
@@ -206,24 +191,15 @@ export default function Resources() {
 
       {state.phase === 'ready' && rows.length > 0 && (
         <>
-          {allTags.length > 0 && (
-            <div className="stage" role="group" aria-label="Filter by tag">
-              <button type="button" className="filter" data-on={tag === '' ? '' : undefined}
-                onClick={() => setTag('')}>All</button>
-              {allTags.slice(0, 12).map(t => (
-                <button key={t} type="button" className="filter"
-                  data-on={tag === t ? '' : undefined}
-                  onClick={() => setTag(tag === t ? '' : t)}>{t}</button>
-              ))}
-              <label className="res-archived">
-                <input type="checkbox" checked={showArchived}
-                  onChange={e => setShowArchived(e.target.checked)} /> archived
-              </label>
-            </div>
-          )}
+          <div className="stage">
+            <label className="res-archived">
+              <input type="checkbox" checked={showArchived}
+                onChange={e => setShowArchived(e.target.checked)} /> archived
+            </label>
+          </div>
 
           <p className="page__count">
-            {search.trim() || tag
+            {search.trim()
               ? `${shown.length} of ${rows.length} artifact${rows.length === 1 ? '' : 's'}`
               : `${rows.length} artifact${rows.length === 1 ? '' : 's'}`}
           </p>
@@ -232,10 +208,9 @@ export default function Resources() {
             <div className="callout callout--plain">
               <p className="callout__title">No match</p>
               <p>
-                Nothing matches{search.trim() ? <> “{search.trim()}”</> : null}
-                {tag ? <> tagged <code>{tag}</code></> : null}.{' '}
+                Nothing matches{search.trim() ? <> “{search.trim()}”</> : null}.{' '}
                 <button type="button" className="linkbtn"
-                  onClick={() => { setSearch(''); setTag('') }}>Clear filters</button>.
+                  onClick={() => setSearch('')}>Clear search</button>.
               </p>
             </div>
           )}
@@ -248,9 +223,6 @@ export default function Resources() {
                   <span className="res-card__v">v{r.currentVersion}</span>
                 </div>
                 {r.summary && <p className="res-card__sum">{r.summary}</p>}
-                <div className="res-card__meta">
-                  {r.tags.slice(0, 4).map(t => <span key={t} className="res-tag">{t}</span>)}
-                </div>
                 <div className="res-card__foot">
                   <span>{r.ownerName}</span>
                   <span className="muted">

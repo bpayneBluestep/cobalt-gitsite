@@ -333,7 +333,6 @@ export default function ArtifactPage() {
           {a.status === 'Archived' && <> · <b>Archived</b></>}
         </p>
         <div className="res-card__meta">
-          {a.tags.map(t => <span key={t} className="res-tag">{t}</span>)}
           <span className="muted">owner {a.ownerName}</span>
           {a.parentArtifactId && (
             <Link className="inlink" to={`/resources/${a.parentArtifactId}`}>forked from another artifact</Link>

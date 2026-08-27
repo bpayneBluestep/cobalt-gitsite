@@ -4978,10 +4978,6 @@ input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) opacit
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 .res-card__meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.res-tag {
-  font-size: var(--t-caption2); color: var(--text-dim);
-  border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px;
-}
 .res-card__foot {
   margin-top: auto; display: flex; justify-content: space-between; gap: 8px;
   font-size: var(--t-caption2);
