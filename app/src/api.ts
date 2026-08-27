@@ -750,9 +750,25 @@ export const TICKET_PRIORITIES = ['Low', 'Normal', 'High', 'Critical'] as const
 /*
  * Two tabs, not one per status: what is still to do, and what is finished. Splitting the
  * open work across Open / Ready / Current hid it: a board is for seeing everything
- * outstanding at once. The statuses still matter, so the Open tab GROUPS by them, in the
- * order of TICKET_STATUSES.
+ * outstanding at once. The statuses still matter, so the Open tab GROUPS by them - in
+ * TICKET_GROUP_ORDER, which is not the same order as TICKET_STATUSES.
  */
+
+/**
+ * The order status groups are STACKED in on a board: nearest-to-done first.
+ *
+ * The reverse of TICKET_STATUSES, and deliberately so. TICKET_STATUSES runs Open →
+ * Complete because that is the order work moves through, which is right for a dropdown:
+ * you pick the next state. A board is answering a different question - what needs a
+ * person right now - and the answer is at the far end of that progression. In Review is
+ * something waiting on someone to look at it; Open is a queue that will keep. Putting
+ * Open at the top buried the ready-to-ship work under the backlog, and the backlog is
+ * always the longest group.
+ *
+ * Complete sits at the top of its own tab, alone, so its position there means nothing.
+ */
+export const TICKET_GROUP_ORDER =
+  [...TICKET_STATUSES].reverse() as readonly string[]
 export const TICKET_TABS = [
   { key: 'open', label: 'Open', statuses: ['Open', 'Up Next', 'In Progress', 'In Review'] },
   { key: 'completed', label: 'Completed', statuses: ['Complete'] },

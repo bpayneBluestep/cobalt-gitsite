@@ -37,12 +37,34 @@ const LOGIN_URL = '/shared/login/login.jsp?desturl=' +
 
 const ALL = 'all'
 
-/**
- * The order kinds are offered in: what you are most likely to be looking for first.
+/*
+ * CLIENT WORK AND OUR OWN WORK ARE TWO BOARDS, not one board with a filter.
  *
- * Client work is the bulk of it and the reason the system exists. The rest is grouped
- * rather than mixed in, because "our own work" and "a client's work" are different
- * questions and a single flat list of 84 makes you read all of them to tell which is which.
+ * They answer different questions and get read by different people on different days.
+ * Client work is what somebody is waiting on and paying for; dev work is what we chose to
+ * do to the product. Mixed together, 368 open tickets across 59 lists means the 311 open
+ * template tickets bury every client's handful - and the client's handful is the half with
+ * somebody waiting at the other end of it.
+ *
+ * The split is on `clientId`, not on `kind`. A list belongs to a company or it does not,
+ * and that is structural: `isClientList` is literally `!!clientId`. `kind` is a label
+ * somebody chooses, so it can be wrong or unset, and it only orders the groups below.
+ */
+const SCOPES = [
+  { key: 'client', label: 'Client work' },
+  { key: 'dev', label: 'Internal & dev' },
+] as const
+
+type ScopeKey = (typeof SCOPES)[number]['key']
+
+const scopeOf = (l: List): ScopeKey => (l.clientId ? 'client' : 'dev')
+
+/**
+ * The order kinds are offered in within a scope.
+ *
+ * Only meaningful on the dev side now that clients have their own tab, where it separates
+ * product work from platform work from everything else, rather than making you read all of
+ * them to tell which is which.
  */
 const KIND_ORDER = ['Client', 'Product', 'Internal Dev', 'Platform Dev', 'Other']
 
@@ -52,6 +74,8 @@ function kindOf(l: List): string {
 
 export default function Tickets() {
   const [params, setParams] = useSearchParams()
+  const rawScope = params.get('scope')
+  const scope: ScopeKey = rawScope === 'dev' ? 'dev' : 'client'
   const selected = params.get('list') || ALL
   const [state, setState] = useState<State>({ phase: 'loading' })
 
@@ -91,22 +115,35 @@ export default function Tickets() {
     return out
   }, [tickets])
 
+  /** Per-scope ticket totals, for the tab badges. Counted before any list filter. */
+  const scopeCounts = useMemo(() => {
+    const byList: Record<string, ScopeKey> = {}
+    for (const l of lists) byList[l.id] = scopeOf(l)
+    const out: Record<string, number> = { client: 0, dev: 0 }
+    for (const t of tickets) {
+      const s = byList[t.listId]
+      if (s) out[s]++
+    }
+    return out
+  }, [lists, tickets])
+
   /*
-   * Only lists that HOLD something, plus whatever is currently selected.
+   * Only lists in this scope that HOLD something, plus whatever is currently selected.
    *
    * 84 lists exist and 57 have tickets; offering the 27 empty ones makes the selector
    * long enough to need reading. The selected list stays regardless, so a link to an
    * empty board still resolves to itself rather than silently jumping to All.
    */
   const offered = useMemo(() => {
-    const rows = lists.filter(l => counts[l.id] || l.id === selected)
+    const rows = lists.filter(l =>
+      scopeOf(l) === scope && (counts[l.id] || l.id === selected))
     return rows.sort((a, b) => {
       const ka = KIND_ORDER.indexOf(kindOf(a))
       const kb = KIND_ORDER.indexOf(kindOf(b))
       if (ka !== kb) return ka - kb
       return (a.clientName || a.listName).localeCompare(b.clientName || b.listName)
     })
-  }, [lists, counts, selected])
+  }, [lists, counts, selected, scope])
 
   const grouped = useMemo(() => {
     const out: { kind: string; rows: List[] }[] = []
@@ -120,7 +157,12 @@ export default function Tickets() {
   }, [offered])
 
   const spansLists = selected === ALL
-  const shown = spansLists ? tickets : tickets.filter(t => t.listId === selected)
+  const inScope = useMemo(() => {
+    const ids: Record<string, true> = {}
+    for (const l of offered) ids[l.id] = true
+    return tickets.filter(t => ids[t.listId])
+  }, [tickets, offered])
+  const shown = spansLists ? inScope : tickets.filter(t => t.listId === selected)
   const activeList = lists.find(l => l.id === selected) || null
 
   /*
@@ -137,6 +179,21 @@ export default function Tickets() {
     const next = new URLSearchParams(params)
     if (id === ALL) next.delete('list')
     else next.set('list', id)
+    setParams(next, { replace: true })
+  }
+
+  /*
+   * Switching scope drops the selected list, always.
+   *
+   * A list belongs to exactly one scope, so carrying `?list=` across would leave the
+   * selector showing a list this tab does not contain and a board with nothing in it -
+   * looking like "no tickets here" when the truth is "wrong tab".
+   */
+  const pickScope = (key: ScopeKey) => {
+    const next = new URLSearchParams(params)
+    next.delete('list')
+    if (key === 'client') next.delete('scope')
+    else next.set('scope', key)
     setParams(next, { replace: true })
   }
 
@@ -166,7 +223,9 @@ export default function Tickets() {
               <div className="ef ef--narrow">
                 <label htmlFor="tk-list">List</label>
                 <select id="tk-list" value={selected} onChange={e => pick(e.target.value)}>
-                  <option value={ALL}>All lists ({tickets.length})</option>
+                  <option value={ALL}>
+                    {scope === 'client' ? 'All clients' : 'All dev lists'} ({inScope.length})
+                  </option>
                   {grouped.map(g => (
                     <optgroup key={g.kind} label={g.kind}>
                       {g.rows.map(l => (
@@ -184,12 +243,32 @@ export default function Tickets() {
         <p className="page__sub-text">
           {state.phase === 'ready'
             ? spansLists
-              ? `${tickets.length} tickets across ${offered.length} lists, ${formatHours(hours)} logged. `
-                + 'Every board in one place, including the lists that are ours rather than a client’s.'
+              ? `${inScope.length} tickets across ${offered.length} `
+                + `${offered.length === 1 ? 'list' : 'lists'}, ${formatHours(hours)} logged.`
               : `${shown.length} tickets, ${formatHours(hours)} logged.`
             : 'Every board, client and internal.'}
         </p>
       </header>
+
+      {/* Client work and our own work, as two boards. Same tab markup as the status tabs
+          inside the board, because they are the same kind of control. */}
+      {state.phase === 'ready' && (
+        <nav className="tabs tabs--scope" aria-label="Ticket scope">
+          {SCOPES.map(s => (
+            <button
+              key={s.key}
+              type="button"
+              className="tab"
+              data-on={s.key === scope ? '' : undefined}
+              aria-current={s.key === scope ? 'true' : undefined}
+              onClick={() => pickScope(s.key)}
+            >
+              {s.label}
+              <span className="tab__n">{scopeCounts[s.key] || 0}</span>
+            </button>
+          ))}
+        </nav>
+      )}
 
       {state.phase === 'loading' && <p className="empty">Loading tickets…</p>}
 
@@ -222,7 +301,11 @@ export default function Tickets() {
 
           {shown.length === 0 ? (
             <p className="empty">
-              {spansLists ? 'No tickets yet.' : 'This list has no tickets yet.'}
+              {spansLists
+                ? scope === 'client'
+                  ? 'No client tickets yet.'
+                  : 'No internal or dev tickets yet.'
+                : 'This list has no tickets yet.'}
             </p>
           ) : (
             <TicketBoard

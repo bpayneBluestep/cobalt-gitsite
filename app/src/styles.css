@@ -1577,6 +1577,19 @@ select:hover:not(:focus) { border-color: var(--text-mute); }
 }
 
 .tabs { display: flex; gap: 0.25rem; flex-wrap: wrap; }
+
+/*
+ * The page-level scope tabs: client work vs our own.
+ *
+ * A rule under them, because the board carries its OWN tab strip (Open / Completed) and
+ * two identical rows stacked read as one row of four unrelated choices. The line says the
+ * top one is a level above: it chooses WHICH board, the one below chooses what to see on it.
+ */
+.tabs--scope {
+  margin-bottom: var(--s-l);
+  padding-bottom: var(--s-s);
+  border-bottom: 1px solid var(--line);
+}
 .tab {
   display: inline-flex;
   align-items: center;

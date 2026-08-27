@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   addTicket, updateTicket, ApiError, formatHours, wesleyStatus,
-  TICKET_STATUSES, TICKET_PRIORITIES, TICKET_TABS, PRIORITY_RANK,
+  TICKET_STATUSES, TICKET_PRIORITIES, TICKET_TABS, TICKET_GROUP_ORDER, PRIORITY_RANK,
   type List, type Ticket, type TicketFieldKey,
 } from '../api'
 import { htmlToText } from '../lib/html'
@@ -12,6 +12,18 @@ import { useSession } from '../session'
 /** Where a ticket lives. The number is the shareable form; the entry id is the fallback. */
 export const ticketPath = (t: Ticket): string =>
   `/tickets/${t.ticketNumber === null ? t.entryId : t.ticketNumber}`
+
+/*
+ * A ticket opens in its own tab.
+ *
+ * The board is a place you work FROM rather than a step on the way to one ticket: you are
+ * triaging a list, and following a link in place costs the row you were reading plus the
+ * tab, filter and search that surfaced it. Coming back then means rebuilding all of it.
+ *
+ * `rel="noopener"` because target="_blank" otherwise hands the new document a live
+ * `window.opener` handle back into this one.
+ */
+const NEW_TAB = { target: '_blank', rel: 'noopener' } as const
 
 /*
  * The ticket board for one list: the Cobalt port of beh's "Clickup Killer".
@@ -176,7 +188,7 @@ export default function TicketBoard({
 
   // Group by status only when the tab holds more than one: beh's rule exactly.
   const groups = useMemo(() => {
-    const present = TICKET_STATUSES.filter(s => rows.some(t => (t.status || 'Open') === s))
+    const present = TICKET_GROUP_ORDER.filter(s => rows.some(t => (t.status || 'Open') === s))
     if (present.length <= 1) return [{ status: '', rows: rows.slice().sort(byPriority) }]
     return present.map(status => ({
       status,
@@ -265,18 +277,18 @@ export default function TicketBoard({
         <td className="tickets__num">
           {t.ticketNumber === null
             ? <span className="muted">-</span>
-            : <Link className="tnum tnum--link" to={ticketPath(t)}>#{t.ticketNumber}</Link>}
+            : <Link className="tnum tnum--link" to={ticketPath(t)} {...NEW_TAB}>#{t.ticketNumber}</Link>}
         </td>
         <th scope="row">
           {child && <span className="subtee" aria-hidden="true">└</span>}
           {strayFrom !== null && (
-            <Link className="subcrumb" to={`/tickets/${strayFrom}`} title="Its parent ticket">
+            <Link className="subcrumb" to={`/tickets/${strayFrom}`} title="Its parent ticket" {...NEW_TAB}>
               #{strayFrom} ›
             </Link>
           )}
           {/* A real link: shareable, middle-clickable, and the browser
               shows where it goes. */}
-          <Link className="rowlink__a" to={ticketPath(t)}>
+          <Link className="rowlink__a" to={ticketPath(t)} {...NEW_TAB}>
             {t.title || <span className="muted">(untitled)</span>}
           </Link>
 
