@@ -4,8 +4,9 @@ import {
   ApiError, getSprint, getTeam, createSprint, assignSprint,
   addEngineer, updateEngineer, deleteEngineer,
   formatHours, shiftSprint, sprintLabel, isSprintKey, nameKey,
-  ENGINEER_DISCIPLINES,
-  type SprintBoard, type Team, type Ticket, type EngineerFieldKey, type User,
+  ENGINEER_DISCIPLINES, ENGINEER_READY_RULE,
+  type SprintBoard, type SprintColumn, type Team, type Ticket, type EngineerFieldKey,
+  type User,
 } from '../api'
 import UserPicker, { loadUsers } from '../components/UserPicker'
 import { useSession } from '../session'
@@ -41,6 +42,9 @@ type State =
 
 const LOGIN_URL = '/shared/login/login.jsp?desturl=' +
   encodeURIComponent(window.location.pathname + window.location.search)
+
+/** The drop-target id for the backlog region. Not an engineer, so it cannot collide. */
+const BACKLOG = '__backlog'
 
 type EngDraft = Record<EngineerFieldKey, string>
 
@@ -92,6 +96,17 @@ export default function Sprints() {
   const [failure, setFailure] = useState('')
   const [engEditing, setEngEditing] = useState<string | 'new' | null>(null)
   const [engDraft, setEngDraft] = useState<EngDraft>(emptyEng(''))
+
+  /*
+   * Drag state, following CrmPipeline's shape so the app has one set of drag semantics
+   * rather than two that drift.
+   *
+   * `dragging` carries the ticket AND the column it came from: the source is what makes
+   * a drop onto its own column a no-op instead of a pointless round trip, and what tells
+   * the backlog region whether a drop there means anything.
+   */
+  const [dragging, setDragging] = useState<{ ticket: Ticket; from: string } | null>(null)
+  const [over, setOver] = useState('')
 
   /** Move to a sprint and put it in the URL, so the view can be linked to. */
   const setSprint = useCallback((key: string) => {
@@ -179,6 +194,39 @@ export default function Sprints() {
       `${t.ticketNumber !== null ? `#${t.ticketNumber}` : t.title} taken out of the sprint.`)
   }
 
+  /** Pick a card up. The payload is required: some browsers cancel a drag without one. */
+  function startDrag(e: React.DragEvent, ticket: Ticket, from: string) {
+    if (!mayPlan || busy) return
+    setDragging({ ticket, from })
+    e.dataTransfer.setData('text/plain', ticket.entryId)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  const endDrag = () => { setDragging(null); setOver('') }
+
+  /*
+   * Can this column take the card currently in flight?
+   *
+   * A roster row with no user record cannot be given work - a ticket stores the engineer
+   * as a user id, and there is none. Knowing that before the drop means the column can
+   * be marked un-droppable while the card is still in the air, rather than accepting the
+   * gesture and then explaining why it did nothing.
+   */
+  function canDrop(col: SprintColumn): boolean {
+    if (!dragging || !mayPlan) return false
+    if (dragging.from === (col.entryId || col.engineer)) return false
+    return !!assignable.find(a => nameKey(a.name) === nameKey(col.engineer))?.userId
+  }
+
+  function dropOn(col: SprintColumn) {
+    const carried = dragging
+    setOver('')
+    setDragging(null)
+    if (!carried || carried.from === (col.entryId || col.engineer)) return
+    const who = assignable.find(a => nameKey(a.name) === nameKey(col.engineer))
+    plan(carried.ticket, who?.userId || col.userId, col.engineer)
+  }
+
   function saveEngineer() {
     if (busy || !mayRoster) return
     if (!engDraft.userId) { setFailure('Pick the person from the list.'); return }
@@ -211,6 +259,19 @@ export default function Sprints() {
 
   const dash = <span className="muted">-</span>
   const templateRoster = !!board?.rosterIsTemplate
+
+  const skips = board?.backlogSkipped
+  const skipTotal = skips ? skips.wrongStatus + skips.noEstimate + skips.noAccountable : 0
+
+  /*
+   * Everything carrying this sprint's number that the board does not show: work the
+   * Engineer-Ready gate excluded, plus work in the sprint with nobody responsible for it.
+   *
+   * Both are deliberately off this board - the sprint view has one strict definition of
+   * what appears on it - but a number that is silently missing from a capacity plan is
+   * the kind of thing you find out about late. So it is stated, with somewhere to go.
+   */
+  const offBoard = (board?.hiddenInSprint || 0) + (board?.unassigned.length || 0)
 
   /** A select of this sprint's engineers, used from three places. */
   function EngineerSelect({
@@ -523,36 +584,46 @@ export default function Sprints() {
             </div>
           </div>
 
-          {board.unassigned.length > 0 && (
-            <div className="callout callout--warn">
-              <p className="callout__title">
-                {board.unassigned.length} ticket{board.unassigned.length === 1 ? '' : 's'} in this sprint with nobody on it
-              </p>
-              <p>
-                {board.unassigned.map(t => t.title).slice(0, 3).join(', ')}
-                {board.unassigned.length > 3 ? '…' : ''}. Assign them below, or they count
-                against nobody's capacity.
-              </p>
-              <ul className="cab__folders">
-                {board.unassigned.map(t => (
-                  <li className="cab__folder" key={t.entryId}>
-                    <span className="cab__open">
-                      <span className="cab__name">{t.title}</span>
-                      <span className="cab__count">{formatHours(t.estHours)}</span>
-                    </span>
-                    <EngineerSelect
-                      label={`Assign ${t.title}`}
-                      onPick={(userId, name) => plan(t, userId, name)}
-                    />
-                  </li>
-                ))}
-              </ul>
-            </div>
+          {/*
+              Work in this sprint that the board does not show. Brandon's rule: the sprint
+              view has strict entry conditions, and a ticket that fails them - not
+              Engineer-Ready, or nobody responsible for it - is not shown here even though
+              it carries the sprint number. It is still on the tickets board, which is
+              where this points, because a silently missing ticket in a capacity plan is
+              worse than a shorter list with a note under it.
+          */}
+          {offBoard > 0 && (
+            <p className="board2__notice">
+              {offBoard} ticket{offBoard === 1 ? '' : 's'} in {sprintLabel(sprint)}{' '}
+              {offBoard === 1 ? 'is' : 'are'} not shown here
+              {board.hiddenInSprint > 0 && board.unassigned.length > 0
+                ? ` - ${board.hiddenInSprint} no longer ready to plan, ${board.unassigned.length} with nobody responsible`
+                : board.hiddenInSprint > 0
+                  ? ' - no longer ready to plan'
+                  : ' - nobody is responsible for them'}.{' '}
+              <Link className="inlink" to="/tickets">Find them on the tickets board</Link>.
+            </p>
           )}
 
           <div className="pipe sprint">
             {board.columns.map(col => (
-              <section className="pipe__col" key={col.entryId || col.engineer} aria-label={col.engineer}>
+              <section
+                className="pipe__col"
+                key={col.entryId || col.engineer}
+                aria-label={col.engineer}
+                data-over={over === (col.entryId || col.engineer) && canDrop(col) ? '' : undefined}
+                data-nodrop={dragging && !canDrop(col) && dragging.from !== (col.entryId || col.engineer)
+                  ? '' : undefined}
+                onDragOver={e => {
+                  if (!canDrop(col)) return
+                  // Without preventDefault the browser refuses the drop entirely.
+                  e.preventDefault()
+                  const id = col.entryId || col.engineer
+                  if (over !== id) setOver(id)
+                }}
+                onDragLeave={() => setOver(o => (o === (col.entryId || col.engineer) ? '' : o))}
+                onDrop={e => { e.preventDefault(); dropOn(col) }}
+              >
                 <header className="pipe__head">
                   <h2>{col.engineer}</h2>
                   <span className="pipe__n">{col.tickets.length}</span>
@@ -567,10 +638,22 @@ export default function Sprints() {
                 <CapacityBar est={col.estHours} capacity={col.capacity} over={col.over} />
                 {col.role && <p className="sprint__role">{col.role}</p>}
 
-                {col.tickets.length === 0 && <p className="pipe__empty">Nothing planned</p>}
+                {col.tickets.length === 0 && (
+                  <p className="pipe__empty">
+                    {canDrop(col) ? 'Drop here' : 'Nothing planned'}
+                  </p>
+                )}
 
                 {col.tickets.map(t => (
-                  <article className="dcard scard" key={t.entryId} data-prio={t.priority}>
+                  <article
+                    className="dcard scard"
+                    key={t.entryId}
+                    data-prio={t.priority}
+                    draggable={mayPlan && !busy}
+                    data-drag={dragging && dragging.ticket.entryId === t.entryId ? '' : undefined}
+                    onDragStart={e => startDrag(e, t, col.entryId || col.engineer)}
+                    onDragEnd={endDrag}
+                  >
                     <p className="dcard__title">
                       {t.ticketNumber !== null && <span className="tnum">#{t.ticketNumber}</span>}
                       <span>{t.title}</span>
@@ -617,23 +700,77 @@ export default function Sprints() {
             ))}
           </div>
 
-          {/* ---- the backlog ---- */}
-          <section className="tsec">
+          {/* ---- the backlog ----
+              Also a drop target: dragging a card back here takes it out of the sprint,
+              which is the gesture people try first and the reverse of planning it in. */}
+          <section
+            className="tsec sprint__backlog"
+            data-over={over === BACKLOG && dragging && dragging.from !== BACKLOG ? '' : undefined}
+            onDragOver={e => {
+              if (!dragging || !mayPlan || dragging.from === BACKLOG) return
+              e.preventDefault()
+              if (over !== BACKLOG) setOver(BACKLOG)
+            }}
+            onDragLeave={() => setOver(o => (o === BACKLOG ? '' : o))}
+            onDrop={e => {
+              e.preventDefault()
+              const carried = dragging
+              setOver(''); setDragging(null)
+              if (carried && carried.from !== BACKLOG) unplan(carried.ticket)
+            }}
+          >
             <div className="panel__head">
               <h2 className="tsec__h">
-                Backlog
+                Ready to plan
                 {board.backlogTotal > 0 && <span className="tsec__n">{board.backlogTotal}</span>}
               </h2>
               <span className="panel__note">
-                Open work with no sprint yet, biggest first
+                {ENGINEER_READY_RULE}, biggest first
                 {board.backlogTotal > board.backlog.length && ` · showing ${board.backlog.length}`}
               </span>
             </div>
 
+            {dragging && dragging.from !== BACKLOG && (
+              <p className="pipe__empty">Drop here to take it out of the sprint</p>
+            )}
+
             {board.backlog.length === 0 ? (
-              <p className="muted tsec__empty">
-                Nothing unplanned: every open ticket already belongs to a sprint.
-              </p>
+              <div className="callout callout--plain">
+                <p className="callout__title">Nothing is ready to plan</p>
+                <p>
+                  The planner only shows work that is {ENGINEER_READY_RULE}. Right now
+                  that leaves nothing{skipTotal > 0 ? ', because:' : '.'}
+                </p>
+                {skipTotal > 0 && (
+                  <ul className="cab__folders">
+                    {board.backlogSkipped.wrongStatus > 0 && (
+                      <li className="cab__folder">
+                        <span className="cab__name">
+                          {board.backlogSkipped.wrongStatus} not Up Next or In Progress
+                        </span>
+                      </li>
+                    )}
+                    {board.backlogSkipped.noEstimate > 0 && (
+                      <li className="cab__folder">
+                        <span className="cab__name">
+                          {board.backlogSkipped.noEstimate} with no time estimate
+                        </span>
+                      </li>
+                    )}
+                    {board.backlogSkipped.noAccountable > 0 && (
+                      <li className="cab__folder">
+                        <span className="cab__name">
+                          {board.backlogSkipped.noAccountable} with nobody accountable
+                        </span>
+                      </li>
+                    )}
+                  </ul>
+                )}
+                <p>
+                  <Link className="inlink" to="/tickets">Open the tickets board</Link> to
+                  set an estimate or an owner, and it will appear here.
+                </p>
+              </div>
             ) : (
               <div className="tablewrap">
                 <table className="fields compact">
@@ -649,7 +786,14 @@ export default function Sprints() {
                   </thead>
                   <tbody>
                     {board.backlog.map(t => (
-                      <tr key={t.entryId} data-prio={t.priority}>
+                      <tr
+                        key={t.entryId}
+                        data-prio={t.priority}
+                        draggable={mayPlan && !busy}
+                        data-drag={dragging && dragging.ticket.entryId === t.entryId ? '' : undefined}
+                        onDragStart={e => startDrag(e, t, BACKLOG)}
+                        onDragEnd={endDrag}
+                      >
                         <td className="tickets__num">
                           {t.ticketNumber === null
                             ? dash
@@ -690,8 +834,9 @@ export default function Sprints() {
 
           <p className="panel__foot">
             Walked {board.listsScanned} list{board.listsScanned === 1 ? '' : 's'} to build this.
-            A ticket with no estimate counts as zero hours, so it plans in without moving
-            the bar. Set one on the ticket to make the sprint honest.
+            Drag a card onto an engineer to plan it - they become its Responsible party,
+            and whoever is Accountable stays put. Drag it back to Ready to plan to take it
+            out of the sprint.
           </p>
         </>
       )}

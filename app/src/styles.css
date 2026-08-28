@@ -4297,6 +4297,26 @@ a.flag:hover { border-color: var(--line-strong); color: var(--text); }
   outline-offset: -2px;
 }
 
+/* A column that cannot take the card in flight: a roster row with no user record behind
+   it, so there is no user id to write. Dimmed for the duration of the drag rather than
+   left looking available and then refusing the drop. */
+.pipe__col[data-nodrop] { opacity: 0.4; }
+
+/* The sprint board's cards and rows are draggable too. A table row cannot take an
+   outline cleanly, so the in-flight row fades the way a card does. */
+.scard[draggable="true"] { cursor: grab; }
+.tsec tbody tr[draggable="true"] { cursor: grab; }
+.tsec tbody tr[data-drag] { opacity: 0.45; cursor: grabbing; }
+
+/* The backlog doubles as "take it out of the sprint". Same target treatment as a
+   column, so the two drop zones read as the same kind of thing. */
+.sprint__backlog[data-over] {
+  background: color-mix(in srgb, var(--cobalt) 8%, transparent);
+  outline: 2px dashed var(--cobalt);
+  outline-offset: 4px;
+  border-radius: var(--r);
+}
+
 /* ── a deal's history ───────────────────────────────────────────────────── */
 
 .dealcard__hist {
