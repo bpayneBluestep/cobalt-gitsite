@@ -427,7 +427,17 @@ export default function TicketBoard({
               : <span className="muted">{t.listName || dash}</span>}
           </td>
         )}
-        <td><span className="pill" data-prio={t.priority}>{t.priority || 'Normal'}</span></td>
+        {/* No priority means NO PILL - an empty cell, not the word "Normal".
+            4,034 of these came in from ClickUp with no priority set, and the old
+            `|| 'Normal'` fallback labelled every one of them Normal while colouring
+            them grey, because `data-prio=""` matches no rule. That read as two kinds
+            of Normal. "Nobody triaged this" and "someone judged this routine" are
+            different facts and the board should not blur them. */}
+        <td>
+          {t.priority
+            ? <span className="pill" data-prio={t.priority}>{t.priority}</span>
+            : null}
+        </td>
         {/* Both owners, side by side. The PM answerable to the client and the engineer
             doing the work are different roles and frequently different people; showing
             only one meant guessing which question a blank was answering. */}

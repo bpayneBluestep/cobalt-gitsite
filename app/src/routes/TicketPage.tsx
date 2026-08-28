@@ -61,7 +61,9 @@ function draftOf(t: Ticket): Draft {
   return {
     title: t.title || '',
     status: t.status || 'Open',
-    priority: t.priority || 'Normal',
+    // Deliberately NOT defaulting to Normal: an unset priority stays unset, so
+    // saving a title or a due date cannot silently triage the ticket for you.
+    priority: t.priority || '',
     dueDate: t.dueDate || '',
     details: t.details || '',
     estHours: t.estHours === null || t.estHours === undefined ? '' : String(t.estHours),
@@ -131,7 +133,7 @@ function claudePrompt(t: Ticket, ehrLink: string): string {
   if (ehrLink) lines.push(`Client's BlueStep org: ${ehrLink}`)
 
   lines.push(
-    `Status: ${t.status || 'Open'} · Priority: ${t.priority || 'Normal'}` +
+    `Status: ${t.status || 'Open'} · Priority: ${t.priority || 'none set'}` +
       (t.sprint ? ` · Sprint ${t.sprint}` : ' · unplanned'),
     `Accountable: ${t.accountableName || '-'} · Responsible: ${t.responsibleName || '-'}`,
   )
@@ -484,7 +486,11 @@ export default function TicketPage() {
           <span className="pill" data-status={(ticket.status || 'Open').replace(/\s+/g, '')}>
             {ticket.status || 'Open'}
           </span>
-          <span className="pill" data-prio={ticket.priority}>{ticket.priority || 'Normal'}</span>
+          {/* Same rule as the board: unset priority shows nothing rather than
+              claiming Normal. The editor below is where you set one. */}
+          {ticket.priority && (
+            <span className="pill" data-prio={ticket.priority}>{ticket.priority}</span>
+          )}
           {ticket.roadblocked && <span className="pill pill--block">Roadblocked</span>}
           {ticket.timerRunning && (
             <span className="pill pill--timer">
@@ -1071,6 +1077,9 @@ export default function TicketPage() {
             <div className="ef">
               <label htmlFor="tp-priority">Priority</label>
               <select id="tp-priority" value={draft.priority} onChange={e => edit('priority', e.target.value)}>
+                {/* A real "unset" choice, so the state most tickets are in is one the
+                    editor can both show and return to. */}
+                <option value="">— none —</option>
                 {TICKET_PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
             </div>

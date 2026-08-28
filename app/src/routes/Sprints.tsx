@@ -662,7 +662,13 @@ export default function Sprints() {
                           {t.title}
                         </th>
                         <td>{t.clientName || t.listName}</td>
-                        <td><span className="pill" data-prio={t.priority}>{t.priority}</span></td>
+                        {/* Unset priority drew an empty bordered pill here - a blank
+                            chip that looked like a rendering fault. Blank cell instead. */}
+                        <td>
+                          {t.priority
+                            ? <span className="pill" data-prio={t.priority}>{t.priority}</span>
+                            : null}
+                        </td>
                         <td className="num">
                           {t.estHours === null
                             ? <span className="muted">no est</span>
