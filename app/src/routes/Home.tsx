@@ -99,6 +99,15 @@ export default function Home() {
   const [busy, setBusy] = useState('')
   const [notice, setNotice] = useState('')
   const [failure, setFailure] = useState('')
+  /*
+   * Three sprints, then the rest on request.
+   *
+   * The list is newest first, so three is the current sprint and the two behind it -
+   * which is the whole of what anyone is still working. Everything older is history, and
+   * after the ClickUp import there can be a dozen of them, which turns a panel meant to
+   * be glanced at into the longest thing on the page.
+   */
+  const [allSprints, setAllSprints] = useState(false)
 
   const load = useCallback(() => {
     setState({ phase: 'loading' })
@@ -360,7 +369,7 @@ export default function Home() {
                 <span className="panel__note">Open one to work it as a board.</span>
               </header>
               <ul className="hsprints">
-                {d.mySprints.map(s => {
+                {(allSprints ? d.mySprints : d.mySprints.slice(0, 3)).map(s => {
                   const left = s.total - s.done
                   const pct = s.total > 0 ? Math.round((s.done / s.total) * 100) : 0
                   return (
@@ -385,6 +394,15 @@ export default function Home() {
                   )
                 })}
               </ul>
+              {d.mySprints.length > 3 && (
+                <p className="hsprints__more">
+                  <button type="button" className="linkbtn" onClick={() => setAllSprints(v => !v)}>
+                    {allSprints
+                      ? 'Show the last three'
+                      : `Show ${d.mySprints.length - 3} older sprint${d.mySprints.length - 3 === 1 ? '' : 's'}`}
+                  </button>
+                </p>
+              )}
             </section>
           )}
 

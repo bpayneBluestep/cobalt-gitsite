@@ -1832,6 +1832,7 @@ select:hover:not(:focus) { border-color: var(--text-mute); }
   transition: width var(--d-fast) var(--curve-decel);
 }
 .hsprint__meta { font-size: 0.72rem; }
+.hsprints__more { margin: var(--s-s) 0 0; font-size: 0.78rem; }
 
 /* The personal kanban. Five status columns, so they need to be narrower than the sprint
    board's per-person ones and to scroll sideways rather than squeeze. */
