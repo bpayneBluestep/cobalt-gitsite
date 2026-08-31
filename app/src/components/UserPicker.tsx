@@ -38,6 +38,7 @@ export function forgetUsers(): void {
 
 export default function UserPicker({
   id, value, onChange, disabled, placeholder = '-', ariaLabel,
+  className, autoFocus, onBlur,
 }: {
   id?: string
   /** The selected user's record id, or '' for nobody. */
@@ -46,6 +47,15 @@ export default function UserPicker({
   disabled?: boolean
   placeholder?: string
   ariaLabel?: string
+  /*
+   * The three below exist for the ticket board's inline cells, where the picker replaces
+   * a table cell for as long as it is open: it has to take the board's compact styling,
+   * take focus the moment it appears (the click that opened it landed on the cell, not
+   * on this), and close again when focus leaves without a choice being made.
+   */
+  className?: string
+  autoFocus?: boolean
+  onBlur?: () => void
 }) {
   const [users, setUsers] = useState<User[]>([])
   const [failed, setFailed] = useState(false)
@@ -66,9 +76,12 @@ export default function UserPicker({
   return (
     <select
       id={id}
+      className={className}
       value={value}
       disabled={disabled}
+      autoFocus={autoFocus}
       aria-label={ariaLabel}
+      onBlur={onBlur}
       onChange={e => onChange(e.target.value)}
     >
       <option value="">{placeholder}</option>

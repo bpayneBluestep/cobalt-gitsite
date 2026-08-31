@@ -1671,6 +1671,99 @@ select:hover:not(:focus) { border-color: var(--text-mute); }
 }
 .board2__confirm { font-size: 0.78rem; color: var(--text-dim); }
 
+/* A rejected write, said out loud. Sits where the notice sits, in the alarm colour the
+   edit card already uses, and is dismissable because it is not tied to a form that
+   closes on its own. */
+.board2__failure {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-s);
+  margin: 0 0 0.8rem;
+  padding: 0.5rem 0.6rem;
+  font-size: 0.78rem;
+  color: var(--text);
+  background: color-mix(in srgb, #ce4a5b 12%, transparent);
+  border-left: 2px solid #ce4a5b;
+  border-radius: var(--r);
+}
+.board2__failure-x {
+  margin-left: auto;
+  padding: 0 0.2rem;
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--text-dim);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.board2__failure-x:hover { color: var(--text); }
+
+/* -- Editable cells on the ticket board -------------------------------------------
+ *
+ * The read state has to look like nothing: a cell that already says "High" or "Dan S."
+ * is finished, and dressing it as a control would turn a scannable table into a form.
+ * The whole affordance is a hover tint plus the pointer, which is enough because the
+ * row is already interactive - the title is a link and the status is a select.
+ *
+ * A block button with a min-height is what makes an EMPTY cell clickable. Untriaged
+ * priority renders no pill at all, on purpose, and a button hugging zero content would
+ * make the single most useful edit the one with no target.
+ */
+.cellbtn {
+  display: block;
+  width: 100%;
+  min-height: 24px;
+  margin: -2px -4px;
+  padding: 2px 4px;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color var(--d-faster) var(--curve-ease);
+}
+.cellbtn:hover { background: var(--bg-sunk); }
+.cellbtn:focus-visible { outline: 2px solid var(--cobalt); outline-offset: -2px; }
+
+/* An empty cell says what is missing, but only while pointed at, so the read view keeps
+   its meaning: no pill = nobody triaged this, and a permanent placeholder would quietly
+   turn that back into a value. */
+.cellbtn[data-empty]::after {
+  content: '+';
+  color: var(--text-mute);
+  opacity: 0;
+  transition: opacity var(--d-faster) var(--curve-ease);
+}
+.cellbtn[data-empty]:hover::after,
+.cellbtn[data-empty]:focus-visible::after { opacity: 1; }
+
+/* The open editor. Sized to sit inside a table row without growing it - the same compact
+   treatment the Move select already gets, so a row being edited does not jump taller
+   than its neighbours. */
+.cellin {
+  width: 100%;
+  min-height: 26px;
+  max-width: 100%;
+  padding: 1px var(--s-xs);
+  font-family: inherit;
+  font-size: var(--t-caption1);
+  color: var(--text);
+  background: var(--bg-panel);
+  border: 1px solid var(--cobalt);
+  border-radius: var(--r);
+}
+.cellin:focus { outline: none; box-shadow: 0 0 0 2px color-mix(in srgb, var(--cobalt) 25%, transparent); }
+.cellin:disabled { opacity: 0.6; cursor: progress; }
+.cellin--n { max-width: 5.5rem; }
+
+/* Reserve the width the editor needs, so opening one does not shove the other columns
+   sideways and move the row being read. */
+.tickets__cell { min-width: 7rem; }
+.tickets__time.tickets__cell { min-width: 6rem; }
+
 /* group header row inside the ticket table */
 .grouprow td {
   padding: 0.55rem 0.6rem !important;

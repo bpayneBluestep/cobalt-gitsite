@@ -1,7 +1,7 @@
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
-  addTicket, updateTicket, ApiError, formatHours, wesleyStatus,
+  addTicket, updateTicket, setTicketPeople, ApiError, formatHours, wesleyStatus,
   TICKET_STATUSES, TICKET_PRIORITIES, TICKET_TABS, TICKET_GROUP_ORDER, PRIORITY_RANK,
   type List, type Ticket, type TicketFieldKey,
 } from '../api'
@@ -66,6 +66,112 @@ function tabOf(status: string): string {
 
 function byPriority(a: Ticket, b: Ticket): number {
   return (PRIORITY_RANK[b.priority] || 0) - (PRIORITY_RANK[a.priority] || 0)
+}
+
+/*
+ * ── Editing from the board ────────────────────────────────────────────────────────
+ *
+ * Triage is the job this table exists for, and until now it could only move a status.
+ * Everything else - who owns it, how urgent it is, how big it is - meant opening the
+ * ticket, and the whole point of a board is deciding those things across a stack of work
+ * rather than one row at a time.
+ *
+ * CLICK TO EDIT, one cell at a time, rather than a control permanently in every cell.
+ * Two reasons, and the second is the one that decided it:
+ *
+ *  1. The read view carries meaning that a row of dropdowns would erase. An empty
+ *     priority cell means nobody triaged this - see the note on the priority cell below -
+ *     and a select showing "(none)" reads as a judgement instead of a gap.
+ *  2. The board renders every row it is given, and the Completed tab on the all-lists
+ *     board is ~5,300 of them. Four permanent selects per row is tens of thousands of
+ *     option elements; a button is a fraction of that, and only the cell you clicked
+ *     becomes a control.
+ */
+type EditCol = 'priority' | 'accountable' | 'responsible' | 'est'
+
+/** Which cell is open, or saving. One string so only ever one cell is either. */
+const cellKey = (entryId: string, col: EditCol): string => entryId + ':' + col
+
+/**
+ * The read half of an editable cell: identical to the static cell it replaces until
+ * you point at it.
+ *
+ * Full-width and full-height so an EMPTY cell is still a target. Untriaged priority
+ * deliberately renders nothing at all, and a button sized to its contents would make the
+ * one field most worth setting the one field you cannot click.
+ */
+function CellBtn({ label, editable, empty, onOpen, children }: {
+  label: string
+  editable: boolean
+  /** Nothing visible in this cell, so CSS can offer a hover-only target marker. */
+  empty?: boolean
+  onOpen: () => void
+  children: React.ReactNode
+}) {
+  if (!editable) return <>{children}</>
+  return (
+    <button
+      type="button"
+      className="cellbtn"
+      data-empty={empty ? '' : undefined}
+      title={label}
+      onClick={onOpen}
+    >
+      {children}
+      <span className="visually-hidden">{label}</span>
+    </button>
+  )
+}
+
+/*
+ * The estimate is the one editable cell without a fixed vocabulary, so it needs a draft.
+ * A select commits the instant you pick; a number is half-typed for as long as it takes
+ * to type it, and saving per keystroke would write 5, then 5.2, then 5.25.
+ *
+ * Enter and blur commit, Escape abandons. Blur COMMITS here rather than cancelling,
+ * because clicking away from a number you just typed reads as "done" - the opposite of
+ * the selects, where the click that changes the value is itself the commit.
+ */
+function EstEditor({ initial, saving, onSave, onCancel }: {
+  initial: number | null
+  saving: boolean
+  onSave: (value: string) => void
+  onCancel: () => void
+}) {
+  const was = initial === null ? '' : String(initial)
+  const [text, setText] = useState(was)
+  // Blur fires again while the editor unmounts after a commit. Without this the save
+  // runs twice - harmless for an idempotent write, but it double-reports and can race
+  // the fresh ticket back over itself.
+  const settled = useRef(false)
+
+  const finish = (save: boolean) => {
+    if (settled.current) return
+    settled.current = true
+    const next = text.trim()
+    if (save && next !== was) onSave(next)
+    else onCancel()
+  }
+
+  return (
+    <input
+      type="number"
+      className="cellin cellin--n"
+      step="0.25"
+      min="0"
+      max="10000"
+      value={text}
+      autoFocus
+      disabled={saving}
+      aria-label="Estimated hours"
+      onChange={e => setText(e.target.value)}
+      onBlur={() => finish(true)}
+      onKeyDown={e => {
+        if (e.key === 'Enter') { e.preventDefault(); finish(true) }
+        else if (e.key === 'Escape') { e.preventDefault(); finish(false) }
+      }}
+    />
+  )
 }
 
 export default function TicketBoard({
@@ -133,6 +239,19 @@ export default function TicketBoard({
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState('')
   const [notice, setNotice] = useState('')
+
+  /*
+   * Inline editing, as two keys rather than two booleans: only one cell can be open and
+   * only one can be in flight, so a pair of `entryId:col` strings says which without a
+   * per-row map to keep in step with 5,000 rows.
+   *
+   * `saving` is separate from the board-wide `busy` on purpose. `busy` belongs to the
+   * create form and locks the board; a cell save should grey out that one cell and leave
+   * the rest of the table usable, because triage is a sequence of small edits and waiting
+   * for each one to land before starting the next is the thing this feature is for.
+   */
+  const [editCell, setEditCell] = useState('')
+  const [savingCell, setSavingCell] = useState('')
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { open: 0, ready: 0, current: 0, completed: 0 }
@@ -334,6 +453,31 @@ export default function TicketBoard({
    */
   const listIdOf = (t: Ticket): string => t.listId || list.id
 
+  /**
+   * Run one cell's write and fold the fresh ticket back into the caller's copy.
+   *
+   * Every path closes the editor, including a failure. The alternative - hold the cell
+   * open on error so the value can be corrected - sounds kinder but leaves a control
+   * showing a value the server rejected, which reads as saved. The row reverts to what
+   * is actually stored and the reason goes in the error line above the table.
+   */
+  function saveCell(t: Ticket, col: EditCol, run: () => Promise<Ticket>, done: string) {
+    const key = cellKey(t.entryId, col)
+    setSavingCell(key); setFailure(''); setNotice('')
+    run()
+      .then(fresh => { onTicket(fresh); setNotice(done) })
+      .catch(err => setFailure(err instanceof ApiError ? err.message : String(err)))
+      .finally(() => { setSavingCell(''); setEditCell('') })
+  }
+
+  /** Who this ticket names for a role, written through the one action that owns both. */
+  function savePeople(t: Ticket, col: 'accountable' | 'responsible', userId: string) {
+    const people = col === 'accountable' ? { accountableId: userId } : { responsibleId: userId }
+    const role = col === 'accountable' ? 'Accountable' : 'Responsible'
+    saveCell(t, col, () => setTicketPeople({ listId: listIdOf(t), entryId: t.entryId }, people),
+      userId ? role + ' updated.' : role + ' cleared.')
+  }
+
   /** Move a ticket's status straight from its row, without opening it. */
   function quickStatus(t: Ticket, status: string) {
     if (busy || !mayEdit) return
@@ -433,28 +577,120 @@ export default function TicketBoard({
             them grey, because `data-prio=""` matches no rule. That read as two kinds
             of Normal. "Nobody triaged this" and "someone judged this routine" are
             different facts and the board should not blur them. */}
-        <td>
-          {t.priority
-            ? <span className="pill" data-prio={t.priority}>{t.priority}</span>
-            : null}
+        <td className="tickets__cell">
+          {editCell === cellKey(t.entryId, 'priority') ? (
+            <select
+              className="cellin"
+              autoFocus
+              disabled={savingCell === cellKey(t.entryId, 'priority')}
+              aria-label={`Priority for "${t.title}"`}
+              value={t.priority || ''}
+              onChange={e => saveCell(
+                t, 'priority',
+                () => updateTicket(listIdOf(t), t.entryId, { priority: e.target.value }),
+                e.target.value ? `Priority set to ${e.target.value}.` : 'Priority cleared.',
+              )}
+              onBlur={() => setEditCell('')}
+            >
+              {/* "Not triaged" is a real option, not the absence of one: it has to be
+                  possible to put a ticket BACK to untriaged, and an empty first option
+                  with no label would read as a rendering fault. */}
+              <option value="">(not set)</option>
+              {TICKET_PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+          ) : (
+            <CellBtn
+              label={t.priority ? 'Change the priority' : 'Set the priority'}
+              editable={mayEdit}
+              empty={!t.priority}
+              onOpen={() => setEditCell(cellKey(t.entryId, 'priority'))}
+            >
+              {t.priority
+                ? <span className="pill" data-prio={t.priority}>{t.priority}</span>
+                : null}
+            </CellBtn>
+          )}
         </td>
         {/* Both owners, side by side. The PM answerable to the client and the engineer
             doing the work are different roles and frequently different people; showing
             only one meant guessing which question a blank was answering. */}
-        <td className="tickets__who" title={t.accountableName || ''}>
-          {t.accountableName || dash}
+        <td className="tickets__who tickets__cell" title={t.accountableName || ''}>
+          {editCell === cellKey(t.entryId, 'accountable') ? (
+            <UserPicker
+              value={t.accountableId}
+              disabled={savingCell === cellKey(t.entryId, 'accountable')}
+              ariaLabel={`Accountable for "${t.title}"`}
+              className="cellin"
+              autoFocus
+              onBlur={() => setEditCell('')}
+              onChange={id => savePeople(t, 'accountable', id)}
+            />
+          ) : (
+            <CellBtn
+              label={t.accountableName ? 'Change who is accountable' : 'Set who is accountable'}
+              editable={mayEdit}
+              onOpen={() => setEditCell(cellKey(t.entryId, 'accountable'))}
+            >
+              {t.accountableName || dash}
+            </CellBtn>
+          )}
         </td>
-        <td className="tickets__who" title={t.responsibleName || t.assignee || ''}>
-          {t.responsibleName || t.assignee || dash}
+        <td className="tickets__who tickets__cell" title={t.responsibleName || t.assignee || ''}>
+          {editCell === cellKey(t.entryId, 'responsible') ? (
+            <UserPicker
+              value={t.responsibleId}
+              disabled={savingCell === cellKey(t.entryId, 'responsible')}
+              ariaLabel={`Responsible for "${t.title}"`}
+              className="cellin"
+              autoFocus
+              onBlur={() => setEditCell('')}
+              onChange={id => savePeople(t, 'responsible', id)}
+            />
+          ) : (
+            <CellBtn
+              label={t.responsibleName ? 'Change who is responsible' : 'Set who is responsible'}
+              editable={mayEdit}
+              onOpen={() => setEditCell(cellKey(t.entryId, 'responsible'))}
+            >
+              {/* The retired free-text assignee still shows when nobody was ever picked,
+                  so an old ticket reads sensibly - but it is not what gets edited. The
+                  picker opens on `responsibleId`, which is empty, and choosing somebody
+                  replaces the legacy string with a real person. */}
+              {t.responsibleName || t.assignee || dash}
+            </CellBtn>
+          )}
         </td>
-        <td className="tickets__time">
-          {logged || est !== null ? (
-            <span className="tvs" data-over={over ? '' : undefined}>
-              {logged ? formatHours(logged) : '0h'}
-              <span className="tvs__sep">/</span>
-              <span className="tvs__est">{est === null ? '-' : formatHours(est)}</span>
-            </span>
-          ) : dash}
+        {/* Logged / estimated. Only the ESTIMATE is editable here - logged hours are the
+            sum of time entries and are changed by logging time, on the ticket page, where
+            a date and a note go with them. Clicking anywhere in the cell edits the
+            estimate, since it is the only half that can be typed. */}
+        <td className="tickets__time tickets__cell">
+          {editCell === cellKey(t.entryId, 'est') ? (
+            <EstEditor
+              initial={est}
+              saving={savingCell === cellKey(t.entryId, 'est')}
+              onCancel={() => setEditCell('')}
+              onSave={value => saveCell(
+                t, 'est',
+                () => updateTicket(listIdOf(t), t.entryId, { estHours: value }),
+                value ? `Estimate set to ${value}h.` : 'Estimate cleared.',
+              )}
+            />
+          ) : (
+            <CellBtn
+              label={est === null ? 'Set the estimate' : 'Change the estimate'}
+              editable={mayEdit}
+              onOpen={() => setEditCell(cellKey(t.entryId, 'est'))}
+            >
+              {logged || est !== null ? (
+                <span className="tvs" data-over={over ? '' : undefined}>
+                  {logged ? formatHours(logged) : '0h'}
+                  <span className="tvs__sep">/</span>
+                  <span className="tvs__est">{est === null ? '-' : formatHours(est)}</span>
+                </span>
+              ) : dash}
+            </CellBtn>
+          )}
         </td>
         <td>{t.dueDate || dash}</td>
         <td className="tickets__move">
@@ -627,6 +863,16 @@ export default function TicketBoard({
       )}
 
       {notice && <p className="board2__notice" role="status">{notice}</p>}
+      {/* Board-level, not inside the create card. This used to render only there, which
+          meant a rejected quick status move - and now any rejected cell edit - reverted
+          the row and explained nothing. */}
+      {failure && !creating && (
+        <p className="board2__failure" role="alert">
+          {failure}
+          <button type="button" className="board2__failure-x" onClick={() => setFailure('')}
+                  aria-label="Dismiss">×</button>
+        </p>
+      )}
 
       {/* Create collects only the essentials. Details, time, files and the roadblock all
           belong to a ticket that exists, so they live on the ticket's own page rather
