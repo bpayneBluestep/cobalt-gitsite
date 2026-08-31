@@ -2101,8 +2101,19 @@ export const updateEngineer = (entryId: string, fields: Partial<Record<EngineerF
 export const deleteEngineer = (entryId: string): Promise<Team> =>
   maestroPost('deleteEngineer', { entryId })
 
-export const getSprint = (sprint: string): Promise<SprintBoard> =>
-  maestroGet('sprint', { sprint })
+/*
+ * The board for one sprint.
+ *
+ * `backlogLimit` exists because the backlog is capped SERVER-side (60 by default) before
+ * it is returned, and this page filters and sorts it in the browser. Filtering a
+ * truncated list silently answers a different question than the one asked - "the High
+ * priority items among the 60 biggest" is not "the High priority items" - so the page
+ * asks for more than it expects to need and says so on the rare occasion it is still cut.
+ */
+export const getSprint = (sprint: string, backlogLimit = 0): Promise<SprintBoard> =>
+  maestroGet('sprint', backlogLimit
+    ? { sprint, backlogLimit: String(backlogLimit) }
+    : { sprint })
 
 /**
  * Put a ticket into a sprint (and optionally onto an engineer). An empty sprint pulls

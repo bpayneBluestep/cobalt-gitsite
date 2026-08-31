@@ -1762,6 +1762,29 @@ select:hover:not(:focus) { border-color: var(--text-mute); }
 /* Reserve the width the editor needs, so opening one does not shove the other columns
    sideways and move the row being read. */
 .tickets__cell { min-width: 7rem; }
+
+/* A sortable column heading. The whole heading is the button, so the click target is the
+   column label rather than a small icon beside it, and the indicator only earns its
+   colour on the column actually in force - otherwise six arrows compete with the data. */
+.sortbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  width: 100%;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.sortbtn:hover { color: var(--cobalt); }
+.sortbtn:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 2px; }
+.sortbtn__i { font-size: 0.65em; color: var(--text-mute); opacity: 0.5; }
+.sortbtn:hover .sortbtn__i { opacity: 1; }
+[aria-sort="ascending"] .sortbtn__i,
+[aria-sort="descending"] .sortbtn__i { color: var(--cobalt); opacity: 1; }
 .tickets__time.tickets__cell { min-width: 6rem; }
 
 /* group header row inside the ticket table */

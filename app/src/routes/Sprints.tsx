@@ -4,11 +4,12 @@ import {
   ApiError, getSprint, getTeam, createSprint, assignSprint,
   addEngineer, updateEngineer, deleteEngineer,
   formatHours, shiftSprint, sprintLabel, isSprintKey, nameKey,
-  ENGINEER_DISCIPLINES, ENGINEER_READY_RULE,
+  ENGINEER_DISCIPLINES, ENGINEER_READY_RULE, PRIORITY_RANK,
   type SprintBoard, type SprintColumn, type Team, type Ticket, type EngineerFieldKey,
   type User,
 } from '../api'
 import UserPicker, { loadUsers } from '../components/UserPicker'
+import { ticketPath } from '../components/TicketBoard'
 import { useSession } from '../session'
 
 /*
@@ -45,6 +46,61 @@ const LOGIN_URL = '/shared/login/login.jsp?desturl=' +
 
 /** The drop-target id for the backlog region. Not an engineer, so it cannot collide. */
 const BACKLOG = '__backlog'
+
+/*
+ * A ticket opens in its own tab, the same rule the tickets board follows.
+ *
+ * More so here: this page is a plan you are holding in your head. Following a link in
+ * place costs the sprint you were looking at, the filters narrowing it and the scroll
+ * position, and reading one description is not worth rebuilding all of that.
+ *
+ * `draggable={false}` on every one of these matters. A card and a backlog row are drag
+ * handles, and an anchor is draggable by default, so without it the browser starts
+ * dragging the LINK - planning by drag silently stops working on exactly the element
+ * people grab.
+ */
+const NEW_TAB = { target: '_blank' as const, rel: 'noopener', draggable: false }
+
+/*
+ * How many backlog rows to pull.
+ *
+ * The server caps at 60 by default, and this page now filters and sorts in the browser,
+ * where a truncated list quietly answers the wrong question. The Engineer-Ready gate
+ * keeps the real backlog small - 24 today against thousands of open tickets - so asking
+ * for 400 costs nothing and makes the controls honest. If it is ever still cut, the page
+ * says so rather than pretending.
+ */
+const BACKLOG_LIMIT = 400
+
+/**
+ * The backlog's sortable columns.
+ *
+ * `est` descending is the default because it is the server's order and a deliberate one:
+ * the backlog is a picking list, and the big items are the ones that decide whether a
+ * sprint fits. Sorting is a way to ask a different question of it, not a correction.
+ */
+type SortKey = 'num' | 'title' | 'list' | 'accountable' | 'priority' | 'est'
+
+const SORT_COLUMNS: { key: SortKey; label: string; numeric?: boolean }[] = [
+  { key: 'num', label: '#', numeric: true },
+  { key: 'title', label: 'Ticket' },
+  { key: 'list', label: 'For' },
+  { key: 'accountable', label: 'Accountable' },
+  { key: 'priority', label: 'Priority', numeric: true },
+  { key: 'est', label: 'Est', numeric: true },
+]
+
+/** What a row sorts by for a given column: a number where one is meaningful, else text. */
+function sortValue(t: Ticket, key: SortKey): number | string {
+  if (key === 'num') return t.ticketNumber === null ? -1 : t.ticketNumber
+  if (key === 'est') return t.estHours === null ? -1 : t.estHours
+  // Not alphabetical: Critical/High/Normal/Low is an order, and sorting it by name would
+  // put Critical between Low and Normal. Unset ranks below Low rather than above it.
+  if (key === 'priority') return PRIORITY_RANK[t.priority] || 0
+  if (key === 'list') return (t.clientName || t.listName || '').toLowerCase()
+  if (key === 'accountable') return (t.accountableName || '').toLowerCase()
+  return (t.title || '').toLowerCase()
+}
 
 type EngDraft = Record<EngineerFieldKey, string>
 
@@ -108,6 +164,21 @@ export default function Sprints() {
   const [dragging, setDragging] = useState<{ ticket: Ticket; from: string } | null>(null)
   const [over, setOver] = useState('')
 
+  /*
+   * Backlog controls. Client-side, over the rows already loaded, for the same reason the
+   * tickets board filters in the browser: the list is small, one fetch already has all of
+   * it, and a round trip per filter change would make narrowing something you wait for.
+   *
+   * Deliberately NOT applied to the engineer columns. Those carry capacity arithmetic in
+   * their headers - "18h of 25h, 72%" - computed server-side over every card in the
+   * column. Hiding cards would leave those totals describing work you can no longer see,
+   * and a capacity plan that does not add up is worse than one you have to read in full.
+   */
+  const [bAcct, setBAcct] = useState('')
+  const [bList, setBList] = useState('')
+  const [bPriority, setBPriority] = useState('')
+  const [bSort, setBSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'est', dir: -1 })
+
   /** Move to a sprint and put it in the URL, so the view can be linked to. */
   const setSprint = useCallback((key: string) => {
     setSprintState(key)
@@ -135,7 +206,7 @@ export default function Sprints() {
   const load = useCallback((key: string) => {
     if (!key) return
     setState({ phase: 'loading' })
-    getSprint(key)
+    getSprint(key, BACKLOG_LIMIT)
       .then(board => setState({ phase: 'ready', board }))
       .catch(err => setState({
         phase: 'error',
@@ -272,6 +343,63 @@ export default function Sprints() {
    * the kind of thing you find out about late. So it is stated, with somewhere to go.
    */
   const offBoard = (board?.hiddenInSprint || 0) + (board?.unassigned.length || 0)
+
+  const backlogRaw = useMemo(() => board?.backlog || [], [board])
+
+  /*
+   * What the selects offer: only values actually present in the backlog, so a filter can
+   * never produce an empty table. 13 clients out of 84 lists have something ready to
+   * plan, and offering the other 71 would be 71 ways to ask a question with no answer.
+   */
+  const backlogOptions = useMemo(() => {
+    const people = new Set<string>()
+    const lists = new Set<string>()
+    const prios = new Set<string>()
+    for (const t of backlogRaw) {
+      if (t.accountableName) people.add(t.accountableName)
+      const forWhom = t.clientName || t.listName
+      if (forWhom) lists.add(forWhom)
+      if (t.priority) prios.add(t.priority)
+    }
+    const alpha = (set: Set<string>) => [...set].sort((a, b) => a.localeCompare(b))
+    return {
+      people: alpha(people),
+      lists: alpha(lists),
+      // Ranked, not alphabetical, for the same reason the sort is.
+      priorities: [...prios].sort((a, b) => (PRIORITY_RANK[b] || 0) - (PRIORITY_RANK[a] || 0)),
+    }
+  }, [backlogRaw])
+
+  const backlogFilters = (bAcct ? 1 : 0) + (bList ? 1 : 0) + (bPriority ? 1 : 0)
+
+  const backlogRows = useMemo(() => {
+    const rows = backlogRaw.filter(t =>
+      (!bAcct || t.accountableName === bAcct) &&
+      (!bList || (t.clientName || t.listName) === bList) &&
+      (!bPriority || t.priority === bPriority))
+
+    return rows.slice().sort((a, b) => {
+      const av = sortValue(a, bSort.key)
+      const bv = sortValue(b, bSort.key)
+      let cmp: number
+      if (typeof av === 'number' && typeof bv === 'number') cmp = av - bv
+      else cmp = String(av).localeCompare(String(bv))
+      // Ties fall back to the estimate, biggest first: within one client or one owner the
+      // question is still which item is big enough to matter.
+      if (cmp === 0) return (b.estHours || 0) - (a.estHours || 0)
+      return cmp * bSort.dir
+    })
+  }, [backlogRaw, bAcct, bList, bPriority, bSort])
+
+  /** Click a heading to sort by it; click the one already active to reverse it. */
+  const sortBy = (key: SortKey) => setBSort(cur => (cur.key === key
+    ? { key, dir: cur.dir === 1 ? -1 : 1 }
+    : { key, dir: key === 'est' || key === 'priority' || key === 'num' ? -1 : 1 }))
+
+  const clearBacklogFilters = () => { setBAcct(''); setBList(''); setBPriority('') }
+
+  /* The one case where filtering in the browser would lie: the server cut the list. */
+  const backlogTruncated = !!board && board.backlogTotal > board.backlog.length
 
   /** A select of this sprint's engineers, used from three places. */
   function EngineerSelect({
@@ -655,8 +783,12 @@ export default function Sprints() {
                     onDragEnd={endDrag}
                   >
                     <p className="dcard__title">
-                      {t.ticketNumber !== null && <span className="tnum">#{t.ticketNumber}</span>}
-                      <span>{t.title}</span>
+                      {t.ticketNumber !== null && (
+                        <Link className="tnum tnum--link" to={ticketPath(t)} {...NEW_TAB}>
+                          #{t.ticketNumber}
+                        </Link>
+                      )}
+                      <Link className="rowlink__a" to={ticketPath(t)} {...NEW_TAB}>{t.title}</Link>
                     </p>
                     {/* A subtask in a sprint is a chunk of something bigger, and a card
                         reading "Backfill existing records" with no context is unplannable
@@ -725,16 +857,71 @@ export default function Sprints() {
                 {board.backlogTotal > 0 && <span className="tsec__n">{board.backlogTotal}</span>}
               </h2>
               <span className="panel__note">
-                {ENGINEER_READY_RULE}, biggest first
-                {board.backlogTotal > board.backlog.length && ` · showing ${board.backlog.length}`}
+                {ENGINEER_READY_RULE}
+                {backlogFilters > 0
+                  ? ` · ${backlogRows.length} of ${backlogRaw.length} shown`
+                  : backlogTruncated ? ` · showing ${board.backlog.length}` : ''}
               </span>
+              {backlogFilters > 0 && (
+                <button type="button" className="linkbtn" onClick={clearBacklogFilters}>
+                  Clear filters
+                </button>
+              )}
             </div>
+
+            {/* Only offered once there is enough to be worth narrowing. Three selects
+                above four rows is more control than content. */}
+            {backlogRaw.length > 4 && (
+              <div className="board2__filters">
+                <div className="ef">
+                  <label htmlFor="b-acct">Accountable</label>
+                  <select id="b-acct" value={bAcct} onChange={e => setBAcct(e.target.value)}>
+                    <option value="">Anyone</option>
+                    {backlogOptions.people.map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </div>
+                <div className="ef">
+                  <label htmlFor="b-list">Client or list</label>
+                  <select id="b-list" value={bList} onChange={e => setBList(e.target.value)}>
+                    <option value="">Anyone's</option>
+                    {backlogOptions.lists.map(l => <option key={l} value={l}>{l}</option>)}
+                  </select>
+                </div>
+                <div className="ef">
+                  <label htmlFor="b-prio">Priority</label>
+                  <select id="b-prio" value={bPriority} onChange={e => setBPriority(e.target.value)}>
+                    <option value="">Any priority</option>
+                    {backlogOptions.priorities.map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {/* The filters act on what was loaded, and the server capped it. Saying so is
+                the difference between a narrowed list and a wrong one. */}
+            {backlogTruncated && (
+              <p className="board2__notice">
+                Showing the {board.backlog.length} biggest of {board.backlogTotal} ready to
+                plan. Sorting and filtering apply to those, not to the rest.
+              </p>
+            )}
 
             {dragging && dragging.from !== BACKLOG && (
               <p className="pipe__empty">Drop here to take it out of the sprint</p>
             )}
 
-            {board.backlog.length === 0 ? (
+            {backlogRaw.length > 0 && backlogRows.length === 0 ? (
+              <div className="callout callout--plain">
+                <p className="callout__title">Nothing matches those filters</p>
+                <p>
+                  {backlogRaw.length} item{backlogRaw.length === 1 ? ' is' : 's are'} ready
+                  to plan, none of them matching all three.{' '}
+                  <button type="button" className="linkbtn" onClick={clearBacklogFilters}>
+                    Clear the filters
+                  </button>.
+                </p>
+              </div>
+            ) : board.backlog.length === 0 ? (
               <div className="callout callout--plain">
                 <p className="callout__title">Nothing is ready to plan</p>
                 <p>
@@ -776,16 +963,28 @@ export default function Sprints() {
                 <table className="fields compact">
                   <thead>
                     <tr>
-                      <th scope="col">#</th>
-                      <th scope="col">Ticket</th>
-                      <th scope="col">For</th>
-                      <th scope="col">Priority</th>
-                      <th scope="col">Est</th>
+                      {SORT_COLUMNS.map(c => (
+                        <th
+                          key={c.key}
+                          scope="col"
+                          className={c.numeric && c.key === 'est' ? 'num' : undefined}
+                          aria-sort={bSort.key === c.key
+                            ? (bSort.dir === 1 ? 'ascending' : 'descending')
+                            : 'none'}
+                        >
+                          <button type="button" className="sortbtn" onClick={() => sortBy(c.key)}>
+                            {c.label}
+                            <span className="sortbtn__i" aria-hidden="true">
+                              {bSort.key === c.key ? (bSort.dir === 1 ? '▲' : '▼') : '↕'}
+                            </span>
+                          </button>
+                        </th>
+                      ))}
                       <th scope="col">Plan into {sprintLabel(sprint)}</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {board.backlog.map(t => (
+                    {backlogRows.map(t => (
                       <tr
                         key={t.entryId}
                         data-prio={t.priority}
@@ -797,15 +996,24 @@ export default function Sprints() {
                         <td className="tickets__num">
                           {t.ticketNumber === null
                             ? dash
-                            : <span className="tnum">#{t.ticketNumber}</span>}
+                            : (
+                              <Link className="tnum tnum--link" to={ticketPath(t)} {...NEW_TAB}>
+                                #{t.ticketNumber}
+                              </Link>
+                            )}
                         </td>
                         <th scope="row">
                           {t.isSubtask && t.parentNumber !== null && (
                             <span className="subcrumb">#{t.parentNumber} ›</span>
                           )}
-                          {t.title}
+                          <Link className="rowlink__a" to={ticketPath(t)} {...NEW_TAB}>
+                            {t.title}
+                          </Link>
                         </th>
                         <td>{t.clientName || t.listName}</td>
+                        <td className="tickets__who" title={t.accountableName || ''}>
+                          {t.accountableName || dash}
+                        </td>
                         {/* Unset priority drew an empty bordered pill here - a blank
                             chip that looked like a rendering fault. Blank cell instead. */}
                         <td>
