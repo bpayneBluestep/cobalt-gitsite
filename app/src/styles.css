@@ -1796,6 +1796,48 @@ select:hover:not(:focus) { border-color: var(--text-mute); }
 
 /* Keeps the sprint bar's two buttons together at its right edge. */
 .sprintbar__acts { display: flex; gap: var(--s-s); align-items: center; flex-wrap: wrap; }
+
+/* -- Your sprints, on Home ---------------------------------------------------------
+   A list of doors rather than a table: the numbers are context for choosing which one
+   to open, so they sit under the name instead of in columns to be compared. */
+.hsprints { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-s); }
+.hsprint {
+  display: grid;
+  gap: 0.3rem;
+  padding: var(--s-s) 0;
+  border-bottom: 1px solid var(--line);
+}
+.hsprint:last-child { border-bottom: none; }
+.hsprint__a {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-s);
+  color: inherit;
+  text-decoration: none;
+}
+.hsprint__a:hover .hsprint__name { color: var(--cobalt); }
+.hsprint__name { font-weight: 600; }
+.hsprint__n { font-size: 0.78rem; color: var(--text-dim); margin-left: auto; }
+.hsprint__bar {
+  display: block;
+  height: 4px;
+  border-radius: var(--r-pill);
+  background: var(--bg-sunk);
+  overflow: hidden;
+}
+.hsprint__fill {
+  display: block;
+  height: 100%;
+  background: #5AA33C;
+  transition: width var(--d-fast) var(--curve-decel);
+}
+.hsprint__meta { font-size: 0.72rem; }
+
+/* The personal kanban. Five status columns, so they need to be narrower than the sprint
+   board's per-person ones and to scroll sideways rather than squeeze. */
+.kanban { align-items: start; }
+.kanban .pipe__col { min-width: 15rem; }
+.kanban .pipe__head h2 { margin: 0; }
 [aria-sort="ascending"] .sortbtn__i,
 [aria-sort="descending"] .sortbtn__i { color: var(--cobalt); opacity: 1; }
 .tickets__time.tickets__cell { min-width: 6rem; }

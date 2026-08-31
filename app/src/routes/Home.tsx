@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ApiError, completeFollowUp, getHome, stopTimer, updateCompany, formatMoney,
+  formatHours, sprintLabel,
   type Home as HomeData, type HomeTicket, type OwedItem,
 } from '../api'
 import { useSession } from '../session'
@@ -339,6 +340,50 @@ export default function Home() {
                     </div>
                   </li>
                 ))}
+              </ul>
+            </section>
+          )}
+
+          {/* ── my sprints ─────────────────────────────────────────────────
+              Above "Your tickets" on purpose: a sprint is the frame those tickets sit
+              inside, and the question "what am I committed to this sprint" comes before
+              "what do I have open in general".
+
+              Newest first, and only sprints you actually have work in - so this is empty
+              and absent for anyone who has never been given any, rather than a panel of
+              zeroes. */}
+          {d.mySprints.length > 0 && (
+            <section className="panel hpanel">
+              <header className="panel__head">
+                <h2>Your sprints</h2>
+                <span className="panel__n">{d.mySprints.length}</span>
+                <span className="panel__note">Open one to work it as a board.</span>
+              </header>
+              <ul className="hsprints">
+                {d.mySprints.map(s => {
+                  const left = s.total - s.done
+                  const pct = s.total > 0 ? Math.round((s.done / s.total) * 100) : 0
+                  return (
+                    <li className="hsprint" key={s.sprint}>
+                      <Link className="hsprint__a" to={`/sprints/mine/${s.sprint}`}>
+                        <span className="hsprint__name">{sprintLabel(s.sprint)}</span>
+                        <span className="hsprint__n">
+                          {left > 0
+                            ? `${left} of ${s.total} left`
+                            : `all ${s.total} done`}
+                        </span>
+                      </Link>
+                      {/* Done against total, as a bar rather than a second number: the
+                          useful reading is how much of it is behind you. */}
+                      <span className="hsprint__bar" aria-hidden="true">
+                        <span className="hsprint__fill" style={{ width: pct + '%' }} />
+                      </span>
+                      <span className="hsprint__meta muted">
+                        {formatHours(s.estHours)} est · {formatHours(s.loggedHours)} logged
+                      </span>
+                    </li>
+                  )
+                })}
               </ul>
             </section>
           )}

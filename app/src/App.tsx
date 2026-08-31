@@ -25,6 +25,7 @@ import CsSurveys from './routes/CsSurveys'
 import CsQuarter from './routes/CsQuarter'
 import CompanySuccess from './routes/CompanySuccess'
 import Sprints from './routes/Sprints'
+import MySprint from './routes/MySprint'
 import Settings from './routes/Settings'
 import TicketPage from './routes/TicketPage'
 import Intake from './routes/Intake'
@@ -228,6 +229,11 @@ function Shell() {
             <Route path="/cs/quarter" element={<Guarded needs="viewCs" what="The quarter review"><CsQuarter /></Guarded>} />
 
             <Route path="/sprints" element={<Guarded needs="viewSprints" what="Sprints"><Sprints /></Guarded>} />
+            {/* Your own sprint work, as a kanban. viewTickets rather than viewSprints:
+                this is your queue arranged by status, not the team's capacity plan, and
+                the two have different audiences. */}
+            <Route path="/sprints/mine/:sprint"
+              element={<Guarded needs="viewTickets" what="Your sprint work"><MySprint /></Guarded>} />
             <Route path="/settings" element={<Guarded needs="viewSettings" what="Settings"><Settings /></Guarded>} />
             {/* A person gets a page of their own, the same as a company. Same gate as the
                 directory it opens from; the write paths keep their own stricter ones. */}

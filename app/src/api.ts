@@ -1717,6 +1717,42 @@ export interface HomeQuiet {
   contactName: string
 }
 
+/** One sprint the caller has work in. Counts every status, Complete included. */
+export interface MySprintTally {
+  sprint: string
+  total: number
+  done: number
+  estHours: number
+  loggedHours: number
+}
+
+export interface MySprintColumn {
+  status: string
+  count: number
+  estHours: number
+  tickets: Ticket[]
+}
+
+export interface MySprintBoard {
+  sprint: string | null
+  me: { recordId: string; name: string }
+  sprints: MySprintTally[]
+  columns: MySprintColumn[]
+  statuses: string[]
+  total: number
+  listsScanned: number
+}
+
+/**
+ * Your own sprint work, as columns of status rather than columns of people.
+ *
+ * The team sprint board answers "does this sprint fit"; this answers "what am I
+ * carrying". Complete is a real column here - on a personal board finishing something is
+ * the point, and you cannot drag into a column that does not exist.
+ */
+export const getMySprint = (sprint?: string): Promise<MySprintBoard> =>
+  maestroGet('mySprint', sprint ? { sprint } : {})
+
 export interface Home {
   today: string
   weekStart: string
@@ -1730,6 +1766,8 @@ export interface Home {
   owed: OwedItem[]
   timer: HomeTimer | null
   tickets: { total: number; byStatus: { status: string; count: number; rows: HomeTicket[] }[] }
+  /** Sprints the caller has work in, newest first. Empty for anyone with none. */
+  mySprints: MySprintTally[]
   blocked: HomeBlocked[]
   deals: HomeDeal[]
   quiet: HomeQuiet[]
