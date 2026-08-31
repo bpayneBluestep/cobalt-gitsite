@@ -72,6 +72,99 @@ const NEW_TAB = { target: '_blank' as const, rel: 'noopener', draggable: false }
  */
 const BACKLOG_LIMIT = 400
 
+/** The terminal status. A card in it counts as done in a column's tally. */
+const DONE = 'Complete'
+
+/** Two decimal places: the same rounding `money()` applies on the server. */
+const money = (n: number): number => Math.round(n * 100) / 100
+
+/*
+ * Recompute every derived figure on the board from the cards it currently holds.
+ *
+ * This exists so that planning a ticket does not have to refetch. `actionSprint` walks
+ * all 84 lists to build a board, which is several seconds, and it was being run twice
+ * (board + roster) after every single drag while the page showed "Loading the sprint" -
+ * so moving four tickets meant four full rebuilds and four blank screens.
+ *
+ * It deliberately MIRRORS the server's arithmetic rather than approximating it: same
+ * money() rounding, same `over` comparison, same integer utilisation, same priority
+ * ordering inside a column. Anything else and the numbers would drift a little on every
+ * move and only agree again after a reload, which is worse than not moving at all.
+ */
+function recomputed(board: SprintBoard): SprintBoard {
+  let totalEst = 0, totalLogged = 0, totalCapacity = 0, totalDone = 0, totalTickets = 0
+
+  const columns = board.columns.map(c => {
+    const capacity = c.capacity || 0
+    const estHours = money(c.tickets.reduce((a, t) => a + (t.estHours || 0), 0))
+    const loggedHours = money(c.tickets.reduce((a, t) => a + (t.loggedHours || 0), 0))
+    const done = c.tickets.filter(t => t.status === DONE).length
+
+    totalEst += estHours
+    totalLogged += loggedHours
+    totalCapacity += capacity
+    totalDone += done
+    totalTickets += c.tickets.length
+
+    return {
+      ...c, estHours, loggedHours, done,
+      remaining: money(capacity - estHours),
+      over: estHours > capacity,
+      utilisation: capacity > 0 ? Math.round((estHours / capacity) * 100) : null,
+    }
+  })
+
+  return {
+    ...board,
+    columns,
+    totals: {
+      ...board.totals,
+      tickets: totalTickets,
+      capacity: money(totalCapacity),
+      estHours: money(totalEst),
+      loggedHours: money(totalLogged),
+      remaining: money(totalCapacity - totalEst),
+      over: totalEst > totalCapacity,
+      utilisation: totalCapacity > 0 ? Math.round((totalEst / totalCapacity) * 100) : null,
+      done: totalDone,
+      unassigned: board.unassigned.length,
+    },
+  }
+}
+
+/**
+ * Move one card to `toKey` - a column's entryId/engineer, or BACKLOG - and settle the
+ * board around it. `fresh` is the ticket the server handed back, which is authoritative
+ * for the card itself; everything else here is derived.
+ */
+function moved(board: SprintBoard, ticket: Ticket, toKey: string, fresh?: Ticket): SprintBoard {
+  const card = fresh || ticket
+  const mine = (t: Ticket) => t.entryId !== ticket.entryId
+
+  const columns = board.columns.map(c => {
+    const key = c.entryId || c.engineer
+    const without = c.tickets.filter(mine)
+    const tickets = key === toKey ? without.concat([card]) : without
+    // The server keeps a column in priority order; a card dropped at the end would
+    // otherwise sit out of order until the next real load.
+    tickets.sort((x, y) => (PRIORITY_RANK[y.priority] || 0) - (PRIORITY_RANK[x.priority] || 0))
+    return { ...c, tickets }
+  })
+
+  const restOfBacklog = board.backlog.filter(mine)
+  const cameFromBacklog = restOfBacklog.length !== board.backlog.length
+  const goingToBacklog = toKey === BACKLOG
+
+  return recomputed({
+    ...board,
+    columns,
+    backlog: goingToBacklog ? [card].concat(restOfBacklog) : restOfBacklog,
+    // Track the true total too, or the "showing N of M" note starts lying.
+    backlogTotal: board.backlogTotal + (goingToBacklog ? 1 : cameFromBacklog ? -1 : 0),
+    unassigned: board.unassigned.filter(mine),
+  })
+}
+
 /**
  * The backlog's sortable columns.
  *
@@ -203,9 +296,12 @@ export default function Sprints() {
     getTeam(key, true).then(setTeam).catch(() => { /* the roster is secondary */ })
   }, [])
 
-  const load = useCallback((key: string) => {
+  const load = useCallback((key: string, quiet = false) => {
     if (!key) return
-    setState({ phase: 'loading' })
+    // Only the FIRST load of a sprint blanks the page. A reload after a failed write is
+    // repairing something already on screen, and replacing it with "Loading the sprint"
+    // throws away the reader's place to tell them what they can already see.
+    if (!quiet) setState({ phase: 'loading' })
     getSprint(key, BACKLOG_LIMIT)
       .then(board => setState({ phase: 'ready', board }))
       .catch(err => setState({
@@ -248,6 +344,41 @@ export default function Sprints() {
 
   const unresolved = assignable.filter(a => !a.userId)
 
+  /*
+   * Apply a move immediately, then send it.
+   *
+   * Planning used to go through `run`, which refetched the whole board AND the roster on
+   * success - two walks of 84 lists, behind a "Loading the sprint" screen, after every
+   * drag. Planning a sprint is a dozen of these in a row, so the page spent most of its
+   * time rebuilt rather than read.
+   *
+   * The card moves in local state first and the request follows. On success the server's
+   * own copy of the ticket replaces the optimistic one, so the card is authoritative even
+   * though nothing was refetched. On failure the board goes back to exactly what it was
+   * and THEN reloads quietly, because a refused write means the local picture is already
+   * wrong in some way this page cannot infer.
+   */
+  function move(t: Ticket, toKey: string, request: Promise<Ticket>, said: string) {
+    if (!mayPlan || !board) return
+    const before = board
+    setState({ phase: 'ready', board: moved(before, t, toKey) })
+    setFailure(''); setNotice(said)
+
+    request
+      .then(fresh => setState(cur => (cur.phase === 'ready'
+        // Re-derive from the CURRENT board, not from `before`: another move may have
+        // landed while this one was in flight, and rebuilding from the stale copy would
+        // silently undo it.
+        ? { phase: 'ready', board: moved(cur.board, t, toKey, fresh) }
+        : cur)))
+      .catch(err => {
+        setState({ phase: 'ready', board: before })
+        setNotice('')
+        setFailure(err instanceof ApiError ? err.message : String(err))
+        load(sprint, true)
+      })
+  }
+
   /** Pull a backlog ticket into this sprint for someone, or move it between columns. */
   function plan(t: Ticket, userId: string, who: string) {
     if (!mayPlan) return
@@ -255,13 +386,15 @@ export default function Sprints() {
       setFailure(`${who} is on the roster but has no matching user record, so work cannot be assigned to them.`)
       return
     }
-    run('plan', assignSprint(t.listId, t.entryId, sprint, userId),
+    const target = board?.columns.find(c => c.userId === userId)
+    move(t, target ? (target.entryId || target.engineer) : BACKLOG,
+      assignSprint(t.listId, t.entryId, sprint, userId),
       `${t.ticketNumber !== null ? `#${t.ticketNumber}` : t.title} → ${who}.`)
   }
 
   function unplan(t: Ticket) {
     if (!mayPlan) return
-    run('plan', assignSprint(t.listId, t.entryId, '', ''),
+    move(t, BACKLOG, assignSprint(t.listId, t.entryId, '', ''),
       `${t.ticketNumber !== null ? `#${t.ticketNumber}` : t.title} taken out of the sprint.`)
   }
 
@@ -274,6 +407,44 @@ export default function Sprints() {
   }
 
   const endDrag = () => { setDragging(null); setOver('') }
+
+  /*
+   * Scroll the page while a card is in the air.
+   *
+   * The engineers are at the top and the backlog is below them, so on any real sprint the
+   * two ends of a drag are not on screen together: you pick a card up at the bottom and
+   * there is nowhere to put it. Browsers auto-scroll a scrollable CONTAINER near its
+   * edge, but not the window, and during a native drag the wheel and the keyboard are
+   * both unavailable - so without this the gesture is simply impossible and the fallback
+   * is the "Plan into…" select.
+   *
+   * Speed ramps with depth into the hot zone rather than being a constant, so easing
+   * toward the edge creeps and going right to it moves. Driven by requestAnimationFrame
+   * and not by the dragover event: dragover fires at whatever rate the browser feels
+   * like, including not at all while the pointer is held still, which is exactly when
+   * the scrolling needs to continue.
+   */
+  useEffect(() => {
+    if (!dragging) return
+    const EDGE = 120      // how deep the hot zone reaches from each viewport edge
+    const MAX = 24        // pixels per frame at the very edge
+    let y = -1
+    let frame = 0
+
+    const track = (e: DragEvent) => { y = e.clientY }
+    const tick = () => {
+      const h = window.innerHeight
+      let dy = 0
+      if (y >= 0 && y < EDGE) dy = -Math.ceil(((EDGE - y) / EDGE) * MAX)
+      else if (y > h - EDGE) dy = Math.ceil(((y - (h - EDGE)) / EDGE) * MAX)
+      if (dy) window.scrollBy(0, dy)
+      frame = requestAnimationFrame(tick)
+    }
+
+    window.addEventListener('dragover', track)
+    frame = requestAnimationFrame(tick)
+    return () => { window.removeEventListener('dragover', track); cancelAnimationFrame(frame) }
+  }, [dragging])
 
   /*
    * Can this column take the card currently in flight?
