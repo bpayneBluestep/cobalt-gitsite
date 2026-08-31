@@ -92,6 +92,7 @@ const CAPABILITY_LABELS: Record<Capability, string> = {
   editSprints: 'Leadership',
   viewStaff: 'any role',
   editStaff: 'Leadership',
+  viewSettings: 'Leadership',
   grantRoles: 'Leadership',
   viewReports: 'Leadership or Accounting',
   viewSchema: 'Leadership, Relate Engineer or Infra Engineer',
@@ -227,10 +228,14 @@ function Shell() {
             <Route path="/cs/quarter" element={<Guarded needs="viewCs" what="The quarter review"><CsQuarter /></Guarded>} />
 
             <Route path="/sprints" element={<Guarded needs="viewSprints" what="Sprints"><Sprints /></Guarded>} />
-            <Route path="/settings" element={<Guarded needs="viewStaff" what="Settings"><Settings /></Guarded>} />
+            <Route path="/settings" element={<Guarded needs="viewSettings" what="Settings"><Settings /></Guarded>} />
             {/* A person gets a page of their own, the same as a company. Same gate as the
                 directory it opens from; the write paths keep their own stricter ones. */}
-            <Route path="/staff/:id" element={<Guarded needs="viewStaff" what="Staff records"><StaffRecord /></Guarded>} />
+            {/* Same gate as Settings, not the weaker viewStaff it used to carry: a staff
+                record IS the Settings data for one person, and it is only reachable from
+                there. Gating the tab while leaving /staff/<id> open would move the door
+                rather than close it. */}
+            <Route path="/staff/:id" element={<Guarded needs="viewSettings" what="Staff records"><StaffRecord /></Guarded>} />
 
             {/* Clients is live. It sits under /clients rather than the root now that
                 Home has it, and is reached from Home and from CRM.

@@ -159,7 +159,13 @@ export type Capability =
   | 'viewOwner' | 'editOwner'
   | 'viewTickets' | 'editTickets'
   | 'viewSprints' | 'editSprints'
+  /*
+   * Seeing that a colleague exists and their name: every picker in the app needs it.
+   * Distinct from 'viewSettings', which is the employment record behind them.
+   */
   | 'viewStaff' | 'editStaff'
+  /** Settings, and the employment detail it holds. Leadership only. */
+  | 'viewSettings'
   | 'grantRoles'
   /*
    * Resources (engineering artifacts). Both are every-role today — Brandon's ruling:
@@ -621,7 +627,7 @@ export interface Staff extends Omit<User, 'directReports'> {
   accountToolingUrl: string
 }
 
-/** One person's whole record. Needs viewStaff, same as the directory it opens from. */
+/** One person's whole record. Needs viewSettings, same as the directory it opens from. */
 export const getStaff = (id: string): Promise<Staff> => maestroGet('staff', { id })
 
 export interface OutlookConnection {

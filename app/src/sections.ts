@@ -188,7 +188,7 @@ export const SECTIONS: Section[] = [
     path: '/settings',
     label: 'Settings',
     built: true,
-    needs: 'viewStaff',
+    needs: 'viewSettings',
     purpose: 'How Cobalt is set up: who works here, and the lists everything else picks from.',
     planned: [
       'Option lists, departments, deal phases, ticket statuses: editable rather than in code',
