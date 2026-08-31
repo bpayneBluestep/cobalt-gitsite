@@ -2034,7 +2034,14 @@ export interface SprintBoard {
   sprints: string[]
   listsScanned: number
   columns: SprintColumn[]
-  /** In this sprint but with nobody's name on it. */
+  /**
+   * In this sprint, ready, and with nobody responsible.
+   *
+   * Rendered as its own column rather than counted in a sentence. A ticket here is in
+   * the blind spot the carry-over rule exposed: it HAS a sprint so the backlog treats it
+   * as planned, and it has no engineer so no column claims it. Every one of the 19 the
+   * ClickUp import stranded was exactly this.
+   */
   unassigned: Ticket[]
   backlog: Ticket[]
   backlogTotal: number
@@ -2110,6 +2117,21 @@ export const deleteEngineer = (entryId: string): Promise<Team> =>
  * priority items among the 60 biggest" is not "the High priority items" - so the page
  * asks for more than it expects to need and says so on the rare occasion it is still cut.
  */
+/**
+ * Carry unfinished work forward into `sprint` from every earlier sprint.
+ *
+ * Complete and In Review stay where they are - they are the old sprint's output.
+ * Everything still open follows the team. `createSprint` already does this; this exists
+ * for a sprint that was started before the rule did. Idempotent.
+ */
+export const carryForward = (
+  sprint: string, dryRun = false,
+): Promise<{
+  sprint: string; dryRun: boolean; scanned: number; carried: number
+  keptBehind: Record<string, number>
+  tickets: { ticketNumber: number | null; title: string; status: string; fromSprint: string }[]
+}> => maestroPost('carryForward', { sprint, dryRun })
+
 export const getSprint = (sprint: string, backlogLimit = 0): Promise<SprintBoard> =>
   maestroGet('sprint', backlogLimit
     ? { sprint, backlogLimit: String(backlogLimit) }

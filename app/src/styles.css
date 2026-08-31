@@ -1783,6 +1783,19 @@ select:hover:not(:focus) { border-color: var(--text-mute); }
 .sortbtn:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 2px; }
 .sortbtn__i { font-size: 0.65em; color: var(--text-mute); opacity: 0.5; }
 .sortbtn:hover .sortbtn__i { opacity: 1; }
+
+/* The nobody-responsible column. Marked as needing attention rather than styled as a
+   peer of the engineers: it holds committed work with no owner, and the whole point is
+   that you empty it. Dashed, because it is not a person. */
+.pipe__col--nobody {
+  border-style: dashed;
+  border-color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 5%, transparent);
+}
+.pipe__col--nobody .pipe__head h2 { color: var(--warn); }
+
+/* Keeps the sprint bar's two buttons together at its right edge. */
+.sprintbar__acts { display: flex; gap: var(--s-s); align-items: center; flex-wrap: wrap; }
 [aria-sort="ascending"] .sortbtn__i,
 [aria-sort="descending"] .sortbtn__i { color: var(--cobalt); opacity: 1; }
 .tickets__time.tickets__cell { min-width: 6rem; }

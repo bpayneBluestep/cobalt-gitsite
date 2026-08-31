@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
-  ApiError, getSprint, getTeam, createSprint, assignSprint,
+  ApiError, getSprint, getTeam, createSprint, assignSprint, carryForward,
   addEngineer, updateEngineer, deleteEngineer,
   formatHours, shiftSprint, sprintLabel, isSprintKey, nameKey,
   ENGINEER_DISCIPLINES, ENGINEER_READY_RULE, PRIORITY_RANK,
@@ -46,6 +46,8 @@ const LOGIN_URL = '/shared/login/login.jsp?desturl=' +
 
 /** The drop-target id for the backlog region. Not an engineer, so it cannot collide. */
 const BACKLOG = '__backlog'
+/** The drag key for the nobody-responsible column: in the sprint, on no engineer. */
+const NOBODY = '__nobody'
 
 /*
  * A ticket opens in its own tab, the same rule the tickets board follows.
@@ -151,6 +153,8 @@ function moved(board: SprintBoard, ticket: Ticket, toKey: string, fresh?: Ticket
     return { ...c, tickets }
   })
 
+  // Leaving the unassigned column is just leaving it: the card is being claimed, and
+  // `columns` above has already put it wherever it was dropped.
   const restOfBacklog = board.backlog.filter(mine)
   const cameFromBacklog = restOfBacklog.length !== board.backlog.length
   const goingToBacklog = toKey === BACKLOG
@@ -318,7 +322,9 @@ export default function Sprints() {
     setBusy(label); setFailure(''); setNotice('')
     work
       .then(() => {
-        setNotice(said)
+        // An empty `said` means the caller already reported what happened, in terms only
+        // it knew - how many tickets moved, say - so do not overwrite it with nothing.
+        if (said) setNotice(said)
         load(sprint)
         loadTeam(sprint)
       })
@@ -492,6 +498,27 @@ export default function Sprints() {
       'Roster updated.')
   }
 
+  /*
+   * Sweep unfinished work out of every earlier sprint into this one.
+   *
+   * `createSprint` does this too, so a sprint started from now on arrives already swept.
+   * The button exists for the sprints that were started before the rule did - and it is
+   * idempotent, so pressing it on a clean sprint reports nothing moved rather than
+   * doing something.
+   *
+   * This one DOES reload the board, unlike a drag: it can move dozens of tickets across
+   * dozens of lists, and there is no local arithmetic that could stand in for that.
+   */
+  function carryOver() {
+    if (!mayRoster) return
+    run('carry', carryForward(sprint).then(r => {
+      setNotice(r.carried
+        ? `${r.carried} unfinished ticket${r.carried === 1 ? '' : 's'} carried into ${sprintLabel(sprint)}.`
+        : `Nothing to carry forward - every earlier sprint is finished or in review.`)
+      return r
+    }), '')
+  }
+
   /** Start this sprint for real, by copying the previous roster forward. */
   function startSprint() {
     if (!mayRoster) return
@@ -513,7 +540,14 @@ export default function Sprints() {
    * what appears on it - but a number that is silently missing from a capacity plan is
    * the kind of thing you find out about late. So it is stated, with somewhere to go.
    */
-  const offBoard = (board?.hiddenInSprint || 0) + (board?.unassigned.length || 0)
+  /*
+   * Work carrying this sprint's number that the board still cannot show.
+   *
+   * No longer includes `unassigned` - that has its own column now. What is left is work
+   * the Engineer-Ready gate excluded: it lost its estimate or its accountable owner
+   * after being planned.
+   */
+  const offBoard = board?.hiddenInSprint || 0
 
   const backlogRaw = useMemo(() => board?.backlog || [], [board])
 
@@ -631,9 +665,18 @@ export default function Sprints() {
           )}
         </div>
 
-        <button type="button" className="btn btn--ghost btn--sm" onClick={() => setShowRoster(v => !v)}>
-          {showRoster ? 'Hide roster' : `Roster (${team ? team.rows.filter(e => e.active).length : '…'})`}
-        </button>
+        <div className="sprintbar__acts">
+          {mayRoster && !templateRoster && (
+            <button type="button" className="btn btn--ghost btn--sm" onClick={carryOver}
+              disabled={!!busy}
+              title="Move every unfinished ticket from earlier sprints into this one. Complete and In Review stay where they are.">
+              {busy === 'carry' ? 'Carrying…' : 'Carry work forward'}
+            </button>
+          )}
+          <button type="button" className="btn btn--ghost btn--sm" onClick={() => setShowRoster(v => !v)}>
+            {showRoster ? 'Hide roster' : `Roster (${team ? team.rows.filter(e => e.active).length : '…'})`}
+          </button>
+        </div>
       </div>
 
       {notice && <p className="board2__notice" role="status">{notice}</p>}
@@ -894,17 +937,80 @@ export default function Sprints() {
           {offBoard > 0 && (
             <p className="board2__notice">
               {offBoard} ticket{offBoard === 1 ? '' : 's'} in {sprintLabel(sprint)}{' '}
-              {offBoard === 1 ? 'is' : 'are'} not shown here
-              {board.hiddenInSprint > 0 && board.unassigned.length > 0
-                ? ` - ${board.hiddenInSprint} no longer ready to plan, ${board.unassigned.length} with nobody responsible`
-                : board.hiddenInSprint > 0
-                  ? ' - no longer ready to plan'
-                  : ' - nobody is responsible for them'}.{' '}
+              {offBoard === 1 ? 'is' : 'are'} not shown here - no longer ready to plan,
+              so {offBoard === 1 ? 'it lost' : 'they lost'} an estimate or an accountable
+              owner after being planned.{' '}
               <Link className="inlink" to="/tickets">Find them on the tickets board</Link>.
             </p>
           )}
 
           <div className="pipe sprint">
+            {/*
+                In the sprint, ready, nobody's name on it.
+                
+                First in the row rather than last, because it is the column you are meant
+                to empty: everything in it is committed work that no engineer has picked
+                up, and it is where carried-forward tickets land. It is a drag SOURCE
+                only - dropping here would have to mean "unassign", and `assignSprint`
+                reads an empty responsibleId as "leave who has it alone" rather than as a
+                clear, so the gesture could not do what it looked like it did.
+            */}
+            {board.unassigned.length > 0 && (
+              <section className="pipe__col pipe__col--nobody" aria-label="Nobody responsible">
+                <header className="pipe__head">
+                  <h2>Nobody yet</h2>
+                  <span className="pipe__n">{board.unassigned.length}</span>
+                </header>
+                <p className="sprint__cap">
+                  {formatHours(board.unassigned.reduce((a, t) => a + (t.estHours || 0), 0))}
+                  <span className="muted"> committed, unclaimed</span>
+                </p>
+                <p className="sprint__role">Drag onto an engineer to claim</p>
+
+                {board.unassigned.map(t => (
+                  <article
+                    className="dcard scard"
+                    key={t.entryId}
+                    data-prio={t.priority}
+                    draggable={mayPlan && !busy}
+                    data-drag={dragging && dragging.ticket.entryId === t.entryId ? '' : undefined}
+                    onDragStart={e => startDrag(e, t, NOBODY)}
+                    onDragEnd={endDrag}
+                  >
+                    <p className="dcard__title">
+                      {t.ticketNumber !== null && (
+                        <Link className="tnum tnum--link" to={ticketPath(t)} {...NEW_TAB}>
+                          #{t.ticketNumber}
+                        </Link>
+                      )}
+                      <Link className="rowlink__a" to={ticketPath(t)} {...NEW_TAB}>{t.title}</Link>
+                    </p>
+                    <p className="dcard__meta">
+                      <span className="pill" data-status={(t.status || 'Open').replace(/s+/g, '')}>{t.status}</span>
+                      <span>{formatHours(t.estHours)} est</span>
+                    </p>
+                    <p className="dcard__co">
+                      <Link className="inlink" to={`/clients/${t.clientId || ''}/tickets`}>
+                        {t.clientName || t.listName}
+                      </Link>
+                    </p>
+                    {t.accountableName && (
+                      <p className="dcard__co muted">PM: {t.accountableName}</p>
+                    )}
+                    <div className="dcard__move">
+                      <EngineerSelect
+                        label={`Give ${t.title} to an engineer`}
+                        onPick={(userId, name) => plan(t, userId, name)}
+                      />
+                      <button type="button" className="linkbtn" disabled={!!busy} onClick={() => unplan(t)}>
+                        Remove
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </section>
+            )}
+
             {board.columns.map(col => (
               <section
                 className="pipe__col"
