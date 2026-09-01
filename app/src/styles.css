@@ -5644,3 +5644,300 @@ input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) opacit
 
 /* A failure inside the account menu, where there is no room for a callout. */
 .usermenu__err { color: var(--danger); }
+
+/* --- Reports ------------------------------------------------------------- */
+/*
+ * Two series, one pair of hues, both themes.
+ *
+ * #3B72E8 (the brand cobalt) and #CE4A8B (cobalt magenta, already in the pigment
+ * family) are the only candidate pair from that family that passes all six palette
+ * checks - lightness band, chroma floor, CVD separation, normal-vision separation AND
+ * 3:1 contrast - against BOTH the light surface (#ffffff) and the dark one (#0f1928).
+ * The obvious first choice, cobalt + slate, fails the chroma floor: slate reads as gray
+ * rather than as a colour. Blue + teal and blue + gold pass separation but drop under
+ * 3:1 on white.
+ *
+ * That is why one pair serves both modes here instead of the usual per-mode re-stepping:
+ * these two already clear the dark surface, so lifting them would only cost contrast.
+ */
+:root {
+  --ser-a: #3B72E8; /* billable */
+  --ser-b: #CE4A8B; /* not billable */
+}
+
+.rcards {
+  list-style: none;
+  margin: 0 0 1.5rem;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  gap: 0.9rem;
+}
+.rcard { display: flex; }
+.rcard__hit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  width: 100%;
+  padding: var(--s-m) var(--s-l);
+  color: inherit;
+  text-decoration: none;
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--cobalt);
+  border-radius: var(--r-lg);
+  box-shadow: var(--el-2);
+  transition: box-shadow var(--d-fast) var(--curve-decel),
+              border-color var(--d-faster) var(--curve-ease);
+}
+.rcard__hit:hover { box-shadow: var(--el-4); border-color: var(--cobalt); }
+.rcard__h {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  color: var(--text);
+}
+.rcard__d { margin: 0; font-size: 0.82rem; line-height: 1.5; color: var(--text-dim); }
+.rcard__s { margin: 0; font-size: 0.72rem; line-height: 1.45; color: var(--text-mute); }
+.rcard__go { margin-top: auto; padding-top: 0.4rem; font-size: 0.78rem; color: var(--cobalt); }
+.rcards__next { font-size: 0.76rem; max-width: 46rem; }
+
+/* --- shared chart furniture ---------------------------------------------- */
+
+/*
+ * The legend is always present for two series, and the swatch is the ONLY place the
+ * series colour appears in text: the label beside it wears a text token. A coloured
+ * word is a word that fails in forced-colors mode and reads as a link everywhere else.
+ */
+.legend { display: flex; flex-wrap: wrap; gap: 0.9rem; margin: 0 0 0.6rem; font-size: 0.72rem; color: var(--text-dim); }
+.legend__i { display: inline-flex; align-items: center; gap: 0.35rem; }
+.legend__sw { width: 10px; height: 10px; border-radius: 2px; }
+.legend__sw--a { background: var(--ser-a, var(--cobalt)); }
+.legend__sw--b { background: var(--ser-b, var(--text-mute)); }
+
+.chart__empty { margin: 0.6rem 0; font-size: 0.78rem; }
+
+/* --- BarRows ------------------------------------------------------------- */
+
+.bars__l { list-style: none; margin: 0; padding: 0; }
+.bars__r {
+  display: grid;
+  grid-template-columns: minmax(7rem, 12rem) 1fr auto;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.22rem 0;
+}
+.bars__r[data-faded] { opacity: 0.72; }
+.bars__r[data-active] .bars__name { color: var(--cobalt); font-weight: 600; }
+
+.bars__lab {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  min-width: 0;
+  padding: 0;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.bars__lab:disabled { cursor: default; }
+.bars__lab:not(:disabled):hover .bars__name { color: var(--cobalt); }
+.bars__name {
+  font-size: 0.78rem;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bars__meta { font-size: 0.66rem; color: var(--text-mute); }
+
+.bars__track {
+  display: block;
+  height: 10px;
+  background: var(--bg-raise);
+  border-radius: 3px;
+}
+/* Thin marks, anchored to the baseline (left), with only the DATA end rounded: a bar
+   rounded at both ends floats free of its axis and stops being comparable. */
+.bars__fill {
+  display: flex;
+  height: 100%;
+  min-width: 3px;
+  overflow: hidden;
+  border-radius: 0 4px 4px 0;
+}
+.bars__seg { display: block; min-width: 2px; }
+.bars__seg--a { background: var(--ser-a, var(--cobalt)); }
+/* The 2px surface gap: two adjacent fills need a sliver of the page between them or
+   they read as one bar that changes colour rather than two quantities. */
+.bars__seg--b {
+  background: var(--ser-b, var(--text-mute));
+  box-shadow: -2px 0 0 0 var(--bg-panel);
+}
+.bars__v {
+  font-family: var(--font-display);
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.bars__more { margin-top: 0.5rem; font-size: 0.74rem; }
+
+/* --- ColumnChart --------------------------------------------------------- */
+
+.cols__read { margin: 0 0 0.4rem; min-height: 1.15rem; font-size: 0.76rem; color: var(--text); }
+.cols__plot {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  padding-top: 0.2rem;
+  border-bottom: 1px solid var(--line);
+}
+.cols__c {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-width: 0;
+  height: 100%;
+  cursor: default;
+}
+.cols__c:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 1px; }
+.cols__stack { display: flex; align-items: flex-end; flex: 1 1 auto; }
+.cols__fill {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 2px;
+  overflow: hidden;
+  border-radius: 4px 4px 0 0;
+  transition: opacity var(--d-faster) var(--curve-ease);
+}
+.cols__c[data-hover] .cols__fill { opacity: 0.82; }
+/* The in-progress week, marked rather than hidden: it is real data, it is just not a
+   whole week yet, and dropping it would make the latest trend invisible. */
+.cols__fill[data-partial] { opacity: 0.6; }
+.cols__seg { display: block; width: 100%; min-height: 2px; }
+.cols__seg--a { background: var(--ser-a, var(--cobalt)); }
+.cols__seg--b {
+  background: var(--ser-b, var(--text-mute));
+  box-shadow: 0 2px 0 0 var(--bg-panel);
+}
+/* A real zero, drawn. Not skipped: a week with nothing logged is itself an answer. */
+.cols__zero { width: 100%; height: 2px; background: var(--line); }
+.cols__lab {
+  padding-top: 0.3rem;
+  overflow: hidden;
+  font-size: 0.62rem;
+  color: var(--text-mute);
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* --- HeatGrid ------------------------------------------------------------ */
+
+.heat__read { margin: 0 0 0.4rem; min-height: 1.15rem; font-size: 0.76rem; color: var(--text); }
+.heat__g {
+  display: grid;
+  grid-template-columns: 2.4rem repeat(24, minmax(0, 1fr));
+  gap: 2px;
+  align-items: center;
+}
+.heat__corner { display: block; }
+.heat__h { font-size: 0.58rem; color: var(--text-mute); text-align: left; }
+.heat__d { font-size: 0.68rem; color: var(--text-dim); }
+.heat__c {
+  display: block;
+  height: 15px;
+  background: var(--bg-raise);
+  border-radius: 2px;
+}
+.heat__c[data-hover] { outline: 2px solid var(--text); outline-offset: 1px; }
+.heat__scale { display: flex; align-items: center; gap: 0.3rem; margin: 0.55rem 0 0; font-size: 0.68rem; }
+.heat__sw { width: 15px; height: 10px; border-radius: 2px; }
+
+/* --- the report page ----------------------------------------------------- */
+
+.trep__filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+  padding: var(--s-m) var(--s-l);
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+}
+.trep__filters .ef { margin: 0; }
+.trep__presets { display: flex; gap: 0.3rem; }
+.trep__warn {
+  margin: 0 0 1rem;
+  padding: var(--s-s) var(--s-m);
+  font-size: 0.76rem;
+  line-height: 1.5;
+  color: var(--text-dim);
+  background: color-mix(in srgb, var(--warn) 9%, var(--bg-panel));
+  border: 1px solid color-mix(in srgb, var(--warn) 35%, var(--line));
+  border-radius: var(--r);
+}
+.trep__scope { margin: -0.5rem 0 1rem; font-size: 0.78rem; color: var(--text-dim); }
+
+.trep__two {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  gap: 0.9rem;
+}
+.trep__two--tight { margin-top: 0.9rem; gap: 1.4rem; }
+.page > .tcard { margin-bottom: 0.9rem; }
+.trep__two > .tcard { margin-bottom: 0.9rem; }
+
+.tcard__h {
+  margin: 0 0 0.2rem;
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+  color: var(--text);
+}
+.tcard__sub {
+  margin: 0 0 0.35rem;
+  font-family: var(--font-display);
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.tcard--bad {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, var(--bg-panel));
+  border-color: color-mix(in srgb, var(--danger) 35%, var(--line));
+}
+
+.trep__tfilter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.7rem;
+  margin-bottom: 0.6rem;
+}
+.trep__tfilter .ef { flex: 1 1 16rem; margin: 0; }
+.trep__tsum { margin: 0; font-size: 0.82rem; }
+/* Wide content scrolls inside its own box; the page body never scrolls sideways. */
+.trep__scroll { overflow-x: auto; }
+.trep__t { min-width: 46rem; }
+.trep__t td { font-variant-numeric: tabular-nums; }
+.trep__num { text-align: right; font-variant-numeric: tabular-nums; }
+.trep__note { max-width: 22rem; font-size: 0.74rem; color: var(--text-dim); }
+.trep__more { margin-top: 0.6rem; }
+.trep__foot { margin: 0.4rem 0 0; font-size: 0.72rem; }
+
+@media (max-width: 720px) {
+  /* The labels are names; at this width the bar has nothing left to be. */
+  .bars__r { grid-template-columns: 1fr auto; }
+  .bars__track { grid-column: 1 / -1; }
+  .heat__g { grid-template-columns: 2rem repeat(24, minmax(0, 1fr)); gap: 1px; }
+  .heat__c { height: 12px; }
+  .trep__filters { flex-direction: column; align-items: stretch; }
+  .trep__presets { flex-wrap: wrap; }
+}

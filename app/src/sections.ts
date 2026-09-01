@@ -171,6 +171,7 @@ export const SECTIONS: Section[] = [
     key: 'reports',
     path: '/reports',
     label: 'Reports',
+    built: true,
     needs: 'viewReports',
     purpose: 'The numbers the company runs on, pulled from the records rather than a spreadsheet.',
     planned: [
@@ -182,6 +183,9 @@ export const SECTIONS: Section[] = [
     foundation:
       'Logged hours are stored as a real number on every ticket, not only inside the time log, ' +
       'so BlueStep reports can total them without any of this being built first.',
+    live: [
+      { to: '/reports/time', label: 'Time Logging', note: 'where the hours go, by week, person, client and hour of day' },
+    ],
   },
   {
     key: 'settings',

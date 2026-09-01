@@ -2847,3 +2847,100 @@ export const getArtifactProposals = (id: string): Promise<{ rows: ArtifactPropos
 
 export const decideArtifactProposal = (id: string, entryId: string, approve: boolean, comment: string): Promise<ArtifactFull> =>
   maestroPost('decideArtifactProposal', { id, entryId, approve, comment })
+
+// ------------------------------------------------------------------- reporting
+
+/**
+ * One person in the time report, after 22 spellings were collapsed to the people
+ * behind them.
+ *
+ * `key` is the endpoint's `nameKey` - lower-cased, punctuation stripped, words SORTED -
+ * which is what makes "Scott, Dan" and "Dan Scott" one person. `aliases` keeps every raw
+ * spelling that collapsed in, so a surprising total can be traced to its strings.
+ * `staff: false` means nobody in Cobalt has that name: a former employee or a bare
+ * ClickUp account, and the report marks them rather than letting a reader assume they
+ * are a colleague.
+ */
+export interface TimePerson {
+  key: string
+  name: string
+  aliases: string[]
+  staff: boolean
+  staffId: string
+}
+
+export interface TimeList {
+  id: string
+  name: string
+  kind: string
+  clientId: string
+  clientName: string
+  archived: boolean
+}
+
+/**
+ * One time entry, at the endpoint's deliberately terse keys.
+ *
+ * These repeat once per entry across thousands of rows, so they are one or two
+ * characters and `p`/`l` are INDICES into `people`/`lists` rather than repeated
+ * strings. `b` is present only when the entry is NOT billable and `n` only when it
+ * carries a note - billable is the default and notes are vanishingly rare. See the
+ * endpoint README's `timeReport` section.
+ */
+export interface TimeEntryRow {
+  /** Date, yyyy-mm-dd. */
+  d: string
+  /** Minutes. */
+  m: number
+  /** Index into `people`. */
+  p: number
+  /** Index into `lists`. */
+  l: number
+  /** The ticket's entry id, for a link. */
+  t: string
+  /** The ticket's number. */
+  tn?: number
+  /** Present, and 0, only when NOT billable. */
+  b?: number
+  /** Local wall-clock start, "yyyy-mm-ddThh:mm". Absent on most history. */
+  at?: string
+  /** Where `at` came from. "logged" is when it was TYPED, not when it was worked. */
+  ak?: 'timer' | 'logged' | 'import'
+  /** The note, when there is one. */
+  n?: string
+}
+
+export interface TimeReport {
+  from: string
+  to: string
+  /** The earliest date the endpoint will serve. */
+  epoch: string
+  /** A requested bound was pulled forward to `epoch`. */
+  truncated: boolean
+  generatedAt: string
+  people: TimePerson[]
+  lists: TimeList[]
+  entries: TimeEntryRow[]
+  totals: {
+    entries: number
+    minutes: number
+    billableMinutes: number
+    people: number
+    lists: number
+    clients: number
+  }
+  /** How much of this window can answer a time-of-day question. */
+  coverage: {
+    earliest: string
+    latest: string
+    /** Entries carrying any clock stamp. */
+    stamped: number
+    /** Entries whose stamp means WORK time - a real timer or the ClickUp import. */
+    workStamped: number
+    unstamped: number
+  }
+}
+
+/** The whole company's time log for a window, flat. The browser does the pivoting. */
+export const getTimeReport = (from: string, to: string): Promise<TimeReport> =>
+  maestroGet('timeReport', { from, to })

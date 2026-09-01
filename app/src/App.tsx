@@ -27,6 +27,8 @@ import CompanySuccess from './routes/CompanySuccess'
 import Sprints from './routes/Sprints'
 import MySprint from './routes/MySprint'
 import Settings from './routes/Settings'
+import Reports from './routes/Reports'
+import TimeReport from './routes/TimeReport'
 import TicketPage from './routes/TicketPage'
 import Intake from './routes/Intake'
 import CompanyAgreements from './routes/CompanyAgreements'
@@ -234,6 +236,14 @@ function Shell() {
                 the two have different audiences. */}
             <Route path="/sprints/mine/:sprint"
               element={<Guarded needs="viewTickets" what="Your sprint work"><MySprint /></Guarded>} />
+            {/* Reports. The index is a directory of cards; each report is its own route
+                under it, guarded on the same capability the section is - Leadership and
+                Accounting. A report that needed a narrower gate would declare it in
+                `reports.ts` and carry it here, the way Surveys does under CS. */}
+            <Route path="/reports" element={<Guarded needs="viewReports" what="Reports"><Reports /></Guarded>} />
+            <Route path="/reports/time"
+              element={<Guarded needs="viewReports" what="The time report"><TimeReport /></Guarded>} />
+
             <Route path="/settings" element={<Guarded needs="viewSettings" what="Settings"><Settings /></Guarded>} />
             {/* A person gets a page of their own, the same as a company. Same gate as the
                 directory it opens from; the write paths keep their own stricter ones. */}
