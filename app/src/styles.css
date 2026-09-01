@@ -2176,6 +2176,26 @@ select:hover:not(:focus) { border-color: var(--text-mute); }
 .railtime { margin-top: 0.7rem; padding-top: 0.7rem; border-top: 1px solid var(--line); }
 .railtime__row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
 .railtime .ef { margin-bottom: 0.5rem; }
+/*
+ * The note is a memo, so it takes the rail's input skin rather than the wider
+ * `.ef textarea` one: same ground, same hairline, same 0.82rem as the Amount field
+ * beside it, or the two fields in one small form read as two different systems.
+ */
+.railtime__note {
+  width: 100%;
+  min-height: 4.5rem;
+  padding: 0.45rem 0.55rem;
+  font-family: inherit;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--text);
+  background: var(--bg-raise);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  resize: vertical;
+}
+.railtime__note::placeholder { color: var(--text-mute); }
+.railtime__hint { margin: 0.25rem 0 0; font-size: 0.7rem; color: var(--text-mute); }
 .railtime__go { display: flex; align-items: center; gap: 0.4rem; }
 .railtime__go .checkline { min-height: 0; }
 
@@ -2194,7 +2214,20 @@ select:hover:not(:focus) { border-color: var(--text-mute); }
 .tlog__t { font-family: var(--font-display); font-size: 0.8rem; color: var(--text); }
 .tlog__d { font-size: 0.72rem; color: var(--text-mute); }
 .tlog__acts { margin-left: auto; display: flex; gap: 0.4rem; }
-.tlog__note { flex: 1 1 100%; font-size: 0.74rem; color: var(--text-dim); }
+/*
+ * pre-wrap, because the note is a memo now: the paragraph breaks someone typed are
+ * part of what they wrote, and collapsing them turns a structured note back into the
+ * one-line shrug the small box used to produce. overflow-wrap catches pasted URLs and
+ * stack traces, which have no spaces to break at and would otherwise widen the rail.
+ */
+.tlog__note {
+  flex: 1 1 100%;
+  font-size: 0.74rem;
+  line-height: 1.45;
+  color: var(--text-dim);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 
 .tsec { padding: 1rem 0; border-top: 1px solid var(--line); }
 .tsec:first-of-type { padding-top: 0; border-top: none; }
@@ -4842,6 +4875,10 @@ a.flag:hover { border-color: var(--line-strong); color: var(--text); }
   input[type="number"],
   input[type="password"],
   select,
+  /* Named, not covered by the bare `textarea` below it: a class beats an element
+     selector, so the rail's memo would keep its 0.82rem and trigger the very zoom
+     this block exists to prevent. */
+  .railtime__note,
   textarea { font-size: var(--t-body2); }
 
   /* Denser cells, because the alternative is scrolling a table sideways for longer. */

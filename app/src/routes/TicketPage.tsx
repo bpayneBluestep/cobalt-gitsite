@@ -1202,11 +1202,23 @@ export default function TicketPage() {
                   <input id="tp-date" type="date" value={timeDate} onChange={e => setTimeDate(e.target.value)} />
                 </div>
               </div>
+              {/*
+                * A memo, not a one-line field. The note is the only place the work itself
+                * gets described, and a single line taught people to write "fixes" and move
+                * on. Given room, the same person writes what they actually did, which is
+                * what anyone reading the log back a month later needs.
+                *
+                * Enter therefore inserts a newline instead of submitting - a memo whose
+                * Enter key files the entry cannot hold a second paragraph. Cmd/Ctrl+Enter
+                * keeps the keyboard path to Log.
+                */}
               <div className="ef">
                 <label htmlFor="tp-note">Note</label>
-                <input id="tp-note" type="text" value={timeNote} autoComplete="off" placeholder="What you did"
+                <textarea id="tp-note" className="railtime__note" rows={4} value={timeNote}
+                  placeholder="What you did, and anything worth knowing later"
                   onChange={e => setTimeNote(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') submitTime() }} />
+                  onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); submitTime() } }} />
+                <p className="railtime__hint">Enter starts a new line. ⌘/Ctrl+Enter logs it.</p>
               </div>
               <div className="railtime__go">
                 <label className="checkline">
