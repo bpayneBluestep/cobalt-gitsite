@@ -492,6 +492,13 @@ function NewEnvelopeModal({
   )
 }
 
+/* Access codes are REQUIRED for email-link (external) recipients: a fresh
+   6-digit code is generated the moment one appears, and the server refuses to
+   persist a blank one. 100000-999999 so no leading zero ever gets mangled. */
+function genAccessCode(): string {
+  return String(100000 + Math.floor(Math.random() * 900000))
+}
+
 /* ---- envelope detail: Draft editor / in-flight controls / read-only viewer ---- */
 function EnvelopeDetail({
   company, env, picks, canEdit, setEnv, onClose, onVoid, notify, reloadList,
@@ -537,6 +544,7 @@ function EnvelopeDetail({
     const next = { ...env, recipients: env.recipients.slice() }
     const r: any = { ...next.recipients[i] }
     r[key] = key === 'routingOrder' ? Math.max(1, Number(val) || 1) : val
+    if (key === 'kind' && val === 'external' && !r.accessCode) r.accessCode = genAccessCode() // required for email-link signers
     next.recipients[i] = r
     persistRecipients(next, key === 'kind' || key === 'routingOrder')
   }
@@ -549,6 +557,7 @@ function EnvelopeDetail({
         id: '', role: '', name: '', email: '', kind: 'external' as const,
         routingOrder: maxOrder + 1, status: 'pending', signedAt: '',
         typedName: '', signatureData: '', tabValues: {}, hasToken: false,
+        accessCode: genAccessCode(),
       }]),
     }
     setEnv(next)
@@ -751,6 +760,7 @@ function EnvelopeDetail({
                   if (!o) return
                   const next = { ...env, recipients: env.recipients.slice() }
                   next.recipients[i] = { ...next.recipients[i], name: o.name, email: o.email, kind: o.kind as any }
+                  if (o.kind === 'external' && !next.recipients[i].accessCode) next.recipients[i] = { ...next.recipients[i], accessCode: genAccessCode() }
                   persistRecipients(next, true)
                 }}>
                 <option value="">Contacts…</option>
@@ -765,9 +775,13 @@ function EnvelopeDetail({
             <input className="env-rec-order" type="number" min={1} value={r.routingOrder} title="Signing order"
               onChange={e => recChange(i, 'routingOrder', e.target.value)} />
             {r.kind === 'external' && (
-              <input className="env-rec-code" value={r.accessCode || ''} placeholder="Access code (optional)"
-                title="They must enter this code to open their link — share it out-of-band"
-                onChange={e => recChange(i, 'accessCode', e.target.value)} />
+              <>
+                <input className="env-rec-code" value={r.accessCode || ''} placeholder="6-digit code" maxLength={6} inputMode="numeric"
+                  title="Required — they must enter this 6-digit code to open their link. Share it out-of-band; it is never emailed."
+                  onChange={e => recChange(i, 'accessCode', e.target.value)} />
+                <button type="button" className="ico-mini" title="Generate a new access code"
+                  onClick={() => recChange(i, 'accessCode', genAccessCode())}>&#8635;</button>
+              </>
             )}
             <button type="button" className="ico-mini danger" title="Remove" onClick={() => recRemove(i)}>✕</button>
           </div>
@@ -989,6 +1003,12 @@ function SendModal({
   }, [env.entryId])
 
   async function confirm() {
+    const badCode = (env.recipients || []).find(r =>
+      r.kind === 'external' && r.status !== 'signed' && r.status !== 'declined' && !/^\d{6}$/.test(r.accessCode || ''))
+    if (badCode) {
+      notify((badCode.name || 'A recipient') + ' needs a 6-digit access code — one is required for every emailed signer.')
+      return
+    }
     const senderValues: Record<string, unknown> = {}
     for (const t of senderTabs) {
       const inp = document.getElementById('env-sv-' + t.id) as HTMLInputElement | null
