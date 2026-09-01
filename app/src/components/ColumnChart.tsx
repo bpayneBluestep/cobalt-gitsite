@@ -107,14 +107,24 @@ export default function ColumnChart({
                     style={{ height: `${pct}%` }}
                     data-partial={c.partial ? '' : undefined}
                   >
-                    {rest > 0 && (
-                      <span className="cols__seg cols__seg--b" style={{ flexGrow: rest }} />
-                    )}
-                    {billable > 0 && (
-                      <span className="cols__seg cols__seg--a" style={{ flexGrow: billable }} />
-                    )}
-                    {c.split === undefined && (
+                    {/*
+                      A ternary, not three independent guards. With guards, an UNSPLIT
+                      column (`split === undefined`, so `billable` is 0 and `rest` is the
+                      whole value) satisfied both the `rest > 0` branch and the unsplit
+                      branch, and rendered a full magenta bar with a blue sliver under
+                      it - a single-series chart painted in the two-series colours.
+                    */}
+                    {c.split === undefined ? (
                       <span className="cols__seg cols__seg--a" style={{ flexGrow: 1 }} />
+                    ) : (
+                      <>
+                        {rest > 0 && (
+                          <span className="cols__seg cols__seg--b" style={{ flexGrow: rest }} />
+                        )}
+                        {billable > 0 && (
+                          <span className="cols__seg cols__seg--a" style={{ flexGrow: billable }} />
+                        )}
+                      </>
                     )}
                   </div>
                 ) : (
