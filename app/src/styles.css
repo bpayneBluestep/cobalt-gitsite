@@ -1138,6 +1138,51 @@ main { flex: 1; min-height: 0; display: flex; }
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--chip) 38%, transparent);
 }
 
+/* ------------------------------------------------- owner filter (Clients)
+ * Toggle buttons, not links: this changes what the table shows, it does not
+ * navigate, and the filter deliberately does not survive a reload. Distinct
+ * from `.chip` above, which is a static display label with a --chip colour.
+ */
+.ownerbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-xs);
+  margin-top: var(--s-s);
+}
+
+.ownerchip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: var(--s-xxs) var(--s-s);
+  font-family: var(--font-ui);
+  font-size: var(--t-caption1);
+  font-weight: 600;
+  line-height: 1.3333;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.ownerchip:hover { border-color: var(--cobalt); color: var(--cobalt); }
+
+/* The pressed state carries the selection, so it must read as chosen without
+   relying on colour alone -- the border thickens and the fill arrives too. */
+.ownerchip[aria-pressed="true"] {
+  color: var(--cobalt);
+  border-color: var(--cobalt);
+  background: color-mix(in srgb, var(--cobalt) 12%, transparent);
+}
+
+.ownerchip__n {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.72em;
+  color: var(--text-mute);
+}
+.ownerchip[aria-pressed="true"] .ownerchip__n { color: inherit; }
+
 /* ---------------------------------------------------------------- legend */
 
 .legend { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.3rem; }

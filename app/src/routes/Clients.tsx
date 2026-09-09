@@ -41,6 +41,43 @@ const touchLabel = (t: Touch): string =>
     : t.days === 1 ? '1 day'
     : `${t.days} days`
 
+/**
+ * One owner filter chip.
+ *
+ * Keyed by `ownerId` where there is one, and by the NAME where there is not: four
+ * clients still carry an imported free-text owner with no staff record behind it, and
+ * keying on id alone would silently drop them from every chip while still counting them
+ * in the total.
+ */
+type OwnerChip = { key: string; label: string; count: number }
+
+const ownerKey = (r: Company): string =>
+  r.ownerId ? r.ownerId : r.owner ? `name:${r.owner}` : 'none'
+
+/*
+ * "Active" is derived from the book, not from the staff list.
+ *
+ * An owner is offered here because clients are sitting under their name today. Building
+ * the row from staff-with-employed instead would keep showing someone the moment their
+ * Employee Info lags reality -- Tony Montiel is still flagged employed in Cobalt and
+ * owns nothing, and would have had a chip that always returned zero rows. Reading the
+ * loaded rows means every chip is guaranteed to yield results and the row maintains
+ * itself as the book moves.
+ */
+function ownerChips(rows: Company[]): OwnerChip[] {
+  const seen = new Map<string, OwnerChip>()
+  for (const r of rows) {
+    const key = ownerKey(r)
+    const existing = seen.get(key)
+    if (existing) existing.count += 1
+    else seen.set(key, { key, label: r.owner || 'Unassigned', count: 1 })
+  }
+  // Biggest book first, then alphabetical: the two names most rows belong to are the
+  // two people most likely to be looking for their own list.
+  return [...seen.values()].sort((a, b) =>
+    b.count - a.count || a.label.localeCompare(b.label))
+}
+
 const LOGIN_URL = '/shared/login/login.jsp?desturl=' +
   encodeURIComponent(window.location.pathname + window.location.search)
 
@@ -69,6 +106,7 @@ export default function Clients() {
    * how people actually look for a client they cannot spell.
    */
   const [search, setSearch] = useState('')
+  const [owner, setOwner] = useState('')
 
   /*
    * Touch data rides in a SECOND call, and its absence is not an error.
@@ -111,12 +149,25 @@ export default function Clients() {
   useEffect(load, [load])
 
   const rows = state.phase === 'ready' ? state.rows : []
+
+  /*
+   * Counted across every client, never across the current search, so the numbers stay
+   * still while you type. What the search did to the result is already spelled out by
+   * the count line below.
+   */
+  const chips = useMemo(() => ownerChips(rows), [rows])
+
   const shown = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return rows
-    return rows.filter(r => [r.name, r.owner, r.website, r.city, r.state, r.postalCode]
-      .some(v => String(v || '').toLowerCase().includes(q)))
-  }, [rows, search])
+    return rows.filter(r => {
+      if (owner && ownerKey(r) !== owner) return false
+      if (!q) return true
+      return [r.name, r.owner, r.website, r.city, r.state, r.postalCode]
+        .some(v => String(v || '').toLowerCase().includes(q))
+    })
+  }, [rows, search, owner])
+
+  const ownerLabel = chips.find(c => c.key === owner)?.label ?? ''
 
   function openPanel() {
     setDraft(EMPTY)
@@ -190,6 +241,34 @@ export default function Clients() {
           Every Company record in the <code>Client</code> category, served by the Maestro.
           Open a name to view and edit its record.
         </p>
+
+        {/* Only shown once there is a choice to make: with a single owner holding the
+            whole book, a filter row is one permanently-pressed button and noise. */}
+        {state.phase === 'ready' && chips.length > 1 && (
+          <div className="ownerbar" role="group" aria-label="Filter by account owner">
+            <button
+              type="button"
+              className="ownerchip"
+              aria-pressed={!owner}
+              onClick={() => setOwner('')}
+            >
+              All <span className="ownerchip__n">{rows.length}</span>
+            </button>
+            {chips.map(c => (
+              <button
+                key={c.key}
+                type="button"
+                className="ownerchip"
+                aria-pressed={owner === c.key}
+                // Clicking the pressed one clears it: the way back to everything is the
+                // control you just used, not a hunt for the All button.
+                onClick={() => setOwner(owner === c.key ? '' : c.key)}
+              >
+                {c.label} <span className="ownerchip__n">{c.count}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </header>
 
       {open && (
@@ -268,9 +347,17 @@ export default function Clients() {
         <div className="callout callout--plain">
           <p className="callout__title">No match</p>
           <p>
-            No client matches “{search.trim()}”.{' '}
-            <button type="button" className="linkbtn" onClick={() => setSearch('')}>
-              Clear the search
+            {/* Name both filters when both are on: "no match" with an owner chip still
+                pressed off-screen is the classic way to think your data vanished. */}
+            No client matches{search.trim() && <> “{search.trim()}”</>}
+            {search.trim() && owner && ' '}
+            {owner && <>under {ownerLabel}</>}.{' '}
+            <button
+              type="button"
+              className="linkbtn"
+              onClick={() => { setSearch(''); setOwner('') }}
+            >
+              Clear {search.trim() && owner ? 'both filters' : 'the filter'}
             </button>.
           </p>
         </div>
@@ -279,9 +366,10 @@ export default function Clients() {
       {state.phase === 'ready' && shown.length > 0 && (
         <>
           <p className="page__count">
-            {search.trim()
+            {search.trim() || owner
               ? `${shown.length} of ${rows.length} client${rows.length === 1 ? '' : 's'}`
               : `${rows.length} client${rows.length === 1 ? '' : 's'}`}
+            {owner && <> · {ownerLabel}</>}
           </p>
           <div className="tablewrap">
             <table className="fields">
