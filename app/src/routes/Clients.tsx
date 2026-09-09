@@ -55,7 +55,7 @@ export default function Clients() {
   const shown = useMemo(() => {
     const q = search.trim().toLowerCase()
     if (!q) return rows
-    return rows.filter(r => [r.name, r.website, r.city, r.state, r.postalCode]
+    return rows.filter(r => [r.name, r.owner, r.website, r.city, r.state, r.postalCode]
       .some(v => String(v || '').toLowerCase().includes(q)))
   }, [rows, search])
 
@@ -115,7 +115,7 @@ export default function Clients() {
                   type="search"
                   value={search}
                   autoComplete="off"
-                  placeholder="Name, website, city…"
+                  placeholder="Name, owner, website, city…"
                   onChange={e => setSearch(e.target.value)}
                 />
               </div>
@@ -229,6 +229,7 @@ export default function Clients() {
               <thead>
                 <tr>
                   <th scope="col">Name</th>
+                  <th scope="col">Account owner</th>
                   <th scope="col">Website</th>
                   <th scope="col">City</th>
                   <th scope="col">State</th>
@@ -246,6 +247,13 @@ export default function Clients() {
                         {row.name || <span className="muted">(unnamed)</span>}
                       </Link>
                     </th>
+                    {/* The account owner: who is answerable for this live client system.
+                        Cached on the company by `setAccountOwner`, so it is a name here,
+                        not a lookup. Unassigned is worth seeing at a glance, hence the
+                        explicit word rather than a dash. */}
+                    <td>
+                      {row.owner || <span className="muted">Unassigned</span>}
+                    </td>
                     <td>
                       {row.website
                         ? <a className="inlink" href={row.website} target="_blank" rel="noopener noreferrer">{row.website}</a>
