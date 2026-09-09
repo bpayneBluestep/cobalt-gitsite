@@ -2649,6 +2649,30 @@ export interface TouchpointWrite {
   notes?: string
 }
 
+/**
+ * Open ticket counts, keyed by company id, for badging a list of clients.
+ *
+ * A dedicated action rather than counting `getTickets()` client-side: that call is 14.5MB
+ * and ~7s because it builds a full row per ticket, and narrowing it to `status=Open`
+ * returns the wrong number (it drops Up Next, In Progress and In Review). This reads two
+ * fields per ticket server-side and answers in ~0.4s with under a kilobyte.
+ *
+ * Counts NON-Complete, NON-subtask tickets on unarchived lists that name a client.
+ * Clients with no open work are absent from `counts` rather than present as 0, so read a
+ * missing key as zero. Internal lists have no client and are excluded entirely, which is
+ * why `openTotal` here is smaller than the open count on the Tickets page.
+ */
+export interface ClientTicketCounts {
+  counts: Record<string, number>
+  clients: number
+  openTotal: number
+  listsScanned: number
+  excludes: string
+}
+
+export const getClientTicketCounts = (): Promise<ClientTicketCounts> =>
+  maestroGet('clientTicketCounts')
+
 export const getCsQueue = (scope: CrmScope = {}): Promise<CsQueue> =>
   maestroGet('csQueue', scopeParams(scope))
 

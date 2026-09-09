@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
-  getClients, createClient, getCsQueue, ApiError,
+  getClients, createClient, getCsQueue, getClientTicketCounts, ApiError,
   COMPANY_FIELDS, type Company, type CompanyFieldKey, type CsRow,
 } from '../api'
 
@@ -120,6 +120,17 @@ export default function Clients() {
    */
   const [touch, setTouch] = useState<Record<string, Touch>>({})
 
+  /*
+   * `null` is "we do not know", which is NOT the same as an empty map.
+   *
+   * The action omits clients with no open work, so a MISSING key means zero and must
+   * render as 0. If the whole call never landed -- still in flight, or a 403 because
+   * `viewTickets` is Leadership/engineering/CS only -- every key is missing for a quite
+   * different reason, and badging all 80 clients "0" would be a confident lie. Null
+   * renders a dash; a loaded map renders real numbers.
+   */
+  const [openTickets, setOpenTickets] = useState<Record<string, number> | null>(null)
+
   const load = useCallback(() => {
     setState({ phase: 'loading' })
     getClients()
@@ -144,6 +155,10 @@ export default function Clients() {
         setTouch(next)
       })
       .catch(() => setTouch({}))
+
+    getClientTicketCounts()
+      .then(data => setOpenTickets(data.counts))
+      .catch(() => setOpenTickets(null))
   }, [])
 
   useEffect(load, [load])
@@ -378,6 +393,7 @@ export default function Clients() {
                   <th scope="col">Name</th>
                   <th scope="col">Account owner</th>
                   <th scope="col">Last touch</th>
+                  <th scope="col">Open tickets</th>
                   <th scope="col">Website</th>
                   <th scope="col">City</th>
                   <th scope="col">State</th>
@@ -422,6 +438,16 @@ export default function Clients() {
                           </span>
                         )
                         : <span className="muted">-</span>}
+                    </td>
+                    {/* Zero is a real answer and gets shown as one, quietly. A dash means
+                        the count is unknown -- not loaded yet, or refused because reading
+                        tickets needs a role this page does not. */}
+                    <td className="clients__tix">
+                      {openTickets === null
+                        ? <span className="muted">-</span>
+                        : openTickets[row.id]
+                          ? <span className="tixbadge">{openTickets[row.id]}</span>
+                          : <span className="muted">0</span>}
                     </td>
                     <td>
                       {row.website

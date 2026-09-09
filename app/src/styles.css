@@ -1138,6 +1138,30 @@ main { flex: 1; min-height: 0; display: flex; }
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--chip) 38%, transparent);
 }
 
+/* ------------------------------------------------- open-ticket badge (Clients)
+ * A count, so it is set in tabular numerals and the column is right-aligned:
+ * scanning for "who has the most open work" should be a vertical read, not a
+ * hunt. Neutral cobalt rather than a severity colour -- open tickets are the
+ * normal state of a healthy client, and colouring them would compete with the
+ * Last touch pill next door, which IS a severity signal.
+ */
+.clients__tix { text-align: right; font-variant-numeric: tabular-nums; }
+
+.tixbadge {
+  display: inline-block;
+  min-width: 1.6rem;
+  padding: var(--s-xxs) var(--s-xs);
+  font-family: var(--font-ui);
+  font-size: var(--t-caption1);
+  font-weight: 600;
+  line-height: 1.3333;
+  text-align: center;
+  border-radius: var(--r-pill);
+  color: var(--cobalt);
+  background: color-mix(in srgb, var(--cobalt) 12%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cobalt) 32%, transparent);
+}
+
 /* ------------------------------------------------- owner filter (Clients)
  * Toggle buttons, not links: this changes what the table shows, it does not
  * navigate, and the filter deliberately does not survive a reload. Distinct
