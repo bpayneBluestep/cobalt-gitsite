@@ -1880,6 +1880,18 @@ select:hover:not(:focus) { border-color: var(--text-mute); }
 .pill[data-prio="Normal"]   { color: var(--cobalt); border-color: var(--cobalt); }
 .pill[data-prio="Low"]      { color: var(--text-mute); }
 
+/* --- last-touch pills (Clients) -------------------------------------------
+ * The same four colours the rest of the app already uses for good / attention /
+ * bad, so a red here reads like a red anywhere else. Banded on contact recency
+ * against the account's own cadence, NOT on CS health: see Touch in Clients.tsx.
+ * `never` is bordered rather than filled-looking so "no contact ever" is visibly
+ * a different statement from "overdue", not just a worse one.
+ */
+.pill[data-touch="fresh"] { color: #5AA33C; border-color: #5AA33C; }
+.pill[data-touch="due"]   { color: var(--warn); border-color: var(--warn); }
+.pill[data-touch="quiet"] { color: #ce4a5b; border-color: #ce4a5b; }
+.pill[data-touch="never"] { color: #ce4a5b; border-color: #ce4a5b; border-style: dashed; }
+
 /* A priority spine on each row, so urgency reads before you parse the text. */
 .tickets tbody tr[data-prio] th { border-left: 2px solid transparent; padding-left: 0.6rem; }
 .tickets tbody tr[data-prio="Critical"] th { border-left-color: #ce4a5b; }

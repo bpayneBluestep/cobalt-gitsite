@@ -1,14 +1,45 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
-  getClients, createClient, ApiError,
-  COMPANY_FIELDS, type Company, type CompanyFieldKey,
+  getClients, createClient, getCsQueue, ApiError,
+  COMPANY_FIELDS, type Company, type CompanyFieldKey, type CsRow,
 } from '../api'
 
 type State =
   | { phase: 'loading' }
   | { phase: 'ready'; rows: Company[] }
   | { phase: 'error'; error: ApiError }
+
+/**
+ * What the Last touch pill knows about one client.
+ *
+ * `band` is deliberately NOT the CS health colour. Health folds in an unanswered
+ * detractor and the last temperature reading, so a client rung yesterday can be Red —
+ * true, and completely wrong under a column headed "Last touch". This bands on contact
+ * recency alone, using the account's own cadence, so the colour means what the label says.
+ */
+type Touch = {
+  days: number | null
+  when: string
+  type: string
+  cadence: number
+  band: 'fresh' | 'due' | 'quiet' | 'never'
+}
+
+/*
+ * The thresholds are the endpoint's, not ours: `checkDue` is past one cadence and
+ * `goneQuiet` is past two, and a cadence is per-account (White Glove 14d, Self-Sufficient
+ * 60d). Re-deriving them here with round numbers would give the Clients page a private
+ * opinion about staleness that disagrees with /cs about the same client.
+ */
+const bandOf = (r: CsRow): Touch['band'] =>
+  r.neverTouched ? 'never' : r.goneQuiet ? 'quiet' : r.checkDue ? 'due' : 'fresh'
+
+const touchLabel = (t: Touch): string =>
+  t.band === 'never' ? 'Never'
+    : t.days === 0 ? 'Today'
+    : t.days === 1 ? '1 day'
+    : `${t.days} days`
 
 const LOGIN_URL = '/shared/login/login.jsp?desturl=' +
   encodeURIComponent(window.location.pathname + window.location.search)
@@ -39,6 +70,18 @@ export default function Clients() {
    */
   const [search, setSearch] = useState('')
 
+  /*
+   * Touch data rides in a SECOND call, and its absence is not an error.
+   *
+   * `csQueue` needs `viewCs` (Leadership, Accounting, Client Success) while this page
+   * needs only `viewClients`, which every role has. A rep or an engineer opening Clients
+   * gets a 403 here — expected, not broken — so the column quietly renders a dash for
+   * them rather than failing a page they are entitled to see. Kept out of `state` for
+   * the same reason: the table must render the moment the clients land, without waiting
+   * on a call that may never succeed.
+   */
+  const [touch, setTouch] = useState<Record<string, Touch>>({})
+
   const load = useCallback(() => {
     setState({ phase: 'loading' })
     getClients()
@@ -47,6 +90,22 @@ export default function Clients() {
         phase: 'error',
         error: err instanceof ApiError ? err : new ApiError(String(err)),
       }))
+
+    getCsQueue()
+      .then(data => {
+        const next: Record<string, Touch> = {}
+        for (const r of data.rows) {
+          next[r.companyId] = {
+            days: r.contactAgeDays,
+            when: r.lastContact,
+            type: r.lastContactType,
+            cadence: r.cadenceDays,
+            band: bandOf(r),
+          }
+        }
+        setTouch(next)
+      })
+      .catch(() => setTouch({}))
   }, [])
 
   useEffect(load, [load])
@@ -230,6 +289,7 @@ export default function Clients() {
                 <tr>
                   <th scope="col">Name</th>
                   <th scope="col">Account owner</th>
+                  <th scope="col">Last touch</th>
                   <th scope="col">Website</th>
                   <th scope="col">City</th>
                   <th scope="col">State</th>
@@ -253,6 +313,27 @@ export default function Clients() {
                         explicit word rather than a dash. */}
                     <td>
                       {row.owner || <span className="muted">Unassigned</span>}
+                    </td>
+                    {/* Days, not a date: "37 days" is the question people are asking of
+                        this column, and a date makes them do the arithmetic. The date and
+                        what the contact actually was live in the tooltip. */}
+                    <td>
+                      {touch[row.id]
+                        ? (
+                          <span
+                            className="pill"
+                            data-touch={touch[row.id].band}
+                            title={
+                              touch[row.id].band === 'never'
+                                ? `No contact ever logged. Cadence: every ${touch[row.id].cadence}d.`
+                                : `${touch[row.id].type || 'Contact'} on ${touch[row.id].when}. ` +
+                                  `Cadence: every ${touch[row.id].cadence}d.`
+                            }
+                          >
+                            {touchLabel(touch[row.id])}
+                          </span>
+                        )
+                        : <span className="muted">-</span>}
                     </td>
                     <td>
                       {row.website
