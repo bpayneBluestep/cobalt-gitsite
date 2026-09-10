@@ -6,6 +6,7 @@ import {
 } from '../api'
 import { Link } from 'react-router-dom'
 import OutlookSettingsPanel from '../components/OutlookSettingsPanel'
+import TicketTemplatesPanel from '../components/TicketTemplatesPanel'
 import PhoneInput from '../components/PhoneInput'
 import { isPhoneOk } from '../lib/phone'
 import { useSession } from '../session'
@@ -80,7 +81,13 @@ export default function Settings() {
     * else would only offer them an error. Not a second permission, just the one already
     * being asked - the settings form's own ACL is Leadership too.
     */
-  const [tab, setTab] = useState<'users' | 'outlook'>('users')
+  /*
+    * Templates needs no extra gate: the whole Settings section already requires
+    * `viewSettings`, which is the same capability every template action is checked
+    * against. Applying a template is the half that a non-Settings user reaches, and
+    * that lives on the board, not here.
+    */
+  const [tab, setTab] = useState<'users' | 'outlook' | 'templates'>('users')
 
   const [state, setState] = useState<State>({ phase: 'loading' })
   const [includeFormer, setIncludeFormer] = useState(true)
@@ -185,6 +192,12 @@ export default function Settings() {
           onClick={() => setTab('users')}>
           Users
         </button>
+        <button type="button" className="subnav__btn"
+          data-on={tab === 'templates' ? '' : undefined}
+          aria-current={tab === 'templates' ? 'true' : undefined}
+          onClick={() => setTab('templates')}>
+          Templates
+        </button>
         {mayEdit && (
           <button type="button" className="subnav__btn"
             data-on={tab === 'outlook' ? '' : undefined}
@@ -196,6 +209,8 @@ export default function Settings() {
       </nav>
 
       {tab === 'outlook' && <OutlookSettingsPanel />}
+
+      {tab === 'templates' && <TicketTemplatesPanel />}
 
       {tab === 'users' && (
         <>

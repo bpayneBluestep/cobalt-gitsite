@@ -2,8 +2,10 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   addTicket, updateTicket, setTicketPeople, ApiError, formatHours, wesleyStatus,
+  getActiveTicketTemplates, applyTicketTemplate,
   TICKET_STATUSES, TICKET_PRIORITIES, TICKET_TABS, TICKET_GROUP_ORDER, PRIORITY_RANK,
   type List, type Ticket, type TicketFieldKey,
+  type TemplatePickerRow, type ApplyPlan, type ApplyResult,
 } from '../api'
 import { htmlToText } from '../lib/html'
 import UserPicker from './UserPicker'
@@ -213,6 +215,17 @@ export default function TicketBoard({
   const [fRoadblock, setFRoadblock] = useState('')
   const [fDue, setFDue] = useState('')
   const [fTime, setFTime] = useState('')
+  // Applying a template: the picker, the server's dry-run plan, and the outcome.
+  const [applying, setApplying] = useState(false)
+  const [templates, setTemplates] = useState<TemplatePickerRow[] | null>(null)
+  const [tplId, setTplId] = useState('')
+  const [tplTitle, setTplTitle] = useState('')
+  const [tplAcc, setTplAcc] = useState('')
+  const [tplResp, setTplResp] = useState('')
+  const [plan, setPlan] = useState<ApplyPlan | null>(null)
+  const [tplResult, setTplResult] = useState<ApplyResult | null>(null)
+  const [tplBusy, setTplBusy] = useState(false)
+  const [tplError, setTplError] = useState('')
   /*
    * Open by default on the all-lists board, closed on one client's.
    *
@@ -413,6 +426,57 @@ export default function TicketBoard({
     setCreating(true)
     setDraft({ ...EMPTY_DRAFT, status: TICKET_TABS.find(t => t.key === tab)?.statuses[0] || 'Open' })
     setFailure(''); setNotice('')
+  }
+
+  /*
+   * ── Apply a template ──────────────────────────────────────────────────────
+   *
+   * Two steps on purpose. Picking a template fetches a DRY RUN, and the plan that
+   * comes back is what gets rendered: the count in "create 31 tickets" is the
+   * server's own, computed by the same code that will do the work, so the
+   * confirmation can never promise a different shape from what arrives. The
+   * browser deliberately does not flatten the tree itself.
+   */
+  function openTemplates() {
+    setApplying(true)
+    setTplError(''); setTplResult(null); setPlan(null); setTplId('')
+    setFailure(''); setNotice('')
+    if (templates === null) {
+      getActiveTicketTemplates()
+        .then(r => setTemplates(r.rows || []))
+        .catch(e => setTplError(e instanceof ApiError ? e.message : String(e)))
+    }
+  }
+
+  function pickTemplate(entryId: string) {
+    setTplId(entryId)
+    setPlan(null); setTplError(''); setTplResult(null)
+    if (!entryId) return
+    setTplBusy(true)
+    applyTicketTemplate({ listId: list.id, entryId, dryRun: true })
+      .then(r => {
+        if (r.plan) { setPlan(r.plan); setTplTitle(r.plan.parentTitle) }
+      })
+      .catch(e => setTplError(e instanceof ApiError ? e.message : String(e)))
+      .finally(() => setTplBusy(false))
+  }
+
+  function runApply() {
+    if (!tplId || tplBusy) return
+    setTplBusy(true); setTplError('')
+    applyTicketTemplate({
+      listId: list.id,
+      entryId: tplId,
+      title: tplTitle.trim() || undefined,
+      accountableId: tplAcc || undefined,
+      responsibleId: tplResp || undefined,
+    })
+      .then(r => {
+        setTplResult(r as ApplyResult)
+        onChanged()
+      })
+      .catch(e => setTplError(e instanceof ApiError ? e.message : String(e)))
+      .finally(() => setTplBusy(false))
   }
 
   function create() {
@@ -742,6 +806,13 @@ export default function TicketBoard({
               <span aria-hidden="true">✦</span> Ask Wesley
             </Link>
           )}
+          {/* Applying needs a single target list, so the all-lists board does not offer
+              it: there would be no answer to "which list do these thirty go on". */}
+          {mayEdit && !spansLists && (
+            <button type="button" className="btn btn--ghost" onClick={openTemplates}>
+              <span aria-hidden="true">⧉</span> Apply template
+            </button>
+          )}
           {mayEdit && !spansLists && (
             <button type="button" className={wesleyAvailable ? 'btn btn--ghost' : 'btn'} onClick={openNew}>
               <span aria-hidden="true">+</span> New ticket
@@ -941,6 +1012,133 @@ export default function TicketBoard({
               Add ticket
             </button>
           </div>
+        </div>
+      )}
+
+      {applying && (
+        <div className="editcard newclient">
+          <div className="editcard__head">
+            <h2>Apply a template</h2>
+            <p className="note">
+              Creates one parent ticket plus a subtask for every step. Steps inside a
+              heading arrive as <code>Heading: Step</code> — a ticket carries one level
+              of subtask, so the tree is flattened on the way in.
+            </p>
+          </div>
+
+          {tplError && <p className="editcard__err" role="alert">{tplError}</p>}
+
+          {/* ── the outcome, once it has run ── */}
+          {tplResult ? (
+            <>
+              <p className="callout__title">
+                Created #{tplResult.parent.ticketNumber} “{tplResult.parent.title}” with{' '}
+                {tplResult.createdCount} subtask{tplResult.createdCount === 1 ? '' : 's'}
+                {tplResult.failedCount ? ' — ' + tplResult.failedCount + ' could not be added' : ''}.
+              </p>
+              {/* A partial apply has to be visible: the endpoint reports per-leaf
+                  failures rather than rolling back, so these are the rows to add by hand. */}
+              {!!tplResult.failedCount && (
+                <div className="callout">
+                  <span className="callout__title">Not created</span>
+                  <ul>
+                    {tplResult.failed.map((f, i) => (
+                      <li key={i}>{f.title} — <span className="muted">{f.detail}</span></li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <div className="editcard__foot">
+                <Link className="btn" to={ticketPath(tplResult.parent)}>Open the parent ticket</Link>
+                <button type="button" className="btn btn--ghost"
+                  onClick={() => { setApplying(false); setTplResult(null); setPlan(null); setTplId('') }}>
+                  Done
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="efgrid">
+                <div className="ef ef--wide">
+                  <label htmlFor="tpl-pick">Template</label>
+                  <select id="tpl-pick" value={tplId} onChange={e => pickTemplate(e.target.value)}>
+                    <option value="">Choose a template…</option>
+                    {(templates || []).map(t => (
+                      <option key={t.entryId} value={t.entryId}>
+                        {t.name} ({t.taskCount} ticket{t.taskCount === 1 ? '' : 's'})
+                      </option>
+                    ))}
+                  </select>
+                  {templates !== null && !templates.length && (
+                    <span className="ef__hint">
+                      No active templates yet. Leadership can build them in Settings → Templates.
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {tplBusy && !plan && <p className="empty">Working out what this would create…</p>}
+
+              {plan && (
+                <>
+                  <div className="efgrid">
+                    <div className="ef ef--wide">
+                      <label htmlFor="tpl-title">Parent ticket title</label>
+                      <input id="tpl-title" type="text" value={tplTitle} autoComplete="off"
+                        onChange={e => setTplTitle(e.target.value)} />
+                      <span className="ef__hint">
+                        Defaults to the template’s name. Worth naming the client.
+                      </span>
+                    </div>
+                    <div className="ef">
+                      <label htmlFor="tpl-resp">Responsible</label>
+                      <UserPicker id="tpl-resp" value={tplResp} placeholder="Nobody yet"
+                        onChange={setTplResp} />
+                      <span className="ef__hint">Goes on the parent only.</span>
+                    </div>
+                    <div className="ef">
+                      <label htmlFor="tpl-acc">Accountable</label>
+                      <UserPicker id="tpl-acc" value={tplAcc} placeholder="Nobody yet"
+                        onChange={setTplAcc} />
+                    </div>
+                  </div>
+
+                  <p className="note">
+                    <strong>{plan.subtaskCount}</strong> subtask
+                    {plan.subtaskCount === 1 ? '' : 's'} will be created:
+                  </p>
+                  <ol className="tpl__preview">
+                    {plan.subtasks.map((s, i) => (
+                      <li key={i}>
+                        {s.title}
+                        {s.estHours ? <span className="muted"> · {s.estHours}h</span> : null}
+                        {s.priority ? <span className="muted"> · {s.priority}</span> : null}
+                      </li>
+                    ))}
+                  </ol>
+                </>
+              )}
+
+              <div className="editcard__foot">
+                <span className="editcard__status">
+                  {tplBusy
+                    ? 'Creating…'
+                    : plan
+                      ? 'Creates ' + (plan.subtaskCount + 1) + ' tickets in total.'
+                      : 'Pick a template to see what it would create.'}
+                </span>
+                <button type="button" className="btn btn--ghost"
+                  onClick={() => { setApplying(false); setTplError(''); setPlan(null); setTplId('') }}
+                  disabled={tplBusy}>
+                  Cancel
+                </button>
+                <button type="button" className="btn" onClick={runApply}
+                  disabled={tplBusy || !plan}>
+                  {plan ? 'Create ' + (plan.subtaskCount + 1) + ' tickets' : 'Create tickets'}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
 

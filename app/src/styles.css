@@ -6025,3 +6025,88 @@ input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) opacit
   .trep__filters { flex-direction: column; align-items: stretch; }
   .trep__presets { flex-wrap: wrap; }
 }
+
+/* ── Ticket templates: the Settings editor and the board's apply preview ──────
+   The editor is a flat list whose nesting is shown by indent alone, so `data-depth`
+   is the only thing that distinguishes a step from a heading. Kept to the existing
+   tokens: no new colours, so it follows both themes without a second definition. */
+
+.tpl__h {
+  margin: 1.25rem 0 0.25rem;
+  font-family: var(--font-display);
+  font-size: 1rem;
+}
+
+.tpl__rows {
+  list-style: none;
+  margin: 0.5rem 0 0.75rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.tpl__row {
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--bg-panel);
+  padding: 0.45rem 0.55rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.5rem;
+  align-items: center;
+}
+
+/* A step sits in from its heading and loses the panel background, so a group reads
+   as one thing rather than five equal rows. */
+.tpl__row[data-depth='1'] {
+  margin-left: 1.75rem;
+  background: var(--bg-sunk);
+  border-left: 2px solid var(--line-strong);
+}
+
+.tpl__main {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 1 1 22rem;
+  min-width: 0;
+}
+
+.tpl__grip {
+  width: 1rem;
+  flex: 0 0 auto;
+  text-align: center;
+}
+
+.tpl__title { flex: 1 1 auto; min-width: 0; }
+.tpl__est   { flex: 0 0 4.25rem; width: 4.25rem; }
+.tpl__pri   { flex: 0 0 8rem; }
+
+.tpl__tools {
+  display: flex;
+  gap: 0.2rem;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+}
+
+.tpl__notes {
+  flex: 1 1 100%;
+  margin-top: 0.35rem;
+}
+
+/* The dry-run preview: a plain read-only list of what is about to be created. */
+.tpl__preview {
+  margin: 0.35rem 0 0.75rem 1.25rem;
+  padding: 0;
+  max-height: 18rem;
+  overflow-y: auto;
+}
+
+.tpl__preview li { margin: 0.15rem 0; }
+
+@media (max-width: 700px) {
+  .tpl__row[data-depth='1'] { margin-left: 0.75rem; }
+  .tpl__main { flex-basis: 100%; }
+  .tpl__pri { flex: 1 1 6rem; }
+}

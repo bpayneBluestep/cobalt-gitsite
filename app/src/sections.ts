@@ -201,6 +201,8 @@ export const SECTIONS: Section[] = [
       'Integrations and API credentials',
     ],
     foundation:
-      'Users is live: everyone in the system with their employment details and reporting line.',
+      'Users is live: everyone in the system with their employment details and reporting line. ' +
+      'So are ticket templates: a reusable tree of tasks authored once here, then applied to any ' +
+      "list from its board to create a parent ticket and its subtasks in one go.",
   },
 ]

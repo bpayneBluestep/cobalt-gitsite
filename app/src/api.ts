@@ -2968,3 +2968,136 @@ export interface TimeReport {
 /** The whole company's time log for a window, flat. The browser does the pivoting. */
 export const getTimeReport = (from: string, to: string): Promise<TimeReport> =>
   maestroGet('timeReport', { from, to })
+
+/*
+ * ── Ticket templates ────────────────────────────────────────────────────────
+ *
+ * A template is a named tree of tasks, two levels deep at most, stored on the
+ * Organization record. Applying one creates a parent ticket plus one subtask per
+ * leaf, with a group's children titled "<group>: <child>" — Cobalt allows exactly
+ * one level of subtask and the flattening happens server-side.
+ *
+ * Note the capability split: authoring needs `viewSettings` (Leadership), but
+ * `getActiveTicketTemplates` and `applyTicketTemplate` need only `editTickets`,
+ * because the engineer applying a template is not a Settings user.
+ */
+
+/** One node. `children` present means it is a group, and a group cannot nest. */
+export interface TemplateTask {
+  id: string
+  title: string
+  details?: string
+  estHours?: number
+  priority?: string
+  children?: TemplateTask[]
+}
+
+export interface TicketTemplate {
+  entryId: string
+  orgId: string
+  orgName: string
+  name: string
+  description: string
+  status: string
+  category: string
+  version: number
+  createdBy: string
+  createdAt: string
+  updatedBy: string
+  updatedAt: string
+  tasks: TemplateTask[]
+  schemaVersion: number
+  /** Leaves, i.e. how many subtasks an apply would create. Derived server-side. */
+  taskCount: number
+  groupCount: number
+  /** Set when the stored body would not parse. The row still lists, with no tasks. */
+  bodyError?: string
+}
+
+export interface TicketTemplateList {
+  rows: TicketTemplate[]
+  orgs: { orgId: string; orgName: string }[]
+  statuses: string[]
+  categories: string[]
+  priorities: string[]
+  maxTasks: number
+}
+
+/** The picker row: what a board needs to offer a template, and nothing else. */
+export interface TemplatePickerRow {
+  entryId: string
+  name: string
+  description: string
+  category: string
+  taskCount: number
+  groupCount: number
+  version: number
+}
+
+/** What an apply WOULD do. Comes from the server so the count cannot disagree. */
+export interface ApplyPlan {
+  templateId: string
+  templateName: string
+  templateVersion: number
+  parentTitle: string
+  parentDetails: string
+  subtasks: { title: string; details?: string; estHours?: number; priority?: string; group: string }[]
+  subtaskCount: number
+}
+
+export interface ApplyResult {
+  templateId: string
+  templateName: string
+  templateVersion: number
+  listId: string
+  parent: Ticket
+  created: { entryId: string; ticketNumber: number; title: string }[]
+  /** Non-empty means a partial apply: these leaves were not created. */
+  failed: { title: string; detail: string }[]
+  createdCount: number
+  failedCount: number
+}
+
+/** The whole library, with its vocabularies. Leadership. */
+export const getTicketTemplates = (): Promise<TicketTemplateList> =>
+  maestroGet('ticketTemplates')
+
+export const getTicketTemplate = (entryId: string): Promise<TicketTemplate> =>
+  maestroGet('ticketTemplate', { entryId })
+
+/**
+ * Create (omit `entryId`) or update (pass one).
+ *
+ * `tasks` is written WHOLE — the editor is one form, not per-row autosave — so
+ * there is no partial-tree state to reconcile. Version bumps on every update.
+ */
+export const saveTicketTemplate = (payload: {
+  entryId?: string
+  orgId?: string
+  name?: string
+  description?: string
+  status?: string
+  category?: string
+  tasks?: TemplateTask[]
+}): Promise<TicketTemplate> => maestroPost('saveTicketTemplate', payload)
+
+export const setTicketTemplateStatus = (entryId: string, status: string): Promise<TicketTemplate> =>
+  maestroPost('setTicketTemplateStatus', { entryId, status })
+
+export const deleteTicketTemplate = (entryId: string): Promise<{ deleted: boolean; name: string }> =>
+  maestroPost('deleteTicketTemplate', { entryId })
+
+/** Active templates only, for the board's picker. Needs `editTickets`, not Settings. */
+export const getActiveTicketTemplates = (): Promise<{ rows: TemplatePickerRow[] }> =>
+  maestroGet('activeTicketTemplates')
+
+/** `dryRun` returns the plan without writing: what the confirmation renders. */
+export const applyTicketTemplate = (payload: {
+  listId: string
+  entryId: string
+  title?: string
+  accountableId?: string
+  responsibleId?: string
+  dryRun?: boolean
+}): Promise<ApplyResult & { dryRun?: boolean; plan?: ApplyPlan }> =>
+  maestroPost('applyTicketTemplate', payload)
