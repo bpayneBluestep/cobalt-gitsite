@@ -179,6 +179,8 @@ export default function TicketPage() {
   const [recElapsed, setRecElapsed] = useState(0)
   const [recBytes, setRecBytes] = useState(0)
   const [recWarn, setRecWarn] = useState('')
+  /** True while a file is over the drop box, so it can say it will take it. */
+  const [dropOver, setDropOver] = useState(false)
   // Leaving the page mid-recording must not leave the screen shared and the clip in limbo.
   const recordingRef = useRef<Recording | null>(null)
   useEffect(() => () => { recordingRef.current?.stop() }, [])
@@ -424,6 +426,46 @@ export default function TicketPage() {
       .then(fresh => { setState({ phase: 'ready', ticket: fresh }); setNotice(`Attached ${file.name}.`) })
       .catch(err => setFailure(err instanceof ApiError ? err.message : String(err)))
       .finally(() => setBusy(''))
+  }
+
+  /*
+   * Dropping a file on the box.
+   *
+   * The box always SAID "or drag one onto this box" and never listened: the file input
+   * inside it is a 1px sliver, so the drop landed on the page and the browser navigated
+   * away to the file instead. Reported by Dan as #5970.
+   *
+   * `dragover` has to be cancelled for a drop to fire at all, and `dragleave` fires when
+   * the pointer crosses to a CHILD element, so the highlight is tracked with a depth
+   * counter rather than a boolean that flickers off halfway across the box.
+   */
+  const dragDepth = useRef(0)
+
+  function onDropFiles(e: React.DragEvent) {
+    e.preventDefault()
+    dragDepth.current = 0
+    setDropOver(false)
+    if (busy || recording) return
+    const dropped = e.dataTransfer?.files
+    if (!dropped || !dropped.length) return
+    // One at a time, like the picker: each upload is its own request and its own ceiling.
+    if (dropped.length > 1) {
+      setNotice(`Attaching ${dropped[0].name}. Drop the rest one at a time.`)
+    }
+    attach(dropped)
+  }
+
+  function onDragEnterBox(e: React.DragEvent) {
+    if (busy || recording) return
+    // Files only: dragging selected text or a link around the page must not light it up.
+    if (!Array.from(e.dataTransfer?.types || []).includes('Files')) return
+    dragDepth.current++
+    setDropOver(true)
+  }
+
+  function onDragLeaveBox() {
+    dragDepth.current = Math.max(0, dragDepth.current - 1)
+    if (dragDepth.current === 0) setDropOver(false)
   }
 
   // -- screen recording -----------------------------------------------------
@@ -871,10 +913,16 @@ export default function TicketPage() {
             </div>
 
             <div className="attach-tools">
-              <label className="drop">
+              <label className="drop" data-over={dropOver ? '' : undefined}
+                onDragEnter={onDragEnterBox}
+                onDragOver={e => { if (!busy && !recording) e.preventDefault() }}
+                onDragLeave={onDragLeaveBox}
+                onDrop={onDropFiles}>
                 <input type="file" className="drop__input" disabled={!!busy || !!recording}
                   onChange={e => { attach(e.target.files); e.target.value = '' }} />
-                <span className="drop__label">{busy === 'attach' ? 'Uploading…' : 'Choose a file'}</span>
+                <span className="drop__label">
+                  {busy === 'attach' ? 'Uploading…' : dropOver ? 'Drop it here' : 'Choose a file'}
+                </span>
                 <span className="drop__hint">or drag one onto this box</span>
               </label>
               {/* The same capture Wesley's intake uses, minus the interview: pick a

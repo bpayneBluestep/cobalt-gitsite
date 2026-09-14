@@ -2548,6 +2548,12 @@ select:hover:not(:focus) { border-color: var(--text-mute); }
 .drop:hover { border-color: var(--cobalt); }
 .drop__input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .drop:focus-within { border-color: var(--cobalt); outline: 2px solid var(--cobalt); outline-offset: 2px; }
+/* A file is over the box. Solid, not dashed: the box is armed, not merely available. */
+.drop[data-over] {
+  border-style: solid;
+  border-color: var(--cobalt);
+  background: color-mix(in srgb, var(--cobalt) 10%, var(--bg-raise));
+}
 
 .drop__label {
   font-family: var(--font-display);
