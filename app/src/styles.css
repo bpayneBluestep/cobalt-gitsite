@@ -2553,6 +2553,18 @@ select:hover:not(:focus) { border-color: var(--text-mute); }
 }
 .drop__hint { font-size: 0.72rem; color: var(--text-mute); }
 
+/* The file drop and the record button side by side; the drop keeps the width. */
+.attach-tools { display: flex; flex-wrap: wrap; align-items: stretch; gap: 0.6rem; }
+.attach-tools .drop { flex: 1 1 14rem; }
+.attach-rec { display: inline-flex; align-items: center; gap: 0.45rem; white-space: nowrap; }
+.attach-rec__dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  background: #ce4a5b;
+  border-radius: 999px;
+}
+.attach-tools + .wes-recording, .attach-tools + .wes-rec-warn { margin-top: 0.6rem; }
+
 .atts { margin: 0.7rem 0 0; padding: 0; list-style: none; }
 
 .att {

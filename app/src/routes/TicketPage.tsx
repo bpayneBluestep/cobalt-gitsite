@@ -6,11 +6,15 @@ import {
   setRoadblock, uploadAttachment, deleteAttachment,
   setTicketPeople, addComponent, updateComponent, deleteComponent,
   addSubtask, setParent, addComment, deleteComment,
-  formatHours, formatMinutes, formatBytes, MAX_ATTACHMENT_BYTES, ceilingFor,
+  formatHours, formatMinutes, formatBytes, MAX_ATTACHMENT_BYTES, MAX_RECORDING_BYTES, ceilingFor,
   TICKET_STATUSES, TICKET_PRIORITIES, COMPONENT_KINDS, COMPONENT_CHANGES,
   sprintLabel,
   type Ticket, type TicketFieldKey, type TimeEntry, type ComponentRef, type ActivityItem,
 } from '../api'
+import {
+  recordingSupported, startRecording, blobToBase64, formatClock, REC_MAX_MS,
+  type Recording, type RecResult,
+} from '../lib/recorder'
 import { sanitizeHtml, htmlToText } from '../lib/html'
 import { openInClaudeCode } from '../lib/claudeCode'
 import { parseDuration, elapsedSince, todayISO, whenLabel, whenExact } from '../lib/time'
@@ -166,6 +170,18 @@ export default function TicketPage() {
   const [busy, setBusy] = useState('')
   const [failure, setFailure] = useState('')
   const [notice, setNotice] = useState('')
+
+  // An ad hoc screen recording, straight onto the ticket. Same recorder Wesley's intake
+  // uses, same 64 MB video ceiling; the difference is that here the clip is uploaded
+  // the moment it stops, with nothing to review in between, because on a ticket that
+  // already exists the recording IS the note.
+  const [recording, setRecording] = useState<Recording | null>(null)
+  const [recElapsed, setRecElapsed] = useState(0)
+  const [recBytes, setRecBytes] = useState(0)
+  const [recWarn, setRecWarn] = useState('')
+  // Leaving the page mid-recording must not leave the screen shared and the clip in limbo.
+  const recordingRef = useRef<Recording | null>(null)
+  useEffect(() => () => { recordingRef.current?.stop() }, [])
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [copied, setCopied] = useState(false)
   // Set on an "Open in Claude Code" click. The handler gives us no success signal,
@@ -408,6 +424,73 @@ export default function TicketPage() {
       .then(fresh => { setState({ phase: 'ready', ticket: fresh }); setNotice(`Attached ${file.name}.`) })
       .catch(err => setFailure(err instanceof ApiError ? err.message : String(err)))
       .finally(() => setBusy(''))
+  }
+
+  // -- screen recording -----------------------------------------------------
+
+  async function beginRecording() {
+    if (!ticket || recording || busy) return
+    setRecWarn(''); setFailure(''); setNotice('')
+    if (!recordingSupported()) {
+      setRecWarn('Screen recording isn’t available in this browser. Record elsewhere and attach the file.')
+      return
+    }
+    try {
+      const handle = await startRecording(
+        r => { void onRecordingDone(r) },
+        p => { setRecElapsed(p.elapsedMs); setRecBytes(p.bytes) },
+        MAX_RECORDING_BYTES,
+      )
+      recordingRef.current = handle
+      setRecording(handle)
+    } catch {
+      // Dismissing the screen picker lands here. A normal choice, not an error.
+      setRecWarn('No screen was shared, so nothing was recorded.')
+    }
+  }
+
+  async function onRecordingDone(result: RecResult) {
+    recordingRef.current = null
+    setRecording(null)
+    setRecElapsed(0); setRecBytes(0)
+    if (!ticket) return
+
+    if (!result.videoBlob.size) {
+      setRecWarn('That recording came out empty, so nothing was attached.')
+      return
+    }
+    if (result.videoBlob.size > MAX_RECORDING_BYTES) {
+      setRecWarn(
+        `That recording is ${formatBytes(result.videoBlob.size)}, over the ` +
+        `${formatBytes(MAX_RECORDING_BYTES)} limit, so it wasn’t attached. Record a shorter stretch.`,
+      )
+      return
+    }
+    if (result.stoppedForSize) {
+      setRecWarn(
+        `Recording stopped at the ${formatBytes(MAX_RECORDING_BYTES)} limit. Everything up to ` +
+        'that point is attached; record a second clip if there is more to show.',
+      )
+    }
+
+    const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ').replace(':', '.')
+    const fileName = `screen-recording ${stamp}.webm`
+    const on = { listId: ticket.listId, entryId: ticket.entryId }
+    setBusy('attach')
+    try {
+      const dataBase64 = await blobToBase64(result.videoBlob)
+      const fresh = await uploadAttachment(on, {
+        fileName,
+        mimeType: result.videoMime || 'video/webm',
+        dataBase64,
+      })
+      setState({ phase: 'ready', ticket: fresh })
+      setNotice(`Attached ${fileName} (${formatBytes(result.videoBlob.size)}).`)
+    } catch (err) {
+      setFailure(err instanceof ApiError ? err.message : String(err))
+    } finally {
+      setBusy('')
+    }
   }
 
   // -- render ---------------------------------------------------------------
@@ -787,12 +870,47 @@ export default function TicketPage() {
               <p className="note">Up to {formatBytes(MAX_ATTACHMENT_BYTES)} each. Saved immediately.</p>
             </div>
 
-            <label className="drop">
-              <input type="file" className="drop__input" disabled={!!busy}
-                onChange={e => { attach(e.target.files); e.target.value = '' }} />
-              <span className="drop__label">{busy === 'attach' ? 'Uploading…' : 'Choose a file'}</span>
-              <span className="drop__hint">or drag one onto this box</span>
-            </label>
+            <div className="attach-tools">
+              <label className="drop">
+                <input type="file" className="drop__input" disabled={!!busy || !!recording}
+                  onChange={e => { attach(e.target.files); e.target.value = '' }} />
+                <span className="drop__label">{busy === 'attach' ? 'Uploading…' : 'Choose a file'}</span>
+                <span className="drop__hint">or drag one onto this box</span>
+              </label>
+              {/* The same capture Wesley's intake uses, minus the interview: pick a
+                  screen, talk, press Stop, and the clip lands in this list. */}
+              {!recording && (
+                <button type="button" className="btn btn--sm attach-rec" disabled={!!busy}
+                  onClick={beginRecording}
+                  title={`Record your screen, with narration, up to ${formatBytes(MAX_RECORDING_BYTES)}`}>
+                  <span className="attach-rec__dot" aria-hidden="true" />
+                  New screen recording
+                </button>
+              )}
+            </div>
+
+            {recording && (
+              <div className="wes-recording" role="status">
+                <span className="wes-rec-dot" aria-hidden="true" />
+                <span className="wes-rec-label">Recording</span>
+                <span className="wes-rec-time">{formatClock(recElapsed)}</span>
+                <span className="muted">
+                  · {formatBytes(recBytes)} of {formatBytes(MAX_RECORDING_BYTES)}
+                  {' · '}up to {formatClock(REC_MAX_MS)}
+                </span>
+                <span className="wes-rec-bar" aria-hidden="true">
+                  <span className="wes-rec-bar__fill"
+                    style={{ width: `${Math.min(100, Math.round((recBytes / MAX_RECORDING_BYTES) * 100))}%` }} />
+                </span>
+                <button type="button" className="btn btn--sm" onClick={() => recording.stop()}>
+                  Stop
+                </button>
+                <p className="wes-rec-coach">
+                  Talk through what you are showing. It uploads to this ticket the moment you stop.
+                </p>
+              </div>
+            )}
+            {recWarn && <p className="wes-rec-warn" role="status">{recWarn}</p>}
 
             {ticket.attachments.length === 0 ? (
               <p className="muted tsec__empty">Nothing attached yet.</p>
