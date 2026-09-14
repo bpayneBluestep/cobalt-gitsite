@@ -2112,6 +2112,9 @@ select:hover:not(:focus) { border-color: var(--text-mute); }
 /* A blocked ticket keeps its priority spine but gains a tint, so it reads as
    "stuck" without stealing the colour that means "urgent". */
 .tickets tbody tr[data-blocked] { background: color-mix(in srgb, #ce4a5b 6%, transparent); }
+/* The planner's Ready-to-plan table is a .fields table, not a .tickets one, and a
+   blocked row has to read the same in both places. */
+.fields tbody tr[data-blocked] { background: color-mix(in srgb, #ce4a5b 6%, transparent); }
 .tickets tbody tr[data-on] { background: color-mix(in srgb, var(--cobalt) 9%, transparent); }
 
 /* --- logged / estimate in the row ---------------------------------------- */

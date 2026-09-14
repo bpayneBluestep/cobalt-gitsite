@@ -311,6 +311,9 @@ export default function Sprints() {
   const [bAcct, setBAcct] = useState('')
   const [bList, setBList] = useState('')
   const [bPriority, setBPriority] = useState('')
+  // Roadblocked work is still plannable - a blocker often clears inside the week - so
+  // this filters rather than hides. The tickets board offers the same three choices.
+  const [bBlocked, setBBlocked] = useState('')
   const [bSort, setBSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'est', dir: -1 })
 
   /** Move to a sprint and put it in the URL, so the view can be linked to. */
@@ -593,6 +596,9 @@ export default function Sprints() {
    * never produce an empty table. 13 clients out of 84 lists have something ready to
    * plan, and offering the other 71 would be 71 ways to ask a question with no answer.
    */
+  /** How much of the ready list is blocked: whether the filter is worth offering. */
+  const blockedReady = useMemo(() => backlogRaw.filter(t => t.roadblocked).length, [backlogRaw])
+
   const backlogOptions = useMemo(() => {
     const people = new Set<string>()
     const lists = new Set<string>()
@@ -612,13 +618,14 @@ export default function Sprints() {
     }
   }, [backlogRaw])
 
-  const backlogFilters = (bAcct ? 1 : 0) + (bList ? 1 : 0) + (bPriority ? 1 : 0)
+  const backlogFilters = (bAcct ? 1 : 0) + (bList ? 1 : 0) + (bPriority ? 1 : 0) + (bBlocked ? 1 : 0)
 
   const backlogRows = useMemo(() => {
     const rows = backlogRaw.filter(t =>
       (!bAcct || t.accountableName === bAcct) &&
       (!bList || (t.clientName || t.listName) === bList) &&
-      (!bPriority || t.priority === bPriority))
+      (!bPriority || t.priority === bPriority) &&
+      (!bBlocked || (bBlocked === 'yes' ? t.roadblocked : !t.roadblocked)))
 
     return rows.slice().sort((a, b) => {
       const av = sortValue(a, bSort.key)
@@ -631,14 +638,14 @@ export default function Sprints() {
       if (cmp === 0) return (remainingHoursOf(b) || 0) - (remainingHoursOf(a) || 0)
       return cmp * bSort.dir
     })
-  }, [backlogRaw, bAcct, bList, bPriority, bSort])
+  }, [backlogRaw, bAcct, bList, bPriority, bBlocked, bSort])
 
   /** Click a heading to sort by it; click the one already active to reverse it. */
   const sortBy = (key: SortKey) => setBSort(cur => (cur.key === key
     ? { key, dir: cur.dir === 1 ? -1 : 1 }
     : { key, dir: key === 'est' || key === 'priority' || key === 'num' ? -1 : 1 }))
 
-  const clearBacklogFilters = () => { setBAcct(''); setBList(''); setBPriority('') }
+  const clearBacklogFilters = () => { setBAcct(''); setBList(''); setBPriority(''); setBBlocked('') }
 
   /* The one case where filtering in the browser would lie: the server cut the list. */
   const backlogTruncated = !!board && board.backlogTotal > board.backlog.length
@@ -1030,6 +1037,11 @@ export default function Sprints() {
                     <p className="dcard__meta">
                       <span className="pill" data-status={(t.status || 'Open').replace(/\s+/g, '')}>{t.status}</span>
                       <EstLeft t={t} />
+                      {t.roadblocked && (
+                        <span className="mark mark--block" title={t.roadblockReason || 'Roadblocked'}>
+                          blocked
+                        </span>
+                      )}
                     </p>
                     <p className="dcard__co">
                       <Link className="inlink" to={`/clients/${t.clientId || ''}/tickets`}>
@@ -1038,6 +1050,9 @@ export default function Sprints() {
                     </p>
                     {t.accountableName && (
                       <p className="dcard__co muted">PM: {t.accountableName}</p>
+                    )}
+                    {t.roadblocked && (
+                      <p className="dcard__next">Blocked: {t.roadblockReason}</p>
                     )}
                     <div className="dcard__move">
                       <EngineerSelect
@@ -1123,6 +1138,11 @@ export default function Sprints() {
                       <span className="pill" data-status={(t.status || 'Open').replace(/\s+/g, '')}>{t.status}</span>
                       <EstLeft t={t} />
                       {t.loggedHours ? <span className="muted">{formatHours(t.loggedHours)} logged</span> : null}
+                      {t.roadblocked && (
+                        <span className="mark mark--block" title={t.roadblockReason || 'Roadblocked'}>
+                          blocked
+                        </span>
+                      )}
                     </p>
                     <p className="dcard__co">
                       <Link className="inlink" to={`/clients/${t.clientId || ''}/tickets`}>
@@ -1213,6 +1233,18 @@ export default function Sprints() {
                     {backlogOptions.priorities.map(p => <option key={p} value={p}>{p}</option>)}
                   </select>
                 </div>
+                {/* Only worth offering when there is something to filter to. Blocked work
+                    is the thing a planner most often wants to set aside for a week. */}
+                {blockedReady > 0 && (
+                  <div className="ef">
+                    <label htmlFor="b-block">Roadblock</label>
+                    <select id="b-block" value={bBlocked} onChange={e => setBBlocked(e.target.value)}>
+                      <option value="">Either</option>
+                      <option value="yes">Roadblocked ({blockedReady})</option>
+                      <option value="no">Not roadblocked</option>
+                    </select>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1307,6 +1339,7 @@ export default function Sprints() {
                       <tr
                         key={t.entryId}
                         data-prio={t.priority}
+                        data-blocked={t.roadblocked ? '' : undefined}
                         draggable={mayPlan && !busy}
                         data-drag={dragging && dragging.ticket.entryId === t.entryId ? '' : undefined}
                         onDragStart={e => startDrag(e, t, BACKLOG)}
@@ -1328,6 +1361,16 @@ export default function Sprints() {
                           <Link className="rowlink__a" to={ticketPath(t)} {...NEW_TAB}>
                             {t.title}
                           </Link>
+                          {/* The same chip the tickets board uses, for the same reason:
+                              planning a blocked ticket into a week is a decision, and it
+                              should not be made without knowing it is blocked. */}
+                          {t.roadblocked && (
+                            <span className="rowmarks">
+                              <span className="mark mark--block" title={t.roadblockReason || 'Roadblocked'}>
+                                blocked
+                              </span>
+                            </span>
+                          )}
                         </th>
                         <td>{t.clientName || t.listName}</td>
                         <td className="tickets__who" title={t.accountableName || ''}>
