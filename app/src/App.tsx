@@ -29,6 +29,7 @@ import MySprint from './routes/MySprint'
 import Settings from './routes/Settings'
 import Reports from './routes/Reports'
 import TimeReport from './routes/TimeReport'
+import BillableReport from './routes/BillableReport'
 import TicketPage from './routes/TicketPage'
 import Intake from './routes/Intake'
 import CompanyAgreements from './routes/CompanyAgreements'
@@ -243,6 +244,8 @@ function Shell() {
             <Route path="/reports" element={<Guarded needs="viewReports" what="Reports"><Reports /></Guarded>} />
             <Route path="/reports/time"
               element={<Guarded needs="viewReports" what="The time report"><TimeReport /></Guarded>} />
+            <Route path="/reports/billable"
+              element={<Guarded needs="viewReports" what="The billable time report"><BillableReport /></Guarded>} />
 
             <Route path="/settings" element={<Guarded needs="viewSettings" what="Settings"><Settings /></Guarded>} />
             {/* A person gets a page of their own, the same as a company. Same gate as the

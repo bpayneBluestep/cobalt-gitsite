@@ -39,4 +39,17 @@ export const REPORTS: ReportCard[] = [
       'timer where one was used and from the ClickUp history everywhere else.',
     needs: 'viewReports',
   },
+  {
+    key: 'billable',
+    path: '/reports/billable',
+    name: 'Billable Time',
+    description:
+      'Billable hours per client, week by week: the one thing finance needs, in a shape ' +
+      'you can export and send, with every entry correctable where it is shown.',
+    source:
+      "Every time entry on every ticket, from 2025 onward, grouped by the client behind " +
+      "the list. Billability came from ClickUp's per-entry flag, which understated it, " +
+      'which is why entries can be flipped here.',
+    needs: 'viewReports',
+  },
 ]

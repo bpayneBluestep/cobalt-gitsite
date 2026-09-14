@@ -7,6 +7,7 @@ import {
 import BarRows, { type BarRow } from '../components/BarRows'
 import ColumnChart, { type Column } from '../components/ColumnChart'
 import HeatGrid from '../components/HeatGrid'
+import { asDate, toIso, mondayOf, addDays, shortDate } from '../lib/weeks'
 
 /*
  * The Time Logging report.
@@ -20,8 +21,6 @@ import HeatGrid from '../components/HeatGrid'
  * what, when in the day, and then every row behind it.
  */
 
-const DAY_MS = 86400000
-
 /** Hours, the unit everyone here talks in. Minutes only for the small print. */
 function hours(minutes: number): string {
   const h = minutes / 60
@@ -34,37 +33,6 @@ function hours(minutes: number): string {
 function pct(part: number, whole: number): string {
   if (!whole) return '0%'
   return `${Math.round((part / whole) * 100)}%`
-}
-
-/*
- * Date maths on plain yyyy-mm-dd strings, anchored to UTC noon.
- *
- * Noon, not midnight: `new Date('2026-08-14')` is parsed as UTC midnight, and in any
- * timezone west of Greenwich that is the 13th locally - so a week bucket built from it
- * lands a day early for half the world and the "weeks" quietly shift. Noon has twelve
- * hours of slack in both directions, which no real offset crosses.
- */
-function asDate(iso: string): Date {
-  return new Date(`${iso}T12:00:00Z`)
-}
-function toIso(d: Date): string {
-  return d.toISOString().slice(0, 10)
-}
-/** The Monday of the week containing `iso`. Weeks are whole calendar weeks, Monday to
- *  Sunday, not a rolling seven days - "last week" is a thing people say about a
- *  calendar, and a rolling window cannot be compared with the one before it. */
-function mondayOf(iso: string): string {
-  const d = asDate(iso)
-  const dow = (d.getUTCDay() + 6) % 7
-  return toIso(new Date(d.getTime() - dow * DAY_MS))
-}
-function addDays(iso: string, n: number): string {
-  return toIso(new Date(asDate(iso).getTime() + n * DAY_MS))
-}
-/** "14 Aug" — short enough for an axis. */
-function shortDate(iso: string): string {
-  const d = asDate(iso)
-  return `${d.getUTCDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getUTCMonth()]}`
 }
 
 /** The window the report opens on: the last 12 whole weeks, ending with this one. */

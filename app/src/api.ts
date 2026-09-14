@@ -1073,10 +1073,21 @@ export const logTime = (
   entry: { minutes?: number; hours?: number; date?: string; note?: string; billable?: boolean },
 ): Promise<Ticket> => maestroPost('logTime', { ...on, ...entry })
 
+/**
+ * Change one time entry. Every field but `timeId` is optional.
+ *
+ * Omitting `minutes` keeps the duration that is stored, which is what makes the
+ * billable-only flip below safe: echoing back a duration read a moment ago would
+ * silently revert whatever correction somebody else made in between.
+ */
 export const editTime = (
   on: On,
-  entry: { timeId: string; minutes: number; date?: string; note?: string; billable?: boolean },
+  entry: { timeId: string; minutes?: number; date?: string; note?: string; billable?: boolean },
 ): Promise<Ticket> => maestroPost('editTime', { ...on, ...entry })
+
+/** Flip one entry's billable flag and touch nothing else. */
+export const setTimeBillable = (on: On, timeId: string, billable: boolean): Promise<Ticket> =>
+  editTime(on, { timeId, billable })
 
 export const deleteTime = (on: On, timeId: string): Promise<Ticket> =>
   maestroPost('deleteTime', { ...on, timeId })
@@ -2954,6 +2965,14 @@ export interface TimeEntryRow {
   l: number
   /** The ticket's entry id, for a link. */
   t: string
+  /**
+   * The time entry's own id.
+   *
+   * With `t` and `lists[l].id` this makes the row addressable: {listId, entryId,
+   * timeId} is exactly what `editTime` takes, which is what lets the Billable Time
+   * report correct a mis-flagged entry where it is shown.
+   */
+  i: string
   /** The ticket's number. */
   tn?: number
   /** Present, and 0, only when NOT billable. */

@@ -6015,6 +6015,80 @@ input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) opacit
 }
 .trep__scope { margin: -0.5rem 0 1rem; font-size: 0.78rem; color: var(--text-dim); }
 
+/* ---------------------------------------------------- the billable grid
+ *
+ * A grid you are about to send somebody, so it reads as a table rather than a
+ * dashboard: figures aligned, the week columns even, and one tap target per cell.
+ */
+
+/* Softer than the epoch warning above it. This one is provenance, not a limitation -
+   it explains why a number looks low, and it should not shout every time. */
+.trep__warn--soft {
+  background: var(--bg-raise);
+  border-color: var(--line);
+}
+
+.bgrid th[scope="col"] { white-space: nowrap; }
+.bgrid tbody th[scope="row"] { font-weight: 600; }
+/* Internal work is not billed, so it reads as context rather than as a client. */
+.bgrid tbody tr[data-internal] th,
+.bgrid tbody tr[data-internal] td { color: var(--text-mute); }
+.bgrid tfoot td, .bgrid tfoot th {
+  border-top: 2px solid var(--line-strong);
+  font-family: var(--font-display);
+}
+
+/* A cell is a button: the figure is the affordance, so it carries no chrome until
+   you are on it. A bordered button in every cell would make the grid unreadable. */
+.bcell {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.05rem;
+  padding: 0.15rem 0.3rem;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.bcell:hover { border-color: var(--line-strong); background: var(--bg-raise); }
+.bcell:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 1px; }
+.bcell[data-open] { border-color: var(--cobalt); background: color-mix(in srgb, var(--cobalt) 12%, transparent); }
+.bcell__b { font-family: var(--font-display); }
+/* Non-billable rides along under the billable figure, smaller and dimmer: present so
+   it can be corrected, never competing with the number being sent. */
+.bcell__o { display: block; font-size: 0.68rem; color: var(--text-mute); white-space: nowrap; }
+
+.bdrawer { margin-top: 1rem; border-color: var(--cobalt); }
+.bdrawer .tcard__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.6rem; }
+.bdrawer .tcard__head h2 { margin: 0; }
+.bdrawer .tcard__head .note { flex: 1 1 auto; }
+
+/* The flip. Reads as a state you can change, not as a badge: bordered, hoverable,
+   and coloured only when the answer is yes. */
+.btoggle {
+  padding: 0.05rem 0.45rem;
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+  color: var(--text-mute);
+  background: var(--bg-sunk);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.btoggle:hover { border-color: var(--cobalt); color: var(--text); }
+.btoggle:disabled { opacity: 0.55; cursor: default; }
+.btoggle[data-on] {
+  color: var(--good);
+  border-color: color-mix(in srgb, var(--good) 55%, var(--line));
+  background: transparent;
+}
+
+.trep__foot { margin-top: 1rem; font-size: 0.72rem; }
+
 .trep__two {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
