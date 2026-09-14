@@ -2115,6 +2115,12 @@ select:hover:not(:focus) { border-color: var(--text-mute); }
 /* The planner's Ready-to-plan table is a .fields table, not a .tickets one, and a
    blocked row has to read the same in both places. */
 .fields tbody tr[data-blocked] { background: color-mix(in srgb, #ce4a5b 6%, transparent); }
+/* Same idea on a card: a blocked ticket sits at the bottom of its column, tinted, with
+   its priority spine intact. Stuck is not the same as urgent. */
+.dcard[data-blocked] {
+  background: color-mix(in srgb, #ce4a5b 7%, var(--bg-raise));
+  border-color: color-mix(in srgb, #ce4a5b 35%, var(--line));
+}
 .tickets tbody tr[data-on] { background: color-mix(in srgb, var(--cobalt) 9%, transparent); }
 
 /* --- logged / estimate in the row ---------------------------------------- */

@@ -35,9 +35,24 @@ const NEW_TAB = { target: '_blank' as const, rel: 'noopener', draggable: false }
 /** Two decimal places, the same rounding the server uses. */
 const money = (n: number): number => Math.round(n * 100) / 100
 
+/*
+ * Blocked work, and why it is set aside rather than given a column of its own.
+ *
+ * Dan asked (#5966) for blocked tickets to have their own space so attention goes to
+ * what is actually actionable. A fourth column was the obvious reading and the wrong
+ * one: a ticket's column IS its status, so moving blocked work out of Up Next would
+ * make the columns stop accounting for the sprint, and dragging a card back would have
+ * to guess which status it came from.
+ *
+ * So the status stays, and the card leaves instead: blocked cards sink to the bottom of
+ * their column with a chip, and one toggle lifts them off the board entirely into a
+ * count you can open when you want to work the blockers rather than the work.
+ */
 export default function MySprint() {
   const { sprint = '' } = useParams()
   const navigate = useNavigate()
+  /** Blocked cards off the board: the "show me only what I can actually do" switch. */
+  const [hideBlocked, setHideBlocked] = useState(false)
   const { can } = useSession()
   const mayEdit = can('editTickets')
 
@@ -85,6 +100,35 @@ export default function MySprint() {
     frame = requestAnimationFrame(tick)
     return () => { window.removeEventListener('dragover', track); cancelAnimationFrame(frame) }
   }, [dragging])
+
+  /** How much of this sprint is stuck, and which of it is not yet finished. */
+  const blocked = useMemo(() => {
+    if (!board) return { total: 0, open: 0 }
+    let total = 0, open = 0
+    for (const c of board.columns) {
+      for (const t of c.tickets) {
+        if (!t.roadblocked) continue
+        total++
+        if (c.status !== 'Complete') open++
+      }
+    }
+    return { total, open }
+  }, [board])
+
+  /** How many of a column's cards are blocked, whether or not they are being shown. */
+  const blockedIn = (col: { tickets: Ticket[] }) => col.tickets.filter(t => t.roadblocked).length
+
+  /**
+   * A column's cards in the order they should read: actionable first, blocked sunk to
+   * the bottom, or gone entirely while the toggle is on. Priority order within each
+   * group is what the server already sorted them into, so it is preserved by a stable
+   * partition rather than re-sorted.
+   */
+  const shownIn = (col: { tickets: Ticket[] }): Ticket[] => {
+    const doable = col.tickets.filter(t => !t.roadblocked)
+    if (hideBlocked) return doable
+    return doable.concat(col.tickets.filter(t => t.roadblocked))
+  }
 
   const totals = useMemo(() => {
     if (!board) return { total: 0, done: 0, est: 0, logged: 0 }
@@ -227,6 +271,23 @@ export default function MySprint() {
         </div>
       )}
 
+      {/* Only shown when something is actually blocked: a switch for a state you are
+          not in is a control that teaches you nothing. */}
+      {board && blocked.open > 0 && (
+        <p className="act__filter">
+          <button type="button" className="linkbtn" onClick={() => setHideBlocked(v => !v)}>
+            {hideBlocked
+              ? `Show the ${blocked.open} blocked ticket${blocked.open === 1 ? '' : 's'}`
+              : `Hide the ${blocked.open} blocked ticket${blocked.open === 1 ? '' : 's'}`}
+          </button>
+          <span className="muted">
+            {hideBlocked
+              ? ' Blocked work is off the board; each column counts only what is left.'
+              : ' Blocked work sits at the bottom of its column.'}
+          </span>
+        </p>
+      )}
+
       {board && (
         <div className="pipe kanban">
           {board.columns.map(col => (
@@ -253,26 +314,32 @@ export default function MySprint() {
                 <h2>
                   <span className="pill" data-status={col.status.replace(/\s+/g, '')}>{col.status}</span>
                 </h2>
-                <span className="pipe__n">{col.tickets.length}</span>
+                <span className="pipe__n">{shownIn(col).length}</span>
               </header>
-              {col.tickets.length > 0 && (
+              {shownIn(col).length > 0 && (
                 <p className="sprint__cap">
-                  {formatHours(col.estHours)}
+                  {formatHours(money(shownIn(col).reduce((a, t) => a + (t.estHours || 0), 0)))}
                   <span className="muted"> estimated</span>
+                  {!hideBlocked && blockedIn(col) > 0 && (
+                    <span className="muted"> · {blockedIn(col)} blocked</span>
+                  )}
                 </p>
               )}
 
-              {col.tickets.length === 0 && (
+              {shownIn(col).length === 0 && (
                 <p className="pipe__empty">
-                  {dragging && mayEdit && dragging.from !== col.status ? 'Drop here' : 'Nothing here'}
+                  {dragging && mayEdit && dragging.from !== col.status
+                    ? 'Drop here'
+                    : blockedIn(col) > 0 ? `Nothing actionable · ${blockedIn(col)} blocked` : 'Nothing here'}
                 </p>
               )}
 
-              {col.tickets.map(t => (
+              {shownIn(col).map(t => (
                 <article
                   className="dcard scard"
                   key={t.entryId}
                   data-prio={t.priority}
+                  data-blocked={t.roadblocked ? '' : undefined}
                   draggable={mayEdit}
                   data-drag={dragging && dragging.ticket.entryId === t.entryId ? '' : undefined}
                   onDragStart={e => startDrag(e, t, col.status)}
@@ -305,6 +372,11 @@ export default function MySprint() {
                       })()}
                     </span>
                     {t.loggedHours ? <span className="muted">{formatHours(t.loggedHours)} logged</span> : null}
+                    {t.roadblocked && (
+                      <span className="mark mark--block" title={t.roadblockReason || 'Roadblocked'}>
+                        blocked
+                      </span>
+                    )}
                   </p>
                   <p className="dcard__co">
                     <Link className="inlink" to={'/clients/' + (t.clientId || '') + '/tickets'}>
