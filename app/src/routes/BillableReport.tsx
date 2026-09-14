@@ -6,7 +6,7 @@ import {
 } from '../api'
 import { useSession } from '../session'
 import {
-  addDays, mondayOf, todayIso, weeksBetween, weekLabel, shortDate,
+  addDays, mondayOf, todayIso, weekLabel, shortDate,
   hoursLabel, hoursNumber,
 } from '../lib/weeks'
 import { downloadCsv } from '../lib/csv'
@@ -19,21 +19,24 @@ import { downloadCsv } from '../lib/csv'
  * question a finance team asks every week: how many billable hours did each client get?
  * So it is a grid rather than a dashboard, it exports, and it is editable.
  *
+ * ONE WEEK AT A TIME, defaulting to last week. Billing is a weekly errand - you sit
+ * down on Monday and deal with the week that just finished - and a grid of thirteen
+ * week columns made that errand harder rather than easier: the week you actually wanted
+ * was one column among many, every figure had to be hunted for before it could be read,
+ * and the ticket rows underneath spread their hours across columns that were empty for
+ * them. With a single week the columns can say what they mean instead: billable, not
+ * billable, total.
+ *
  * Editable because of where the data came from. Cobalt's billable flag is ClickUp's
  * ENTRY flag as imported; in that workspace the real signal was a `billable` tag on the
  * TASK, which the import ignored. So a meaningful amount of genuinely billable work is
  * sitting here marked non-billable, and a report that could only display that would be
  * showing you a number you cannot trust and cannot fix. Every entry flips in one click.
  *
- * Both figures are shown for the same reason: you cannot correct what is hidden. The
- * non-billable column switches off for the moment you actually send the thing.
- *
- * Three levels, expanded in place rather than in a drawer: client, the tickets worked
- * for that client, and the entries on each ticket. A client total is the figure you send
- * and the ticket list is the answer to the question that always follows it - "what was
- * that time?" - so they belong in one structure you can walk down, keeping the week
- * columns aligned the whole way rather than jumping to a separate table that has lost
- * them.
+ * Three levels, expanded in place: client, the tickets worked for that client, and the
+ * entries on each ticket. A client total is the figure you send and the ticket list is
+ * the answer to the question that always follows it - "what was that time?" - so they
+ * belong in one structure you can walk down.
  */
 
 const INTERNAL = '__internal__'
@@ -46,41 +49,57 @@ type State =
 const LOGIN_URL = '/shared/login/login.jsp?desturl=' +
   encodeURIComponent(window.location.pathname + window.location.search)
 
-const PRESETS: { label: string; weeks: number }[] = [
-  { label: '4 weeks', weeks: 4 },
-  { label: '8 weeks', weeks: 8 },
-  { label: '13 weeks', weeks: 13 },
-  { label: '26 weeks', weeks: 26 },
-]
+/** How far back the picker offers. Two years is further back than anyone re-bills. */
+const WEEKS_BACK = 104
 
-/** The window this report opens on: the last 4 whole weeks, ending today. */
-function defaultRange(): { from: string; to: string } {
-  const today = todayIso()
-  return { from: addDays(mondayOf(today), -7 * 3), to: today }
+/**
+ * The week this report opens on: the last WHOLE week, not the one in progress.
+ *
+ * A week still running is a week whose figure will change, and the figure finance wants
+ * on Monday morning is the one that has stopped moving.
+ */
+function lastWeek(): string {
+  return addDays(mondayOf(todayIso()), -7)
 }
 
-/** Minutes in one cell, split the only way this report cares about. */
-interface Cell { billable: number; other: number }
+/** Every week the picker offers, newest first, floored at the endpoint's epoch. */
+function weekChoices(epoch: string | undefined, selected: string): string[] {
+  const floor = epoch ? mondayOf(epoch) : ''
+  const out: string[] = []
+  let cursor = mondayOf(todayIso())
+  for (let i = 0; i < WEEKS_BACK; i++) {
+    if (floor && cursor < floor) break
+    out.push(cursor)
+    cursor = addDays(cursor, -7)
+  }
+  // A week reached by an old link, or one before the epoch, still needs an option to
+  // select - otherwise the dropdown silently names a week other than the one on screen.
+  if (!out.includes(selected)) out.push(selected)
+  return out.sort((a, b) => (a < b ? 1 : a > b ? -1 : 0))
+}
 
-/** One ticket under a client: the same weekly shape, plus the entries behind it. */
+/** "7-13 Sep", carrying the year once it is no longer the current one. */
+function weekOptionLabel(monday: string, today: string): string {
+  const base = weekLabel(monday)
+  return monday.slice(0, 4) === today.slice(0, 4) ? base : `${base} ${monday.slice(0, 4)}`
+}
+
+/** One ticket under a client: its own totals, plus the entries behind them. */
 interface TicketRow {
   /** The ticket's entry id. Also the expand key, since it is unique across the org. */
   id: string
   number: number | null
   title: string
   listId: string
-  weeks: Map<string, Cell>
   billable: number
   other: number
   entries: TimeEntryRow[]
 }
 
-/** One client's row: minutes per week, split by billable, plus its own totals. */
+/** One client's row for the week. */
 interface ClientRow {
   key: string
   name: string
-  /** Keyed by the week's Monday. */
-  weeks: Map<string, Cell>
   billable: number
   other: number
   /** True for the one synthetic row that holds work with no client behind it. */
@@ -90,24 +109,15 @@ interface ClientRow {
 }
 
 /**
- * One week cell, at whatever level it is on.
+ * One figure, at whatever level it is on.
  *
- * A component rather than three copies: client, ticket and total rows all render the
- * same figure the same way, and three copies is how the ticket rows end up rounding
+ * A component rather than a dozen copies: client, ticket, entry and total rows all
+ * render hours the same way, and a dozen copies is how the ticket rows end up rounding
  * differently from the client row above them.
  */
-function Figure({ cell, showOther }: { cell?: Cell; showOther: boolean }) {
-  if (!cell || (!cell.billable && !cell.other)) {
-    return <td className="num"><span className="muted">·</span></td>
-  }
-  return (
-    <td className="num">
-      <span className="bcell__b">{hoursNumber(cell.billable)}</span>
-      {showOther && cell.other > 0 && (
-        <span className="bcell__o">+{hoursNumber(cell.other)} nb</span>
-      )}
-    </td>
-  )
+function Hours({ v, strong }: { v: number; strong?: boolean }) {
+  if (!v) return <td className="num"><span className="muted">·</span></td>
+  return <td className="num">{strong ? <strong>{hoursNumber(v)}</strong> : hoursNumber(v)}</td>
 }
 
 export default function BillableReport() {
@@ -120,10 +130,10 @@ export default function BillableReport() {
   /*
    * What is open, as two sets of keys.
    *
-   * Local rather than in the URL, unlike the date window: a window is what you link
-   * somebody to, while which rows you happened to unfold is a reading position, and
-   * putting a dozen of them in the query string would make the link you send
-   * unshareable-looking for no gain.
+   * Local rather than in the URL, unlike the week: a week is what you link somebody to,
+   * while which rows you happened to unfold is a reading position, and putting a dozen
+   * of them in the query string would make the link you send unshareable-looking for no
+   * gain.
    */
   const [openClients, setOpenClients] = useState<Set<string>>(() => new Set())
   const [openTickets, setOpenTickets] = useState<Set<string>>(() => new Set())
@@ -137,20 +147,30 @@ export default function BillableReport() {
   const [notice, setNotice] = useState('')
 
   /*
-   * The window and the two view switches live in the URL.
+   * The week and the billable-only switch live in the URL.
    *
    * A week you are about to send to somebody is a week you want to be able to link to,
-   * and "open the report and then set it to these dates" is not a link. Same reasoning
-   * the CRM scope and Time Logging already follow.
+   * and "open the report and then set it to these dates" is not a link. `from` is still
+   * honoured so links made while this report showed a date range land on a real week
+   * rather than silently on today's.
    */
-  const fallback = defaultRange()
-  const from = params.get('from') || fallback.from
-  const to = params.get('to') || fallback.to
+  const week = params.get('week') || mondayOf(params.get('from') || lastWeek())
+  const from = week
+  const to = addDays(week, 6)
   const billableOnly = params.get('only') === '1'
+  const showOther = !billableOnly
 
   const setParam = (key: string, value: string) => {
     const next = new URLSearchParams(params)
     if (value) next.set(key, value); else next.delete(key)
+    setParams(next, { replace: true })
+  }
+
+  const setWeek = (monday: string) => {
+    const next = new URLSearchParams(params)
+    next.set('week', monday)
+    // Left behind, these would win on the next read of an old link.
+    next.delete('from'); next.delete('to')
     setParams(next, { replace: true })
   }
 
@@ -169,51 +189,55 @@ export default function BillableReport() {
 
   const report = state.phase === 'ready' ? state.report : null
 
-  const applyPreset = (weeks: number) => {
-    const today = todayIso()
-    const next = new URLSearchParams(params)
-    next.set('from', addDays(mondayOf(today), -7 * (weeks - 1)))
-    next.set('to', today)
-    setParams(next, { replace: true })
-  }
+  const today = todayIso()
+  const thisWeek = mondayOf(today)
+  const priorWeek = lastWeek()
+  const choices = useMemo(() => weekChoices(report?.epoch, week), [report?.epoch, week])
+  const earliest = report ? mondayOf(report.epoch) : ''
+  const prevWeek = addDays(week, -7)
+  const nextWeek = addDays(week, 7)
 
   /*
    * The pivot.
    *
    * Grouped by CLIENT, not by list: a client with two lists gets one invoice, and
    * finance does not care that the work was split across a Client list and a Platform
-   * one. The entry drawer still names the ticket, so nothing is lost by rolling up.
+   * one. The ticket rows underneath still name every ticket, so nothing is lost.
    *
    * Work on a list with no client is not dropped. It is real time somebody spent, and
    * hiding it would make this report's grand total disagree with Time Logging's for the
-   * same window - a disagreement nobody would notice for a month. It gets its own row,
-   * is excluded from the client totals, and is never billable by definition.
+   * same week - a disagreement nobody would notice for a month. It gets its own row, is
+   * excluded from the client totals, and is never billable by definition.
+   *
+   * `billableOnly` filters here rather than at render, so the totals, the KPIs and the
+   * export all agree with what is on screen. The point of that switch is the moment you
+   * actually send the thing, and a total that quietly included work the table was not
+   * showing would be worse than no switch at all.
    */
   const view = useMemo(() => {
     if (!report) return null
-    const weeks = weeksBetween(report.from, report.to)
-    const weekSet = new Set(weeks)
+    // Read off the report, not off the URL: while a new week is loading those two
+    // disagree for a beat, and the table would blank on every step.
+    const monday = mondayOf(report.from)
     const byClient = new Map<string, ClientRow>()
     const ticketsById = new Map<string, TicketRow>()
-    // What the endpoint knows about each ticket, joined on the entry id every row carries.
+    // What the endpoint knows about each ticket, joined on the id every row carries.
     const meta = new Map(report.tickets.map(t => [t.t, t]))
     let billable = 0
     let other = 0
     let internalMinutes = 0
-
-    const add = (cells: Map<string, Cell>, monday: string, mins: number, isBillable: boolean) => {
-      let cell = cells.get(monday)
-      if (!cell) { cell = { billable: 0, other: 0 }; cells.set(monday, cell) }
-      if (isBillable) cell.billable += mins; else cell.other += mins
-    }
+    let ticketCount = 0
 
     for (const e of report.entries) {
       const list = report.lists[e.l]
       if (!list) continue
-      const monday = mondayOf(e.d)
-      // An entry outside the rendered columns would be counted in a total that no column
+      // An entry outside the week on screen would land in a total that no column
       // accounts for, which is how a grid stops adding up.
-      if (!weekSet.has(monday)) continue
+      if (mondayOf(e.d) !== monday) continue
+
+      // `b` is emitted only when FALSE, which is the endpoint's terseness, not a bug.
+      const isBillable = e.b === undefined
+      if (billableOnly && !isBillable) continue
 
       const internal = !list.clientId
       const key = internal ? INTERNAL : list.clientId
@@ -222,7 +246,6 @@ export default function BillableReport() {
         row = {
           key,
           name: internal ? 'Internal (no client)' : (list.clientName || list.name),
-          weeks: new Map(),
           billable: 0,
           other: 0,
           internal,
@@ -231,17 +254,14 @@ export default function BillableReport() {
         byClient.set(key, row)
       }
 
-      // `b` is emitted only when FALSE, which is the endpoint's terseness, not a bug.
-      const isBillable = e.b === undefined
-      add(row.weeks, monday, e.m, isBillable)
       if (isBillable) { row.billable += e.m; if (!internal) billable += e.m }
       else { row.other += e.m; if (!internal) other += e.m }
       if (internal) internalMinutes += e.m
 
       /*
-       * The ticket level. Keyed on the ticket's entry id and scoped per client, so the
-       * same ticket appearing under two clients - which it cannot today, but a list can
-       * be re-pointed - would not merge two clients' hours into one row.
+       * The ticket level, keyed per client as well as per ticket: the same ticket under
+       * two clients - which it cannot be today, but a list can be re-pointed - must not
+       * merge two clients' hours into one row.
        */
       const tkey = `${key}|${e.t}`
       let ticket = ticketsById.get(tkey)
@@ -254,15 +274,14 @@ export default function BillableReport() {
           // it would lose real hours from a client's total.
           title: m?.ti || '(untitled ticket)',
           listId: list.id,
-          weeks: new Map(),
           billable: 0,
           other: 0,
           entries: [],
         }
         ticketsById.set(tkey, ticket)
         row.tickets.push(ticket)
+        ticketCount++
       }
-      add(ticket.weeks, monday, e.m, isBillable)
       if (isBillable) ticket.billable += e.m; else ticket.other += e.m
       ticket.entries.push(e)
     }
@@ -288,18 +307,8 @@ export default function BillableReport() {
       }
     }
 
-    const weekTotals = weeks.map(w => {
-      let b = 0, o = 0
-      for (const r of rows) {
-        if (r.internal) continue
-        const c = r.weeks.get(w)
-        if (c) { b += c.billable; o += c.other }
-      }
-      return { week: w, billable: b, other: o }
-    })
-
-    return { weeks, rows, billable, other, internalMinutes, weekTotals }
-  }, [report])
+    return { monday, rows, billable, other, internalMinutes, ticketCount }
+  }, [report, billableOnly])
 
   /*
    * Flip one entry, in place.
@@ -348,32 +357,27 @@ export default function BillableReport() {
    */
   function exportGrid() {
     if (!view || !report) return
-    const head = ['Level', 'Client', 'Ticket', 'Title', ...view.weeks.map(w => `${w} (billable h)`)]
-    if (!billableOnly) head.push(...view.weeks.map(w => `${w} (non-billable h)`))
-    head.push('Total billable h')
-    if (!billableOnly) head.push('Total non-billable h')
+    const head = ['Level', 'Client', 'Ticket', 'Title', 'Billable h']
+    if (showOther) head.push('Non-billable h', 'Total h')
 
     const line = (
       level: string, client: string, ticket: string, title: string,
-      weeks: Map<string, Cell>, billable: number, other: number,
+      billable: number, other: number,
     ): (string | number)[] => {
-      const cells: (string | number)[] = [level, client, ticket, title]
-      for (const w of view.weeks) cells.push(hoursNumber(weeks.get(w)?.billable || 0))
-      if (!billableOnly) for (const w of view.weeks) cells.push(hoursNumber(weeks.get(w)?.other || 0))
-      cells.push(hoursNumber(billable))
-      if (!billableOnly) cells.push(hoursNumber(other))
+      const cells: (string | number)[] = [level, client, ticket, title, hoursNumber(billable)]
+      if (showOther) cells.push(hoursNumber(other), hoursNumber(billable + other))
       return cells
     }
 
     const body: (string | number)[][] = []
     for (const r of view.rows) {
-      body.push(line('Client', r.name, '', '', r.weeks, r.billable, r.other))
+      body.push(line('Client', r.name, '', '', r.billable, r.other))
       for (const t of r.tickets) {
         body.push(line('Ticket', r.name, t.number === null ? '' : `#${t.number}`, t.title,
-          t.weeks, t.billable, t.other))
+          t.billable, t.other))
       }
     }
-    downloadCsv(`billable-hours-${report.from}-to-${report.to}.csv`, [head, ...body])
+    downloadCsv(`billable-hours-week-${week}.csv`, [head, ...body])
   }
 
   function exportEntries() {
@@ -397,7 +401,7 @@ export default function BillableReport() {
           e.b === undefined ? 'yes' : 'no',
         ]
       })
-    downloadCsv(`billable-entries-${report.from}-to-${report.to}.csv`, [head, ...body])
+    downloadCsv(`billable-entries-week-${week}.csv`, [head, ...body])
   }
 
   return (
@@ -406,39 +410,52 @@ export default function BillableReport() {
         <div>
           <h1>Billable Time</h1>
           <p className="page__sub">
-            Billable hours per client, week by week. Built to be exported and sent, and
-            editable because the flag it reports on came out of ClickUp imperfect.
+            Billable hours per client, one week at a time. Built to be exported and sent,
+            and editable because the flag it reports on came out of ClickUp imperfect.
           </p>
         </div>
         <Link className="btn btn--ghost btn--sm" to="/reports">All reports</Link>
       </header>
 
       <div className="trep__filters">
-        <div className="ef ef--narrow">
-          <label htmlFor="br-from">From</label>
-          <input id="br-from" type="date" value={from} min={report ? report.epoch : undefined}
-            onChange={e => setParam('from', e.target.value)} />
+        {/* Step and pick, not a date range: the week is the unit here, so the controls
+            are the ones you would use on a calendar. */}
+        <div className="bweek" role="group" aria-label="Week">
+          <button type="button" className="btn btn--ghost btn--sm bweek__step"
+            disabled={!!earliest && prevWeek < earliest}
+            onClick={() => setWeek(prevWeek)}
+            title="The week before">‹</button>
+          <label className="visually-hidden" htmlFor="br-week">Week</label>
+          <select id="br-week" className="bweek__sel" value={week}
+            onChange={e => setWeek(e.target.value)}>
+            {choices.map(w => (
+              <option key={w} value={w}>
+                {weekOptionLabel(w, today)}
+                {w === priorWeek ? ' — last week' : ''}
+                {w === thisWeek ? ' — this week, still running' : ''}
+              </option>
+            ))}
+          </select>
+          <button type="button" className="btn btn--ghost btn--sm bweek__step"
+            disabled={nextWeek > thisWeek}
+            onClick={() => setWeek(nextWeek)}
+            title="The week after">›</button>
         </div>
-        <div className="ef ef--narrow">
-          <label htmlFor="br-to">To</label>
-          <input id="br-to" type="date" value={to}
-            onChange={e => setParam('to', e.target.value)} />
-        </div>
-        <div className="trep__presets" role="group" aria-label="Range presets">
-          {PRESETS.map(p => (
-            <button key={p.label} type="button" className="btn btn--ghost btn--sm"
-              onClick={() => applyPreset(p.weeks)}>
-              {p.label}
-            </button>
-          ))}
-        </div>
+        {week !== priorWeek && (
+          <button type="button" className="btn btn--ghost btn--sm" onClick={() => setWeek(priorWeek)}>
+            Back to last week
+          </button>
+        )}
         <span className="tpage__spacer" />
         <button type="button" className="btn btn--ghost btn--sm"
-          onClick={() => setParam('only', billableOnly ? '' : '1')}>
+          onClick={() => setParam('only', billableOnly ? '' : '1')}
+          title={billableOnly
+            ? 'Bring non-billable work back, so it can be corrected'
+            : 'Drop non-billable work entirely — the view you send'}>
           {billableOnly ? 'Show non-billable too' : 'Billable only'}
         </button>
-        {/* One control, two states: with a dozen clients, opening each by hand to check
-            a week is the difference between using this and exporting it. */}
+        {/* One control, two states: with a dozen clients, opening each by hand to read
+            the week is the difference between using this and exporting it. */}
         <button type="button" className="btn btn--ghost btn--sm" disabled={!view}
           onClick={() => {
             if (!view) return
@@ -457,9 +474,9 @@ export default function BillableReport() {
 
       {report && report.truncated && (
         <p className="trep__warn">
-          Showing from {report.epoch}. Earlier hours are on the tickets, but ClickUp's
-          billable flag was not in use before then, so billable figures reaching further
-          back would be an artifact of the old system rather than a fact about the work.
+          Cobalt's billable figures start at {report.epoch}. ClickUp's billable flag was
+          not in use before then, so a figure for an earlier week would be an artifact of
+          the old system rather than a fact about the work.
         </p>
       )}
 
@@ -495,31 +512,34 @@ export default function BillableReport() {
               <p className="kpi__k">Billable</p>
               <p className="kpi__v">{hoursLabel(view.billable)}</p>
               <p className="kpi__n">
-                across {view.rows.filter(r => !r.internal).length} client
+                {weekLabel(view.monday)} · across{' '}
+                {view.rows.filter(r => !r.internal).length} client
                 {view.rows.filter(r => !r.internal).length === 1 ? '' : 's'}
               </p>
             </div>
+            {showOther && (
+              <div className="kpi">
+                <p className="kpi__k">Not billable</p>
+                <p className="kpi__v">{hoursLabel(view.other)}</p>
+                <p className="kpi__n">
+                  {view.billable + view.other > 0
+                    ? `${Math.round((view.other / (view.billable + view.other)) * 100)}% of client work`
+                    : 'nothing logged'}
+                </p>
+              </div>
+            )}
             <div className="kpi">
-              <p className="kpi__k">Not billable</p>
-              <p className="kpi__v">{hoursLabel(view.other)}</p>
-              <p className="kpi__n">
-                {view.billable + view.other > 0
-                  ? `${Math.round((view.other / (view.billable + view.other)) * 100)}% of client work`
-                  : 'nothing logged'}
-              </p>
+              <p className="kpi__k">Tickets</p>
+              <p className="kpi__v">{view.ticketCount}</p>
+              <p className="kpi__n">worked this week</p>
             </div>
-            <div className="kpi">
-              <p className="kpi__k">Per week</p>
-              <p className="kpi__v">
-                {hoursLabel(view.weeks.length ? view.billable / view.weeks.length : 0)}
-              </p>
-              <p className="kpi__n">billable, over {view.weeks.length} weeks</p>
-            </div>
-            <div className="kpi">
-              <p className="kpi__k">Internal</p>
-              <p className="kpi__v">{hoursLabel(view.internalMinutes)}</p>
-              <p className="kpi__n">no client, never billed</p>
-            </div>
+            {showOther && (
+              <div className="kpi">
+                <p className="kpi__k">Internal</p>
+                <p className="kpi__v">{hoursLabel(view.internalMinutes)}</p>
+                <p className="kpi__n">no client, never billed</p>
+              </div>
+            )}
           </div>
 
           {/* Said once, near the figures, because it explains why the numbers look low
@@ -529,27 +549,31 @@ export default function BillableReport() {
             real signal was usually a tag on the task, which the import did not read, so
             some of what shows as non-billable here is billable work.{' '}
             {mayEdit
-              ? 'Open a cell to correct an entry.'
+              ? 'Expand a client, then a ticket, to correct an entry.'
               : 'Correcting one needs the ticket-editing role.'}
           </p>
 
           {view.rows.length === 0 ? (
             <div className="callout callout--plain">
-              <p className="callout__title">No time logged in this window</p>
-              <p>Nothing was logged between {shortDate(report.from)} and {shortDate(report.to)}.</p>
+              <p className="callout__title">Nothing to bill for this week</p>
+              <p>
+                {billableOnly
+                  ? `No billable time was logged in the week of ${weekLabel(view.monday)}.`
+                  : `Nothing was logged in the week of ${weekLabel(view.monday)}.`}
+              </p>
             </div>
           ) : (
             <div className="tablewrap">
-              <table className="fields compact bgrid">
+              <table className="fields compact bgrid bgrid--week">
                 <thead>
                   <tr>
-                    <th scope="col">Client</th>
-                    {view.weeks.map(w => (
-                      <th key={w} scope="col" className="num" title={`Week starting ${w}`}>
-                        {weekLabel(w)}
-                      </th>
-                    ))}
-                    <th scope="col" className="num">Total</th>
+                    <th scope="col">Client · ticket · entry</th>
+                    <th scope="col" className="num">Billable</th>
+                    {showOther && <th scope="col" className="num">Not billable</th>}
+                    {showOther && <th scope="col" className="num">Total</th>}
+                    {mayEdit && (
+                      <th scope="col"><span className="visually-hidden">Billability</span></th>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -570,13 +594,10 @@ export default function BillableReport() {
                               </span>
                             </button>
                           </th>
-                          {view.weeks.map(w => <Figure key={w} cell={r.weeks.get(w)} showOther={!billableOnly} />)}
-                          <td className="num">
-                            <strong>{hoursNumber(r.billable)}</strong>
-                            {!billableOnly && r.other > 0 && (
-                              <span className="bcell__o">+{hoursNumber(r.other)} nb</span>
-                            )}
-                          </td>
+                          <Hours v={r.billable} strong />
+                          {showOther && <Hours v={r.other} />}
+                          {showOther && <Hours v={r.billable + r.other} strong />}
+                          {mayEdit && <td />}
                         </tr>
 
                         {clientOpen && r.tickets.map(t => {
@@ -602,18 +623,14 @@ export default function BillableReport() {
                                   <Link className="inlink bexp__go" to={`/tickets/${t.number ?? t.id}`}
                                     target="_blank" rel="noopener" title="Open the ticket">open</Link>
                                 </th>
-                                {view.weeks.map(w => <Figure key={w} cell={t.weeks.get(w)} showOther={!billableOnly} />)}
-                                <td className="num">
-                                  {hoursNumber(t.billable)}
-                                  {!billableOnly && t.other > 0 && (
-                                    <span className="bcell__o">+{hoursNumber(t.other)} nb</span>
-                                  )}
-                                </td>
+                                <Hours v={t.billable} />
+                                {showOther && <Hours v={t.other} />}
+                                {showOther && <Hours v={t.billable + t.other} />}
+                                {mayEdit && <td />}
                               </tr>
 
                               {ticketOpen && t.entries.map(e => {
                                 const isBillable = e.b === undefined
-                                const monday = mondayOf(e.d)
                                 return (
                                   <tr key={`${e.t}-${e.i}`} data-level="entry">
                                     <th scope="row">
@@ -625,20 +642,14 @@ export default function BillableReport() {
                                         <span className="bent__n">{e.n || 'no note'}</span>
                                       </span>
                                     </th>
-                                    {/* The hours sit in the week they belong to, so an
-                                        entry lines up under the column it is part of and
-                                        you can see which week a correction will move. */}
-                                    {view.weeks.map(w => (
-                                      <td key={w} className="num">
-                                        {w === monday
-                                          ? <span className={isBillable ? undefined : 'bcell__o'}>
-                                              {hoursNumber(e.m)}
-                                            </span>
-                                          : null}
-                                      </td>
-                                    ))}
-                                    <td className="num">
-                                      {mayEdit ? (
+                                    {/* Which column the hours sit in IS the flag, so a
+                                        correction reads as the figure moving rather than
+                                        as a label changing its wording. */}
+                                    <Hours v={isBillable ? e.m : 0} />
+                                    {showOther && <Hours v={isBillable ? 0 : e.m} />}
+                                    {showOther && <Hours v={e.m} />}
+                                    {mayEdit && (
+                                      <td className="num">
                                         <button
                                           type="button"
                                           className="btoggle"
@@ -651,12 +662,8 @@ export default function BillableReport() {
                                         >
                                           {busyId === e.i ? 'saving…' : isBillable ? 'billable' : 'not billable'}
                                         </button>
-                                      ) : (
-                                        <span className={isBillable ? 'tag' : 'muted'}>
-                                          {isBillable ? 'billable' : 'not billable'}
-                                        </span>
-                                      )}
-                                    </td>
+                                      </td>
+                                    )}
                                   </tr>
                                 )
                               })}
@@ -670,20 +677,10 @@ export default function BillableReport() {
                 <tfoot>
                   <tr>
                     <th scope="row">All clients</th>
-                    {view.weekTotals.map(t => (
-                      <td key={t.week} className="num">
-                        <strong>{hoursNumber(t.billable)}</strong>
-                        {!billableOnly && t.other > 0 && (
-                          <span className="bcell__o">+{hoursNumber(t.other)} nb</span>
-                        )}
-                      </td>
-                    ))}
-                    <td className="num">
-                      <strong>{hoursNumber(view.billable)}</strong>
-                      {!billableOnly && view.other > 0 && (
-                        <span className="bcell__o">+{hoursNumber(view.other)} nb</span>
-                      )}
-                    </td>
+                    <Hours v={view.billable} strong />
+                    {showOther && <Hours v={view.other} />}
+                    {showOther && <Hours v={view.billable + view.other} strong />}
+                    {mayEdit && <td />}
                   </tr>
                 </tfoot>
               </table>
@@ -691,8 +688,8 @@ export default function BillableReport() {
           )}
 
           <p className="trep__foot muted">
-            Generated {report.generatedAt} · {report.entries.length} entries read ·
-            {' '}weeks run Monday to Sunday.
+            Week of {weekLabel(view.monday)} ({report.from} to {report.to}) ·
+            {' '}generated {report.generatedAt} · weeks run Monday to Sunday.
           </p>
         </>
       )}

@@ -6003,6 +6003,15 @@ input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) opacit
 }
 .trep__filters .ef { margin: 0; }
 .trep__presets { display: flex; gap: 0.3rem; }
+
+/* The week picker.
+ *
+ * Arrows either side of a dropdown: stepping to the week before is the common move and
+ * deserves one click, while jumping back two months is rare enough to deserve a list.
+ */
+.bweek { display: inline-flex; align-items: center; gap: 0.25rem; }
+.bweek__step { min-width: 1.9rem; padding-inline: 0.45rem; font-size: 0.95rem; line-height: 1; }
+.bweek__sel { min-width: 16rem; }
 .trep__warn {
   margin: 0 0 1rem;
   padding: var(--s-s) var(--s-m);
@@ -6038,12 +6047,11 @@ input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) opacit
   font-family: var(--font-display);
 }
 
-/* A figure in the grid. The cells stopped being buttons when the hierarchy replaced
-   the drawer - you walk down the rows now, rather than opening a cell sideways. */
-.bcell__b { font-family: var(--font-display); }
-/* Non-billable rides along under the billable figure, smaller and dimmer: present so
-   it can be corrected, never competing with the number being sent. */
-.bcell__o { display: block; font-size: 0.68rem; color: var(--text-mute); white-space: nowrap; }
+/* One week, so the columns can be named rather than dated: billable, not billable,
+   total. Figures in the display face, and the name column takes whatever is left so the
+   three numeric columns sit together at the right where they can be compared. */
+.bgrid--week td.num { font-family: var(--font-display); white-space: nowrap; }
+.bgrid--week th[scope="col"]:first-child { width: 100%; }
 
 /* ---- the three levels ----------------------------------------------------
  *
