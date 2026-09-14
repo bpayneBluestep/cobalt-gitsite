@@ -6038,33 +6038,74 @@ input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) opacit
   font-family: var(--font-display);
 }
 
-/* A cell is a button: the figure is the affordance, so it carries no chrome until
-   you are on it. A bordered button in every cell would make the grid unreadable. */
-.bcell {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.05rem;
-  padding: 0.15rem 0.3rem;
-  font: inherit;
-  color: inherit;
-  background: none;
-  border: 1px solid transparent;
-  border-radius: 5px;
-  cursor: pointer;
-}
-.bcell:hover { border-color: var(--line-strong); background: var(--bg-raise); }
-.bcell:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 1px; }
-.bcell[data-open] { border-color: var(--cobalt); background: color-mix(in srgb, var(--cobalt) 12%, transparent); }
+/* A figure in the grid. The cells stopped being buttons when the hierarchy replaced
+   the drawer - you walk down the rows now, rather than opening a cell sideways. */
 .bcell__b { font-family: var(--font-display); }
 /* Non-billable rides along under the billable figure, smaller and dimmer: present so
    it can be corrected, never competing with the number being sent. */
 .bcell__o { display: block; font-size: 0.68rem; color: var(--text-mute); white-space: nowrap; }
 
-.bdrawer { margin-top: 1rem; border-color: var(--cobalt); }
-.bdrawer .tcard__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.6rem; }
-.bdrawer .tcard__head h2 { margin: 0; }
-.bdrawer .tcard__head .note { flex: 1 1 auto; }
+/* ---- the three levels ----------------------------------------------------
+ *
+ * Client, ticket, entry, in one table so the week columns stay aligned the whole way
+ * down. Depth is carried by indent and weight rather than by a border per level: three
+ * boxed levels in a grid this wide reads as a wireframe, not a report.
+ */
+
+.bgrid tbody tr[data-level="ticket"] > th,
+.bgrid tbody tr[data-level="entry"] > th { font-weight: 400; }
+.bgrid tbody tr[data-level="ticket"] > td,
+.bgrid tbody tr[data-level="ticket"] > th { background: color-mix(in srgb, var(--bg-raise) 55%, transparent); }
+.bgrid tbody tr[data-level="entry"] > td,
+.bgrid tbody tr[data-level="entry"] > th {
+  background: var(--bg-sunk);
+  font-size: 0.74rem;
+  color: var(--text-dim);
+}
+/* The client row that follows an open group needs air above it, or the previous
+   client's entries read as belonging to it. */
+.bgrid tbody tr[data-level="entry"] + tr[data-level="client"] > th,
+.bgrid tbody tr[data-level="ticket"] + tr[data-level="client"] > th,
+.bgrid tbody tr[data-level="entry"] + tr[data-level="client"] > td,
+.bgrid tbody tr[data-level="ticket"] + tr[data-level="client"] > td { border-top: 2px solid var(--line); }
+
+/* The expander is the row label: the whole name is the target, because a caret alone
+   is a 12px hit area on the one control people use most on this page. */
+.bexp {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  max-width: 100%;
+  padding: 0.1rem 0.25rem;
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.bexp:hover { border-color: var(--line-strong); background: var(--bg-raise); }
+.bexp:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 1px; }
+.bexp--sub { padding-left: 1.3rem; font-weight: 400; }
+.bexp__caret { flex: none; font-size: 0.7rem; color: var(--text-mute); }
+.bexp__t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 34rem; }
+.bexp__n { flex: none; font-size: 0.68rem; color: var(--text-mute); white-space: nowrap; }
+.bexp__go { margin-left: 0.5rem; font-size: 0.7rem; }
+
+/* One entry: date, who, note. The note takes what is left and truncates, because a
+   three-line note would push the hours out of the reader's eye line. */
+.bent { display: inline-flex; align-items: baseline; gap: 0.5rem; padding-left: 2.6rem; }
+.bent__d { flex: none; font-family: var(--font-display); color: var(--text-mute); }
+.bent__w { flex: none; }
+.bent__n {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 30rem;
+  color: var(--text-mute);
+}
 
 /* The flip. Reads as a state you can change, not as a badge: bordered, hoverable,
    and coloured only when the answer is yes. */

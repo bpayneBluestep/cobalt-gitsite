@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
   ApiError, getTimeReport, setTimeBillable,
@@ -27,6 +27,13 @@ import { downloadCsv } from '../lib/csv'
  *
  * Both figures are shown for the same reason: you cannot correct what is hidden. The
  * non-billable column switches off for the moment you actually send the thing.
+ *
+ * Three levels, expanded in place rather than in a drawer: client, the tickets worked
+ * for that client, and the entries on each ticket. A client total is the figure you send
+ * and the ticket list is the answer to the question that always follows it - "what was
+ * that time?" - so they belong in one structure you can walk down, keeping the week
+ * columns aligned the whole way rather than jumping to a separate table that has lost
+ * them.
  */
 
 const INTERNAL = '__internal__'
@@ -52,16 +59,55 @@ function defaultRange(): { from: string; to: string } {
   return { from: addDays(mondayOf(today), -7 * 3), to: today }
 }
 
+/** Minutes in one cell, split the only way this report cares about. */
+interface Cell { billable: number; other: number }
+
+/** One ticket under a client: the same weekly shape, plus the entries behind it. */
+interface TicketRow {
+  /** The ticket's entry id. Also the expand key, since it is unique across the org. */
+  id: string
+  number: number | null
+  title: string
+  listId: string
+  weeks: Map<string, Cell>
+  billable: number
+  other: number
+  entries: TimeEntryRow[]
+}
+
 /** One client's row: minutes per week, split by billable, plus its own totals. */
 interface ClientRow {
   key: string
   name: string
   /** Keyed by the week's Monday. */
-  weeks: Map<string, { billable: number; other: number }>
+  weeks: Map<string, Cell>
   billable: number
   other: number
   /** True for the one synthetic row that holds work with no client behind it. */
   internal: boolean
+  /** Biggest biller first, same rule as the clients above them. */
+  tickets: TicketRow[]
+}
+
+/**
+ * One week cell, at whatever level it is on.
+ *
+ * A component rather than three copies: client, ticket and total rows all render the
+ * same figure the same way, and three copies is how the ticket rows end up rounding
+ * differently from the client row above them.
+ */
+function Figure({ cell, showOther }: { cell?: Cell; showOther: boolean }) {
+  if (!cell || (!cell.billable && !cell.other)) {
+    return <td className="num"><span className="muted">·</span></td>
+  }
+  return (
+    <td className="num">
+      <span className="bcell__b">{hoursNumber(cell.billable)}</span>
+      {showOther && cell.other > 0 && (
+        <span className="bcell__o">+{hoursNumber(cell.other)} nb</span>
+      )}
+    </td>
+  )
 }
 
 export default function BillableReport() {
@@ -71,6 +117,22 @@ export default function BillableReport() {
   const [params, setParams] = useSearchParams()
   const [state, setState] = useState<State>({ phase: 'loading' })
   const [busyId, setBusyId] = useState('')
+  /*
+   * What is open, as two sets of keys.
+   *
+   * Local rather than in the URL, unlike the date window: a window is what you link
+   * somebody to, while which rows you happened to unfold is a reading position, and
+   * putting a dozen of them in the query string would make the link you send
+   * unshareable-looking for no gain.
+   */
+  const [openClients, setOpenClients] = useState<Set<string>>(() => new Set())
+  const [openTickets, setOpenTickets] = useState<Set<string>>(() => new Set())
+
+  const toggle = (set: Set<string>, key: string): Set<string> => {
+    const next = new Set(set)
+    if (next.has(key)) next.delete(key); else next.add(key)
+    return next
+  }
   const [failure, setFailure] = useState('')
   const [notice, setNotice] = useState('')
 
@@ -85,7 +147,6 @@ export default function BillableReport() {
   const from = params.get('from') || fallback.from
   const to = params.get('to') || fallback.to
   const billableOnly = params.get('only') === '1'
-  const openCell = params.get('cell') || ''
 
   const setParam = (key: string, value: string) => {
     const next = new URLSearchParams(params)
@@ -133,9 +194,18 @@ export default function BillableReport() {
     const weeks = weeksBetween(report.from, report.to)
     const weekSet = new Set(weeks)
     const byClient = new Map<string, ClientRow>()
+    const ticketsById = new Map<string, TicketRow>()
+    // What the endpoint knows about each ticket, joined on the entry id every row carries.
+    const meta = new Map(report.tickets.map(t => [t.t, t]))
     let billable = 0
     let other = 0
     let internalMinutes = 0
+
+    const add = (cells: Map<string, Cell>, monday: string, mins: number, isBillable: boolean) => {
+      let cell = cells.get(monday)
+      if (!cell) { cell = { billable: 0, other: 0 }; cells.set(monday, cell) }
+      if (isBillable) cell.billable += mins; else cell.other += mins
+    }
 
     for (const e of report.entries) {
       const list = report.lists[e.l]
@@ -156,18 +226,45 @@ export default function BillableReport() {
           billable: 0,
           other: 0,
           internal,
+          tickets: [],
         }
         byClient.set(key, row)
       }
 
-      let cell = row.weeks.get(monday)
-      if (!cell) { cell = { billable: 0, other: 0 }; row.weeks.set(monday, cell) }
-
       // `b` is emitted only when FALSE, which is the endpoint's terseness, not a bug.
       const isBillable = e.b === undefined
-      if (isBillable) { cell.billable += e.m; row.billable += e.m; if (!internal) billable += e.m }
-      else { cell.other += e.m; row.other += e.m; if (!internal) other += e.m }
+      add(row.weeks, monday, e.m, isBillable)
+      if (isBillable) { row.billable += e.m; if (!internal) billable += e.m }
+      else { row.other += e.m; if (!internal) other += e.m }
       if (internal) internalMinutes += e.m
+
+      /*
+       * The ticket level. Keyed on the ticket's entry id and scoped per client, so the
+       * same ticket appearing under two clients - which it cannot today, but a list can
+       * be re-pointed - would not merge two clients' hours into one row.
+       */
+      const tkey = `${key}|${e.t}`
+      let ticket = ticketsById.get(tkey)
+      if (!ticket) {
+        const m = meta.get(e.t)
+        ticket = {
+          id: e.t,
+          number: m?.n ?? e.tn ?? null,
+          // A ticket whose title the endpoint could not read still gets a row: dropping
+          // it would lose real hours from a client's total.
+          title: m?.ti || '(untitled ticket)',
+          listId: list.id,
+          weeks: new Map(),
+          billable: 0,
+          other: 0,
+          entries: [],
+        }
+        ticketsById.set(tkey, ticket)
+        row.tickets.push(ticket)
+      }
+      add(ticket.weeks, monday, e.m, isBillable)
+      if (isBillable) ticket.billable += e.m; else ticket.other += e.m
+      ticket.entries.push(e)
     }
 
     // Biggest biller first: the rows that matter to an invoice are at the top, and
@@ -177,6 +274,19 @@ export default function BillableReport() {
       if (b.billable !== a.billable) return b.billable - a.billable
       return a.name.localeCompare(b.name)
     })
+
+    // Same rule one level down, and entries oldest first: a ticket's entries are a
+    // story of the work, and a story runs forwards.
+    for (const r of rows) {
+      r.tickets.sort((a, b) => {
+        if (b.billable !== a.billable) return b.billable - a.billable
+        if (b.other !== a.other) return b.other - a.other
+        return (b.number || 0) - (a.number || 0)
+      })
+      for (const t of r.tickets) {
+        t.entries.sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0))
+      }
+    }
 
     const weekTotals = weeks.map(w => {
       let b = 0, o = 0
@@ -190,23 +300,6 @@ export default function BillableReport() {
 
     return { weeks, rows, billable, other, internalMinutes, weekTotals }
   }, [report])
-
-  /** The entries behind one cell, for the drawer. Recomputed so a flip re-reads it. */
-  const cellEntries = useMemo((): { rows: TimeEntryRow[]; label: string } | null => {
-    if (!report || !openCell) return null
-    const [clientKey, monday] = openCell.split('|')
-    if (!clientKey || !monday) return null
-    const rows = report.entries.filter(e => {
-      const list = report.lists[e.l]
-      if (!list) return false
-      const key = list.clientId || INTERNAL
-      return key === clientKey && mondayOf(e.d) === monday
-    })
-    const name = clientKey === INTERNAL
-      ? 'Internal (no client)'
-      : (report.lists.find(l => l.clientId === clientKey)?.clientName || 'Client')
-    return { rows: rows.slice().sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0)), label: `${name}, ${weekLabel(monday)}` }
-  }, [report, openCell])
 
   /*
    * Flip one entry, in place.
@@ -244,21 +337,42 @@ export default function BillableReport() {
     }
   }
 
+  /*
+   * The grid, as a spreadsheet.
+   *
+   * Client rows AND ticket rows, with a Level column, rather than clients alone. A
+   * finance team asking "what was that 20 hours?" is the next question after every
+   * invoice, and answering it with a second file they have to line up by hand is worse
+   * than one file they can filter. Level makes both readings possible: filter to Client
+   * for the summary, to Ticket for the detail.
+   */
   function exportGrid() {
     if (!view || !report) return
-    const head = ['Client', ...view.weeks.map(w => `${w} (billable h)`)]
+    const head = ['Level', 'Client', 'Ticket', 'Title', ...view.weeks.map(w => `${w} (billable h)`)]
     if (!billableOnly) head.push(...view.weeks.map(w => `${w} (non-billable h)`))
     head.push('Total billable h')
     if (!billableOnly) head.push('Total non-billable h')
 
-    const body = view.rows.map(r => {
-      const cells: (string | number)[] = [r.name]
-      for (const w of view.weeks) cells.push(hoursNumber(r.weeks.get(w)?.billable || 0))
-      if (!billableOnly) for (const w of view.weeks) cells.push(hoursNumber(r.weeks.get(w)?.other || 0))
-      cells.push(hoursNumber(r.billable))
-      if (!billableOnly) cells.push(hoursNumber(r.other))
+    const line = (
+      level: string, client: string, ticket: string, title: string,
+      weeks: Map<string, Cell>, billable: number, other: number,
+    ): (string | number)[] => {
+      const cells: (string | number)[] = [level, client, ticket, title]
+      for (const w of view.weeks) cells.push(hoursNumber(weeks.get(w)?.billable || 0))
+      if (!billableOnly) for (const w of view.weeks) cells.push(hoursNumber(weeks.get(w)?.other || 0))
+      cells.push(hoursNumber(billable))
+      if (!billableOnly) cells.push(hoursNumber(other))
       return cells
-    })
+    }
+
+    const body: (string | number)[][] = []
+    for (const r of view.rows) {
+      body.push(line('Client', r.name, '', '', r.weeks, r.billable, r.other))
+      for (const t of r.tickets) {
+        body.push(line('Ticket', r.name, t.number === null ? '' : `#${t.number}`, t.title,
+          t.weeks, t.billable, t.other))
+      }
+    }
     downloadCsv(`billable-hours-${report.from}-to-${report.to}.csv`, [head, ...body])
   }
 
@@ -322,6 +436,16 @@ export default function BillableReport() {
         <button type="button" className="btn btn--ghost btn--sm"
           onClick={() => setParam('only', billableOnly ? '' : '1')}>
           {billableOnly ? 'Show non-billable too' : 'Billable only'}
+        </button>
+        {/* One control, two states: with a dozen clients, opening each by hand to check
+            a week is the difference between using this and exporting it. */}
+        <button type="button" className="btn btn--ghost btn--sm" disabled={!view}
+          onClick={() => {
+            if (!view) return
+            if (openClients.size) { setOpenClients(new Set()); setOpenTickets(new Set()); return }
+            setOpenClients(new Set(view.rows.map(r => r.key)))
+          }}>
+          {openClients.size ? 'Collapse all' : 'Expand all'}
         </button>
         <button type="button" className="btn btn--sm" disabled={!view} onClick={exportGrid}>
           Export grid
@@ -429,37 +553,119 @@ export default function BillableReport() {
                   </tr>
                 </thead>
                 <tbody>
-                  {view.rows.map(r => (
-                    <tr key={r.key} data-internal={r.internal ? '' : undefined}>
-                      <th scope="row">{r.name}</th>
-                      {view.weeks.map(w => {
-                        const c = r.weeks.get(w)
-                        const id = `${r.key}|${w}`
-                        const empty = !c || (!c.billable && !c.other)
-                        return (
-                          <td key={w} className="num">
-                            {empty ? <span className="muted">·</span> : (
-                              <button type="button" className="bcell"
-                                data-open={openCell === id ? '' : undefined}
-                                onClick={() => setParam('cell', openCell === id ? '' : id)}
-                                title="Show the entries behind this figure">
-                                <span className="bcell__b">{hoursNumber(c!.billable)}</span>
-                                {!billableOnly && c!.other > 0 && (
-                                  <span className="bcell__o">+{hoursNumber(c!.other)} nb</span>
-                                )}
-                              </button>
+                  {view.rows.map(r => {
+                    const clientOpen = openClients.has(r.key)
+                    return (
+                      <Fragment key={r.key}>
+                        <tr data-internal={r.internal ? '' : undefined} data-level="client">
+                          <th scope="row">
+                            <button type="button" className="bexp"
+                              aria-expanded={clientOpen}
+                              onClick={() => setOpenClients(o => toggle(o, r.key))}
+                              title={clientOpen ? 'Hide the tickets' : 'Show the tickets worked'}>
+                              <span className="bexp__caret" aria-hidden="true">{clientOpen ? '▾' : '▸'}</span>
+                              {r.name}
+                              <span className="bexp__n">
+                                {r.tickets.length} ticket{r.tickets.length === 1 ? '' : 's'}
+                              </span>
+                            </button>
+                          </th>
+                          {view.weeks.map(w => <Figure key={w} cell={r.weeks.get(w)} showOther={!billableOnly} />)}
+                          <td className="num">
+                            <strong>{hoursNumber(r.billable)}</strong>
+                            {!billableOnly && r.other > 0 && (
+                              <span className="bcell__o">+{hoursNumber(r.other)} nb</span>
                             )}
                           </td>
-                        )
-                      })}
-                      <td className="num">
-                        <strong>{hoursNumber(r.billable)}</strong>
-                        {!billableOnly && r.other > 0 && (
-                          <span className="bcell__o">+{hoursNumber(r.other)} nb</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                        </tr>
+
+                        {clientOpen && r.tickets.map(t => {
+                          const tkey = `${r.key}|${t.id}`
+                          const ticketOpen = openTickets.has(tkey)
+                          return (
+                            <Fragment key={tkey}>
+                              <tr data-level="ticket">
+                                <th scope="row">
+                                  <button type="button" className="bexp bexp--sub"
+                                    aria-expanded={ticketOpen}
+                                    onClick={() => setOpenTickets(o => toggle(o, tkey))}
+                                    title={ticketOpen ? 'Hide the time entries' : 'Show every time entry'}>
+                                    <span className="bexp__caret" aria-hidden="true">{ticketOpen ? '▾' : '▸'}</span>
+                                    {t.number !== null && <span className="tnum">#{t.number}</span>}
+                                    <span className="bexp__t">{t.title}</span>
+                                    <span className="bexp__n">
+                                      {t.entries.length} entr{t.entries.length === 1 ? 'y' : 'ies'}
+                                    </span>
+                                  </button>
+                                  {/* The link is its own target, not the whole row: the row
+                                      expands, and one control cannot do both. */}
+                                  <Link className="inlink bexp__go" to={`/tickets/${t.number ?? t.id}`}
+                                    target="_blank" rel="noopener" title="Open the ticket">open</Link>
+                                </th>
+                                {view.weeks.map(w => <Figure key={w} cell={t.weeks.get(w)} showOther={!billableOnly} />)}
+                                <td className="num">
+                                  {hoursNumber(t.billable)}
+                                  {!billableOnly && t.other > 0 && (
+                                    <span className="bcell__o">+{hoursNumber(t.other)} nb</span>
+                                  )}
+                                </td>
+                              </tr>
+
+                              {ticketOpen && t.entries.map(e => {
+                                const isBillable = e.b === undefined
+                                const monday = mondayOf(e.d)
+                                return (
+                                  <tr key={`${e.t}-${e.i}`} data-level="entry">
+                                    <th scope="row">
+                                      <span className="bent">
+                                        <span className="bent__d">{shortDate(e.d)}</span>
+                                        <span className="bent__w">
+                                          {report.people[e.p]?.name || 'unattributed'}
+                                        </span>
+                                        <span className="bent__n">{e.n || 'no note'}</span>
+                                      </span>
+                                    </th>
+                                    {/* The hours sit in the week they belong to, so an
+                                        entry lines up under the column it is part of and
+                                        you can see which week a correction will move. */}
+                                    {view.weeks.map(w => (
+                                      <td key={w} className="num">
+                                        {w === monday
+                                          ? <span className={isBillable ? undefined : 'bcell__o'}>
+                                              {hoursNumber(e.m)}
+                                            </span>
+                                          : null}
+                                      </td>
+                                    ))}
+                                    <td className="num">
+                                      {mayEdit ? (
+                                        <button
+                                          type="button"
+                                          className="btoggle"
+                                          data-on={isBillable ? '' : undefined}
+                                          disabled={busyId === e.i}
+                                          onClick={() => flip(e, !isBillable)}
+                                          title={isBillable
+                                            ? 'Mark this entry not billable'
+                                            : 'Mark this entry billable'}
+                                        >
+                                          {busyId === e.i ? 'saving…' : isBillable ? 'billable' : 'not billable'}
+                                        </button>
+                                      ) : (
+                                        <span className={isBillable ? 'tag' : 'muted'}>
+                                          {isBillable ? 'billable' : 'not billable'}
+                                        </span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                )
+                              })}
+                            </Fragment>
+                          )
+                        })}
+                      </Fragment>
+                    )
+                  })}
                 </tbody>
                 <tfoot>
                   <tr>
@@ -482,75 +688,6 @@ export default function BillableReport() {
                 </tfoot>
               </table>
             </div>
-          )}
-
-          {cellEntries && (
-            <section className="tcard bdrawer">
-              <div className="tcard__head">
-                <h2>{cellEntries.label}</h2>
-                <p className="note">
-                  {cellEntries.rows.length} entr{cellEntries.rows.length === 1 ? 'y' : 'ies'}
-                  {mayEdit ? ' · click Billable to change it' : ''}
-                </p>
-                <button type="button" className="linkbtn" onClick={() => setParam('cell', '')}>
-                  Close
-                </button>
-              </div>
-              <div className="tablewrap">
-                <table className="fields compact">
-                  <thead>
-                    <tr>
-                      <th scope="col">Date</th>
-                      <th scope="col">Ticket</th>
-                      <th scope="col">Person</th>
-                      <th scope="col">Note</th>
-                      <th scope="col" className="num">Hours</th>
-                      <th scope="col">Billable</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {cellEntries.rows.map(e => {
-                      const isBillable = e.b === undefined
-                      return (
-                        <tr key={`${e.t}-${e.i}`}>
-                          <td>{shortDate(e.d)}</td>
-                          <td>
-                            {/* The number where there is one, the entry id otherwise:
-                                the same two-way route the ticket page already answers on.
-                                Not `ticketPath`, which wants a whole Ticket. */}
-                            <Link className="tnum tnum--link" to={`/tickets/${e.tn ?? e.t}`}
-                              target="_blank" rel="noopener">
-                              {e.tn ? `#${e.tn}` : 'open'}
-                            </Link>
-                          </td>
-                          <td>{report.people[e.p]?.name || <span className="muted">unattributed</span>}</td>
-                          <td>{e.n || <span className="muted">no note</span>}</td>
-                          <td className="num">{hoursNumber(e.m)}</td>
-                          <td>
-                            {mayEdit ? (
-                              <button
-                                type="button"
-                                className="btoggle"
-                                data-on={isBillable ? '' : undefined}
-                                disabled={busyId === e.i}
-                                onClick={() => flip(e, !isBillable)}
-                                title={isBillable ? 'Mark this entry not billable' : 'Mark this entry billable'}
-                              >
-                                {busyId === e.i ? 'saving…' : isBillable ? 'billable' : 'not billable'}
-                              </button>
-                            ) : (
-                              <span className={isBillable ? 'tag' : 'muted'}>
-                                {isBillable ? 'billable' : 'not billable'}
-                              </span>
-                            )}
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </section>
           )}
 
           <p className="trep__foot muted">

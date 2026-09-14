@@ -2985,6 +2985,24 @@ export interface TimeEntryRow {
   n?: string
 }
 
+/**
+ * One ticket that had time on it in the window.
+ *
+ * An index table rather than a title on every entry row: a ticket carries several
+ * entries and a title is long, so per-row would cost more than the rest of the payload.
+ * Entry rows carry `t`, which is this `t`, and the client joins on it.
+ */
+export interface TimeTicket {
+  /** The ticket's entry id. What `TimeEntryRow.t` holds. */
+  t: string
+  /** Its number, or null on a ticket that never got one. */
+  n: number | null
+  /** Its title. */
+  ti: string
+  /** Index into `lists`. */
+  l: number
+}
+
 export interface TimeReport {
   from: string
   to: string
@@ -2995,6 +3013,7 @@ export interface TimeReport {
   generatedAt: string
   people: TimePerson[]
   lists: TimeList[]
+  tickets: TimeTicket[]
   entries: TimeEntryRow[]
   totals: {
     entries: number
@@ -3002,6 +3021,7 @@ export interface TimeReport {
     billableMinutes: number
     people: number
     lists: number
+    tickets: number
     clients: number
   }
   /** How much of this window can answer a time-of-day question. */
