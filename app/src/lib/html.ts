@@ -20,7 +20,9 @@ const ALLOWED_TAGS = [
 const UNWRAP_TAGS = ['DIV', 'SPAN', 'FONT']
 
 const ALLOWED_ATTRS: Record<string, string[]> = {
-  A: ['href', 'title'],
+  // target/rel are allowed because `clean` sets them itself on outbound links; a
+  // document that arrives carrying them is no worse than one that does not.
+  A: ['href', 'title', 'target', 'rel'],
 }
 
 function safeHref(value: string): string | null {
@@ -67,6 +69,14 @@ function clean(node: Element): void {
       }
     }
 
+    // An outbound link opens in a new tab. Inside a ticket, following a link in the
+    // same tab loses whatever you were half way through writing, and `noopener` is
+    // what stops the opened page from reaching back through window.opener.
+    if (tag === 'A' && /^https?:/i.test(el.getAttribute('href') || '')) {
+      el.setAttribute('target', '_blank')
+      el.setAttribute('rel', 'noopener noreferrer')
+    }
+
     if (UNWRAP_TAGS.indexOf(tag) >= 0 && !el.attributes.length) {
       el.replaceWith(...Array.from(el.childNodes))
     }
@@ -104,4 +114,38 @@ export function textToHtml(text: string): string {
     .filter(Boolean)
     .map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`)
     .join('')
+}
+
+/** Text with the four HTML-significant characters neutralised. */
+function escapeHtml(text: string): string {
+  return text.replace(/[&<>"]/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string))
+}
+
+/**
+ * A bare URL in plain text, turned into a real link.
+ *
+ * Only for text that is KNOWN to be plain - the input is escaped first, so running
+ * this over markup would linkify the insides of attributes. `sanitizeHtml` is the
+ * entry point for anything that might already be HTML.
+ */
+export function linkifyPlainText(text: string): string {
+  const escaped = escapeHtml(text)
+  return escaped.replace(
+    /\b(https?:\/\/[^\s<]+[^\s<.,;:!?)\]}'"])/gi,
+    url => `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`,
+  )
+}
+
+/**
+ * One stored note as safe HTML, whichever era it came from.
+ *
+ * Comments were plain text until links were added to them, so the store holds both
+ * shapes and there is no flag distinguishing them. A note that contains no tag at all
+ * is treated as plain text: escaped, linkified, and left to `white-space: pre-wrap`
+ * for its line breaks. Anything else goes through the allowlist.
+ */
+export function noteHtml(stored: string): string {
+  if (!stored) return ''
+  return /<[a-z][\s\S]*>/i.test(stored) ? sanitizeHtml(stored) : linkifyPlainText(stored)
 }

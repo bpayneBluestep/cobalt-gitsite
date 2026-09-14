@@ -2439,6 +2439,9 @@ select:hover:not(:focus) { border-color: var(--text-mute); }
   color: var(--text);
 }
 .rte__body:focus { outline: none; }
+
+/* The comment box: a couple of lines that grow, not a page-height canvas. */
+.rte__body--compact { min-height: 3.4rem; max-height: 14rem; }
 .rte__body:empty::before {
   content: attr(data-placeholder);
   color: var(--text-mute);
@@ -3857,6 +3860,16 @@ a.subcrumb:hover { color: var(--cobalt); }
   border-top: 1px solid var(--line);
 }
 .act__compose textarea { width: 100%; resize: vertical; }
+
+/* A posted note renders as real HTML now, so its links and lists need to look like
+   the description's do rather than inheriting the bare bubble. */
+.act__said a { color: var(--cobalt); }
+.act__said p { margin: 0 0 0.4rem; }
+.act__said p:last-child { margin-bottom: 0; }
+.act__said ul, .act__said ol { margin: 0.2rem 0 0.4rem 1.1rem; padding: 0; }
+/* pre-wrap is what gives a legacy plain-text note its line breaks; a note that is
+   real markup brings its own, and would otherwise gain a blank line per tag. */
+.act__said:has(p), .act__said:has(ul), .act__said:has(ol) { white-space: normal; }
 .act__composefoot {
   display: flex;
   align-items: center;

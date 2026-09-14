@@ -15,7 +15,7 @@ import {
   recordingSupported, startRecording, blobToBase64, formatClock, REC_MAX_MS,
   type Recording, type RecResult,
 } from '../lib/recorder'
-import { sanitizeHtml, htmlToText } from '../lib/html'
+import { sanitizeHtml, htmlToText, noteHtml } from '../lib/html'
 import { openInClaudeCode } from '../lib/claudeCode'
 import { parseDuration, elapsedSince, todayISO, whenLabel, whenExact } from '../lib/time'
 import RichTextEditor from '../components/RichTextEditor'
@@ -214,6 +214,9 @@ export default function TicketPage() {
 
   // Comment box, and whether the automated events are shown alongside them.
   const [comment, setComment] = useState('')
+  // A contentEditable is only reset when its docKey changes, so posting bumps this
+  // to empty the box. Without it the comment you just sent stays sitting in the field.
+  const [commentKey, setCommentKey] = useState(0)
   const [showEvents, setShowEvents] = useState(true)
 
   const load = useCallback(() => {
@@ -316,10 +319,17 @@ export default function TicketPage() {
   }
 
   function submitComment() {
-    if (!ticket || !comment.trim() || busy) return
-    const text = comment.trim()
+    if (!ticket || busy) return
+    // "Empty" is what the sanitiser says it is: a contentEditable left alone still
+    // holds a <br> or an empty <p>, and posting that would be a blank comment.
+    const text = sanitizeHtml(comment)
+    if (!text) return
     // Cleared on success only: a failed post must not eat what someone just wrote.
-    run('comment', addComment(on, text), () => { setComment(''); setNotice('Comment added.') })
+    run('comment', addComment(on, text), () => {
+      setComment('')
+      setCommentKey(k => k + 1)
+      setNotice('Comment added.')
+    })
   }
 
   function submitSubtask() {
@@ -1183,7 +1193,15 @@ export default function TicketPage() {
                           <span className="act__who">{a.who || 'Someone'}</span>
                           {a.type === 'event'
                             ? <span className="act__text"> {a.text}</span>
-                            : <span className="act__said">{a.text}</span>}
+                            : (
+                              /* Notes carry links now. Older ones are plain text and
+                                 have no flag saying so, which is what noteHtml sorts
+                                 out; both end up escaped and safe. */
+                              <span
+                                className="act__said"
+                                dangerouslySetInnerHTML={{ __html: noteHtml(a.text) }}
+                              />
+                            )}
                         </p>
                         <p className="act__meta">
                           <time dateTime={a.at} title={whenExact(a.at)}>{whenLabel(a.at)}</time>
@@ -1203,12 +1221,16 @@ export default function TicketPage() {
             })()}
 
             <div className="act__compose">
-              <textarea
+              {/* The same editor as the description, kept short. A note is where a link
+                  to the thing you are talking about belongs, and it used to arrive as
+                  unclickable text. Ctrl+K links the selection; Dan's #5967. */}
+              <RichTextEditor
                 value={comment}
-                rows={2}
+                docKey={`comment-${ticket.entryId}-${commentKey}`}
+                compact
+                onChange={setComment}
                 placeholder="Add a comment: what you found, what you are waiting on, what you decided."
-                aria-label="Add a comment"
-                onChange={e => setComment(e.target.value)}
+                ariaLabel="Add a comment"
                 onKeyDown={e => {
                   // Ctrl/Cmd+Enter posts. Plain Enter stays a newline: a comment is prose,
                   // and losing a half-written paragraph to a stray keystroke is worse than
@@ -1217,9 +1239,9 @@ export default function TicketPage() {
                 }}
               />
               <div className="act__composefoot">
-                <span className="muted">⌘/Ctrl + Enter</span>
+                <span className="muted">Ctrl + K to link · ⌘/Ctrl + Enter to post</span>
                 <button type="button" className="btn btn--sm"
-                  disabled={!!busy || !comment.trim()} onClick={submitComment}>
+                  disabled={!!busy || !sanitizeHtml(comment)} onClick={submitComment}>
                   {busy === 'comment' ? 'Posting…' : 'Comment'}
                 </button>
               </div>
