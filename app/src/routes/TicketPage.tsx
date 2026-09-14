@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { useSession } from '../session'
 import {
   ApiError, getTicket, updateTicket, deleteTicket, getCompany,
   logTime, editTime, deleteTime, startTimer, stopTimer,
   setRoadblock, uploadAttachment, deleteAttachment,
   setTicketPeople, addComponent, updateComponent, deleteComponent,
-  addSubtask, setParent, addComment, deleteComment,
+  addSubtask, setParent, addComment, editComment, deleteComment, nameKey,
   formatHours, formatMinutes, formatBytes, MAX_ATTACHMENT_BYTES, MAX_RECORDING_BYTES, ceilingFor,
   TICKET_STATUSES, TICKET_PRIORITIES, COMPONENT_KINDS, COMPONENT_CHANGES,
   sprintLabel,
@@ -167,6 +168,7 @@ export default function TicketPage() {
   const { key = '' } = useParams()
   const [state, setState] = useState<State>({ phase: 'loading' })
   const [draft, setDraft] = useState<Draft | null>(null)
+  const { session, can } = useSession()
   const [busy, setBusy] = useState('')
   const [failure, setFailure] = useState('')
   const [notice, setNotice] = useState('')
@@ -217,6 +219,9 @@ export default function TicketPage() {
   // A contentEditable is only reset when its docKey changes, so posting bumps this
   // to empty the box. Without it the comment you just sent stays sitting in the field.
   const [commentKey, setCommentKey] = useState(0)
+  /** The comment being rewritten, and its working copy. Only ever one at a time. */
+  const [editingId, setEditingId] = useState('')
+  const [editingText, setEditingText] = useState('')
   const [showEvents, setShowEvents] = useState(true)
 
   const load = useCallback(() => {
@@ -329,6 +334,36 @@ export default function TicketPage() {
       setComment('')
       setCommentKey(k => k + 1)
       setNotice('Comment added.')
+    })
+  }
+
+  /*
+   * Rewriting a note you already posted. Dan's #5963: he wanted to add context to a
+   * note and the only route was a second note underneath the first.
+   *
+   * Whose note it is has to be judged on the stored name, because an activity item
+   * carries no user id and never has - adding one now would leave every existing
+   * comment unattributable, and therefore uneditable by the person who wrote it.
+   * `nameKey` is what reconciles "Payne, Brandon" with "Brandon Payne".
+   */
+  const meKey = nameKey(session?.fullName || '')
+  const mayEditAnyComment = can('editStaff')
+  const mayEditComment = (a: ActivityItem) =>
+    a.type === 'comment' && (mayEditAnyComment || (!!meKey && nameKey(a.who) === meKey))
+
+  function startEditComment(a: ActivityItem) {
+    setEditingId(a.id)
+    setEditingText(a.text)
+    setFailure(''); setNotice('')
+  }
+
+  function saveEditComment() {
+    if (!ticket || !editingId || busy) return
+    const text = sanitizeHtml(editingText)
+    if (!text) { setFailure('A comment needs something in it. Use Remove to delete one.'); return }
+    const on = { listId: ticket.listId, entryId: ticket.entryId }
+    run('comment', editComment(on, editingId, text), () => {
+      setEditingId(''); setEditingText(''); setNotice('Comment updated.')
     })
   }
 
@@ -1193,18 +1228,63 @@ export default function TicketPage() {
                           <span className="act__who">{a.who || 'Someone'}</span>
                           {a.type === 'event'
                             ? <span className="act__text"> {a.text}</span>
-                            : (
-                              /* Notes carry links now. Older ones are plain text and
-                                 have no flag saying so, which is what noteHtml sorts
-                                 out; both end up escaped and safe. */
-                              <span
-                                className="act__said"
-                                dangerouslySetInnerHTML={{ __html: noteHtml(a.text) }}
-                              />
-                            )}
+                            : editingId === a.id
+                              ? null
+                              : (
+                                /* Notes carry links now. Older ones are plain text and
+                                   have no flag saying so, which is what noteHtml sorts
+                                   out; both end up escaped and safe. */
+                                <span
+                                  className="act__said"
+                                  dangerouslySetInnerHTML={{ __html: noteHtml(a.text) }}
+                                />
+                              )}
                         </p>
+
+                        {editingId === a.id && (
+                          <div className="act__edit">
+                            <RichTextEditor
+                              value={a.text}
+                              docKey={`edit-${a.id}`}
+                              compact
+                              onChange={setEditingText}
+                              ariaLabel="Edit this comment"
+                              onKeyDown={e => {
+                                if (e.key === 'Escape') { setEditingId(''); setEditingText('') }
+                                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                                  e.preventDefault(); saveEditComment()
+                                }
+                              }}
+                            />
+                            <div className="act__composefoot">
+                              <button type="button" className="linkbtn"
+                                onClick={() => { setEditingId(''); setEditingText('') }}>
+                                Cancel
+                              </button>
+                              <button type="button" className="btn btn--sm" disabled={!!busy}
+                                onClick={saveEditComment}>
+                                {busy === 'comment' ? 'Saving…' : 'Save'}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
                         <p className="act__meta">
                           <time dateTime={a.at} title={whenExact(a.at)}>{whenLabel(a.at)}</time>
+                          {/* Said plainly rather than hidden: a note that changed after
+                              people read it should say so, even though the earlier
+                              wording is not kept. */}
+                          {a.editedAt && (
+                            <span className="muted" title={`Edited ${whenExact(a.editedAt)}${a.editedBy ? ` by ${a.editedBy}` : ''}`}>
+                              edited {whenLabel(a.editedAt)}
+                            </span>
+                          )}
+                          {mayEditComment(a) && editingId !== a.id && (
+                            <button type="button" className="linkbtn" disabled={!!busy}
+                              onClick={() => startEditComment(a)}>
+                              Edit
+                            </button>
+                          )}
                           {a.type === 'comment' && (
                             <button type="button" className="linkbtn linkbtn--danger" disabled={!!busy}
                               onClick={() => run('comment', deleteComment(on, a.id),

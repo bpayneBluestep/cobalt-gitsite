@@ -3861,6 +3861,11 @@ a.subcrumb:hover { color: var(--cobalt); }
 }
 .act__compose textarea { width: 100%; resize: vertical; }
 
+/* The in-place comment editor sits where the note was, inset so the thread still
+   reads as a thread rather than growing a second composer. */
+.act__edit { margin: 0.3rem 0 0.2rem; }
+.act__edit .act__composefoot { justify-content: flex-start; }
+
 /* A posted note renders as real HTML now, so its links and lists need to look like
    the description's do rather than inheriting the bare bubble. */
 .act__said a { color: var(--cobalt); }

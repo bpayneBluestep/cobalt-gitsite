@@ -1047,6 +1047,16 @@ export const setParent = (on: On, parentId: string): Promise<Ticket> =>
 export const addComment = (on: On, text: string): Promise<Ticket> =>
   maestroPost('addComment', { ...on, text })
 
+/**
+ * Rewrite a comment you already posted.
+ *
+ * Yours only, unless you are Leadership; the endpoint decides and refuses with
+ * NOT_YOURS. The earlier wording is not kept: a note is a person talking, and the
+ * events beside it are the part that must stay unwritable.
+ */
+export const editComment = (on: On, commentId: string, text: string): Promise<Ticket> =>
+  maestroPost('editComment', { ...on, commentId, text })
+
 /** Comments only: the endpoint refuses an event with NOT_A_COMMENT. */
 export const deleteComment = (on: On, commentId: string): Promise<Ticket> =>
   maestroPost('deleteComment', { ...on, commentId })
@@ -1385,6 +1395,9 @@ export interface ActivityItem {
   text: string
   /** Present on deal comments only. Tickets have no notion of a contact kind. */
   kind?: string
+  /** Set once a comment has been rewritten. The earlier wording is not kept. */
+  editedAt?: string
+  editedBy?: string
 }
 
 /** One deal with its history: what a list view deliberately leaves out. */
