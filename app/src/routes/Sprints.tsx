@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import {
   ApiError, getSprint, getTeam, createSprint, assignSprint, carryForward,
   addEngineer, updateEngineer, deleteEngineer,
-  formatHours, shiftSprint, sprintLabel, isSprintKey, nameKey,
+  formatHours, remainingHoursOf, shiftSprint, sprintLabel, isSprintKey, nameKey,
   ENGINEER_DISCIPLINES, ENGINEER_READY_RULE, PRIORITY_RANK,
   type SprintBoard, type SprintColumn, type Team, type Ticket, type EngineerFieldKey,
   type User,
@@ -94,25 +94,28 @@ const money = (n: number): number => Math.round(n * 100) / 100
  * move and only agree again after a reload, which is worse than not moving at all.
  */
 function recomputed(board: SprintBoard): SprintBoard {
-  let totalEst = 0, totalLogged = 0, totalCapacity = 0, totalDone = 0, totalTickets = 0
+  let totalEst = 0, totalLogged = 0, totalRemaining = 0, totalCapacity = 0, totalDone = 0, totalTickets = 0
 
   const columns = board.columns.map(c => {
     const capacity = c.capacity || 0
     const estHours = money(c.tickets.reduce((a, t) => a + (t.estHours || 0), 0))
     const loggedHours = money(c.tickets.reduce((a, t) => a + (t.loggedHours || 0), 0))
+    // Capacity is spent by what is LEFT, not by the whole estimate: see remainingHoursOf.
+    const remainingHours = money(c.tickets.reduce((a, t) => a + (remainingHoursOf(t) || 0), 0))
     const done = c.tickets.filter(t => t.status === DONE).length
 
     totalEst += estHours
     totalLogged += loggedHours
+    totalRemaining += remainingHours
     totalCapacity += capacity
     totalDone += done
     totalTickets += c.tickets.length
 
     return {
-      ...c, estHours, loggedHours, done,
-      remaining: money(capacity - estHours),
-      over: estHours > capacity,
-      utilisation: capacity > 0 ? Math.round((estHours / capacity) * 100) : null,
+      ...c, estHours, loggedHours, remainingHours, done,
+      remaining: money(capacity - remainingHours),
+      over: remainingHours > capacity,
+      utilisation: capacity > 0 ? Math.round((remainingHours / capacity) * 100) : null,
     }
   })
 
@@ -125,9 +128,10 @@ function recomputed(board: SprintBoard): SprintBoard {
       capacity: money(totalCapacity),
       estHours: money(totalEst),
       loggedHours: money(totalLogged),
-      remaining: money(totalCapacity - totalEst),
-      over: totalEst > totalCapacity,
-      utilisation: totalCapacity > 0 ? Math.round((totalEst / totalCapacity) * 100) : null,
+      remainingHours: money(totalRemaining),
+      remaining: money(totalCapacity - totalRemaining),
+      over: totalRemaining > totalCapacity,
+      utilisation: totalCapacity > 0 ? Math.round((totalRemaining / totalCapacity) * 100) : null,
       done: totalDone,
       unassigned: board.unassigned.length,
     },
@@ -190,7 +194,8 @@ const SORT_COLUMNS: { key: SortKey; label: string; numeric?: boolean }[] = [
 /** What a row sorts by for a given column: a number where one is meaningful, else text. */
 function sortValue(t: Ticket, key: SortKey): number | string {
   if (key === 'num') return t.ticketNumber === null ? -1 : t.ticketNumber
-  if (key === 'est') return t.estHours === null ? -1 : t.estHours
+  // The Est column sorts by what is LEFT: that is the number deciding whether it fits.
+  if (key === 'est') { const left = remainingHoursOf(t); return left === null ? -1 : left }
   // Not alphabetical: Critical/High/Normal/Low is an order, and sorting it by name would
   // put Critical between Low and Normal. Unset ranks below Low rather than above it.
   if (key === 'priority') return PRIORITY_RANK[t.priority] || 0
@@ -210,6 +215,38 @@ interface Assignable {
   name: string
   /** The user id to write. Empty when no user has that name. */
   userId: string
+}
+
+/**
+ * A ticket's estimate and what is left of it, for a card: `4h est` alone when nothing is
+ * logged, `2h left · 4h est` once some is. The remaining figure leads because it is the one
+ * the column is spending capacity on.
+ */
+function EstLeft({ t }: { t: Ticket }) {
+  const left = remainingHoursOf(t)
+  if (left === null) return <span className="muted">no est</span>
+  if (left === t.estHours) return <span>{formatHours(t.estHours)} est</span>
+  return (
+    <span>
+      {formatHours(left)} left
+      <span className="muted"> · {formatHours(t.estHours)} est</span>
+    </span>
+  )
+}
+
+/**
+ * The Est cell in Ready to plan: the estimate, and under it what is left when time has
+ * already been logged. Planning the ticket charges the engineer the `left` figure.
+ */
+function EstCell({ t }: { t: Ticket }) {
+  const left = remainingHoursOf(t)
+  if (left === null || left === t.estHours) return <>{formatHours(t.estHours)}</>
+  return (
+    <span className="estcell" title={`${formatHours(t.estHours)} estimated, ${formatHours(t.loggedHours)} logged`}>
+      {formatHours(t.estHours)}
+      <span className="estcell__left">{formatHours(left)} left</span>
+    </span>
+  )
 }
 
 function CapacityBar({ est, capacity, over }: { est: number; capacity: number; over: boolean }) {
@@ -591,7 +628,7 @@ export default function Sprints() {
       else cmp = String(av).localeCompare(String(bv))
       // Ties fall back to the estimate, biggest first: within one client or one owner the
       // question is still which item is big enough to matter.
-      if (cmp === 0) return (b.estHours || 0) - (a.estHours || 0)
+      if (cmp === 0) return (remainingHoursOf(b) || 0) - (remainingHoursOf(a) || 0)
       return cmp * bSort.dir
     })
   }, [backlogRaw, bAcct, bList, bPriority, bSort])
@@ -904,8 +941,13 @@ export default function Sprints() {
           <div className="kpis">
             <div className="kpi">
               <p className="kpi__k">Committed</p>
-              <p className="kpi__v">{formatHours(board.totals.estHours)}</p>
-              <p className="kpi__n">{board.totals.tickets} ticket{board.totals.tickets === 1 ? '' : 's'}</p>
+              <p className="kpi__v">{formatHours(board.totals.remainingHours)}</p>
+              <p className="kpi__n">
+                {board.totals.tickets} ticket{board.totals.tickets === 1 ? '' : 's'}
+                {board.totals.estHours !== board.totals.remainingHours
+                  ? ` · ${formatHours(board.totals.estHours)} estimated`
+                  : ''}
+              </p>
             </div>
             <div className="kpi">
               <p className="kpi__k">Capacity</p>
@@ -962,8 +1004,8 @@ export default function Sprints() {
                   <span className="pipe__n">{board.unassigned.length}</span>
                 </header>
                 <p className="sprint__cap">
-                  {formatHours(board.unassigned.reduce((a, t) => a + (t.estHours || 0), 0))}
-                  <span className="muted"> committed, unclaimed</span>
+                  {formatHours(board.unassigned.reduce((a, t) => a + (remainingHoursOf(t) || 0), 0))}
+                  <span className="muted"> left, unclaimed</span>
                 </p>
                 <p className="sprint__role">Drag onto an engineer to claim</p>
 
@@ -986,8 +1028,8 @@ export default function Sprints() {
                       <Link className="rowlink__a" to={ticketPath(t)} {...NEW_TAB}>{t.title}</Link>
                     </p>
                     <p className="dcard__meta">
-                      <span className="pill" data-status={(t.status || 'Open').replace(/s+/g, '')}>{t.status}</span>
-                      <span>{formatHours(t.estHours)} est</span>
+                      <span className="pill" data-status={(t.status || 'Open').replace(/\s+/g, '')}>{t.status}</span>
+                      <EstLeft t={t} />
                     </p>
                     <p className="dcard__co">
                       <Link className="inlink" to={`/clients/${t.clientId || ''}/tickets`}>
@@ -1034,13 +1076,13 @@ export default function Sprints() {
                   <span className="pipe__n">{col.tickets.length}</span>
                 </header>
                 <p className="sprint__cap" data-over={col.over ? '' : undefined}>
-                  {formatHours(col.estHours)}
+                  {formatHours(col.remainingHours)}
                   <span className="muted"> of {formatHours(col.capacity)}</span>
                   {col.utilisation !== null && (
                     <span className="sprint__pct">{col.utilisation}%</span>
                   )}
                 </p>
-                <CapacityBar est={col.estHours} capacity={col.capacity} over={col.over} />
+                <CapacityBar est={col.remainingHours} capacity={col.capacity} over={col.over} />
                 {col.role && <p className="sprint__role">{col.role}</p>}
 
                 {col.tickets.length === 0 && (
@@ -1079,7 +1121,7 @@ export default function Sprints() {
                     )}
                     <p className="dcard__meta">
                       <span className="pill" data-status={(t.status || 'Open').replace(/\s+/g, '')}>{t.status}</span>
-                      <span>{formatHours(t.estHours)} est</span>
+                      <EstLeft t={t} />
                       {t.loggedHours ? <span className="muted">{formatHours(t.loggedHours)} logged</span> : null}
                     </p>
                     <p className="dcard__co">
@@ -1301,7 +1343,7 @@ export default function Sprints() {
                         <td className="num">
                           {t.estHours === null
                             ? <span className="muted">no est</span>
-                            : formatHours(t.estHours)}
+                            : <EstCell t={t} />}
                         </td>
                         <td>
                           <EngineerSelect

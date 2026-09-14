@@ -3271,6 +3271,10 @@ select:hover:not(:focus) { border-color: var(--text-mute); }
   color: var(--text);
 }
 .sprint__cap[data-over] { color: #ce4a5b; }
+/* Est cell in Ready to plan: the estimate, with what is left of it underneath once time
+   has been logged. Planning charges the engineer the smaller figure. */
+.estcell { display: inline-flex; flex-direction: column; align-items: flex-end; line-height: 1.2; }
+.estcell__left { font-size: 0.72rem; color: var(--text-mute); font-weight: 400; }
 .sprint__pct { margin-left: 0.4rem; font-size: 0.7rem; color: var(--text-mute); }
 .sprint__role {
   margin: 0.4rem 0 0.6rem;

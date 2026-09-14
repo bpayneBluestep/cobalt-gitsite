@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
-  ApiError, getMySprint, updateTicket, formatHours, sprintLabel, isSprintKey,
+  ApiError, getMySprint, updateTicket, formatHours, remainingHoursOf, sprintLabel, isSprintKey,
   PRIORITY_RANK,
   type MySprintBoard, type Ticket,
 } from '../api'
@@ -296,7 +296,14 @@ export default function MySprint() {
                   )}
                   <p className="dcard__meta">
                     {t.priority && <span className="pill" data-prio={t.priority}>{t.priority}</span>}
-                    <span>{t.estHours === null ? 'no est' : formatHours(t.estHours) + ' est'}</span>
+                    <span>
+                      {(() => {
+                        const left = remainingHoursOf(t)
+                        if (left === null) return 'no est'
+                        if (left === t.estHours) return formatHours(t.estHours) + ' est'
+                        return formatHours(left) + ' left · ' + formatHours(t.estHours) + ' est'
+                      })()}
+                    </span>
                     {t.loggedHours ? <span className="muted">{formatHours(t.loggedHours)} logged</span> : null}
                   </p>
                   <p className="dcard__co">

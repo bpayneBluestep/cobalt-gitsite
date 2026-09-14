@@ -1230,6 +1230,17 @@ export function formatMinutes(minutes: number): string {
   return `${h}h ${rest}m`
 }
 
+/**
+ * What a ticket still costs: estimate less logged, never below zero, null with no estimate.
+ *
+ * The server's `remainingHoursOf`, mirrored so the planner's optimistic arithmetic agrees
+ * with the board it will reload into. A 4h ticket with 2h logged is 2h of a sprint.
+ */
+export function remainingHoursOf(t: { estHours: number | null; loggedHours: number | null }): number | null {
+  if (t.estHours === null || t.estHours === undefined) return null
+  return Math.round(Math.max(0, t.estHours - (t.loggedHours || 0)) * 100) / 100
+}
+
 /** Hours as `3.5h`, or an em dash when there is no value at all. */
 export function formatHours(hours: number | null): string {
   if (hours === null || hours === undefined) return '-'
@@ -1724,6 +1735,8 @@ export interface MySprintTally {
   done: number
   estHours: number
   loggedHours: number
+  /** Estimate less logged, floored at zero: what the sprint still owes. */
+  remainingHours: number
 }
 
 export interface MySprintColumn {
@@ -2057,9 +2070,15 @@ export interface SprintColumn {
   tickets: Ticket[]
   estHours: number
   loggedHours: number
+  /**
+   * Estimate less logged across the column, floored per ticket. This, not `estHours`, is
+   * what capacity is spent against: `remaining`, `over` and `utilisation` derive from it.
+   */
+  remainingHours: number
+  /** Headroom: capacity minus remainingHours. Negative when over. */
   remaining: number
   over: boolean
-  /** Percent of capacity committed, or null when they have no capacity set. */
+  /** Percent of capacity committed (by remaining hours), or null when they have no capacity set. */
   utilisation: number | null
   done: number
 }
@@ -2096,7 +2115,7 @@ export interface SprintBoard {
   hiddenInSprint: number
   totals: {
     engineers: number; tickets: number; capacity: number; estHours: number
-    loggedHours: number; remaining: number; over: boolean
+    loggedHours: number; remainingHours: number; remaining: number; over: boolean
     utilisation: number | null; done: number; unassigned: number
   }
   statuses: string[]
