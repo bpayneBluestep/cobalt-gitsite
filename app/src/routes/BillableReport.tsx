@@ -52,6 +52,14 @@ const LOGIN_URL = '/shared/login/login.jsp?desturl=' +
 /** How far back the picker offers. Two years is further back than anyone re-bills. */
 const WEEKS_BACK = 104
 
+/** Blended hourly rate behind the Expected Revenue card. Deliberately a constant: finance
+ *  bills every client at the same rate today, and a per-client rate has nowhere to live yet. */
+const HOURLY_RATE = 175
+
+const money = new Intl.NumberFormat('en-US', {
+  style: 'currency', currency: 'USD', maximumFractionDigits: 0,
+})
+
 /**
  * The week this report opens on: the last WHOLE week, not the one in progress.
  *
@@ -508,6 +516,11 @@ export default function BillableReport() {
       {report && view && (
         <>
           <div className="kpis">
+            <div className="kpi" data-tone="good">
+              <p className="kpi__k">Expected revenue</p>
+              <p className="kpi__v">{money.format((view.billable / 60) * HOURLY_RATE)}</p>
+              <p className="kpi__n">{money.format(HOURLY_RATE)}/h × {hoursLabel(view.billable)} billable</p>
+            </div>
             <div className="kpi">
               <p className="kpi__k">Billable</p>
               <p className="kpi__v">{hoursLabel(view.billable)}</p>
