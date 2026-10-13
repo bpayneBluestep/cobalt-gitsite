@@ -176,8 +176,21 @@ function EstEditor({ initial, saving, onSave, onCancel }: {
   )
 }
 
+/*
+ * What the table is stacked by.
+ *
+ * `status` is the board's native shape: In Review on top, Open at the bottom, because
+ * the question is "what needs a person". `list` answers a different question - "where
+ * does each client stand" - and only exists on the all-lists board, where there is more
+ * than one list to stack by. In list mode the List column is redundant with the group
+ * header, so it gives way to a Status column: the information swaps places rather than
+ * being lost.
+ */
+export type GroupBy = 'status' | 'list'
+
 export default function TicketBoard({
   list, tickets, onChanged, onTicket, spansLists = false,
+  groupBy = 'status', onGroupBy, listNoun = 'List',
 }: {
   list: List
   tickets: Ticket[]
@@ -195,7 +208,15 @@ export default function TicketBoard({
    * Writes to an EXISTING ticket still work, because a ticket carries its own `listId`.
    */
   spansLists?: boolean
+  /** Stack by status (default) or by list. Only honoured when `spansLists`. */
+  groupBy?: GroupBy
+  /** Offered as a toggle when present and `spansLists`; the caller owns the choice. */
+  onGroupBy?: (g: GroupBy) => void
+  /** What a list is called on this board: "Client" on the client tab, "List" elsewhere. */
+  listNoun?: string
 }) {
+  // A single-list board has one list, so there is nothing to group by but status.
+  const byList = spansLists && groupBy === 'list'
   /*
    * Engineers, Client Success and Leadership work tickets. Sales and Accounting read them
    * Sales for context before a call, Accounting for the hours behind a bill, and must
@@ -412,15 +433,55 @@ export default function TicketBoard({
     [visible, visibleIds],
   )
 
-  // Group by status only when the tab holds more than one: beh's rule exactly.
-  const groups = useMemo(() => {
+  /*
+   * One group shape for both modes: `status` is set in status mode, `list` in list mode,
+   * and a lone unlabelled group when there is nothing to stack by.
+   */
+  type Group = {
+    key: string
+    status: string
+    list: { id: string; name: string; clientId: string } | null
+    rows: Ticket[]
+  }
+
+  /** Status order then priority, so a client's group reads top-down like the board does. */
+  const byStatusThenPriority = (a: Ticket, b: Ticket): number => {
+    const sa = TICKET_GROUP_ORDER.indexOf(a.status || 'Open')
+    const sb = TICKET_GROUP_ORDER.indexOf(b.status || 'Open')
+    if (sa !== sb) return sa - sb
+    return byPriority(a, b)
+  }
+
+  const groups = useMemo((): Group[] => {
+    if (byList) {
+      // Alphabetical by the name the group header shows, so a client is where you would
+      // look for it rather than wherever its list id happened to sort.
+      const seen: Record<string, Group> = {}
+      for (const t of rows) {
+        const id = t.listId || ''
+        if (!seen[id]) {
+          seen[id] = {
+            key: 'list:' + id, status: '',
+            list: { id, name: t.clientName || t.listName || '(no list)', clientId: t.clientId || '' },
+            rows: [],
+          }
+        }
+        seen[id].rows.push(t)
+      }
+      const out = Object.values(seen)
+      for (const g of out) g.rows.sort(byStatusThenPriority)
+      return out.sort((a, b) => a.list!.name.localeCompare(b.list!.name))
+    }
+    // Group by status only when the tab holds more than one: beh's rule exactly.
     const present = TICKET_GROUP_ORDER.filter(s => rows.some(t => (t.status || 'Open') === s))
-    if (present.length <= 1) return [{ status: '', rows: rows.slice().sort(byPriority) }]
+    if (present.length <= 1) {
+      return [{ key: '_all', status: '', list: null, rows: rows.slice().sort(byPriority) }]
+    }
     return present.map(status => ({
-      status,
+      key: 'status:' + status, status, list: null,
       rows: rows.filter(t => (t.status || 'Open') === status).sort(byPriority),
     }))
-  }, [rows])
+  }, [rows, byList])
 
   function openNew() {
     setCreating(true)
@@ -628,11 +689,20 @@ export default function TicketBoard({
         </th>
         {/* Whose backlog this is. A client list links to the record; an internal one has
             no record to link to, so it reads as plain text rather than a dead link. */}
-        {spansLists && (
+        {spansLists && !byList && (
           <td className="tickets__list" title={t.clientName || t.listName || ''}>
             {t.clientId
               ? <Link className="rowlink__a" to={`/clients/${t.clientId}/tickets`}>{t.clientName || t.listName}</Link>
               : <span className="muted">{t.listName || dash}</span>}
+          </td>
+        )}
+        {/* Grouped by list, the status is no longer the group header, so it becomes a
+            cell: the same pill the header used, in the slot the List column vacated. */}
+        {byList && (
+          <td className="tickets__status">
+            <span className="pill" data-status={(t.status || 'Open').replace(/\s+/g, '')}>
+              {t.status || 'Open'}
+            </span>
           </td>
         )}
         {/* No priority means NO PILL - an empty cell, not the word "Normal".
@@ -839,6 +909,24 @@ export default function TicketBoard({
         >
           Filters{activeFilters ? <span className="filter__n">{activeFilters}</span> : null}
         </button>
+        {/* Only where there is more than one list to stack by. A segmented pair rather
+            than a dropdown: two options, and the current one should read as a position. */}
+        {spansLists && onGroupBy && (
+          <div className="seg" role="group" aria-label="Group tickets by">
+            <span className="seg__label">Group</span>
+            {([['status', 'Status'], ['list', listNoun]] as [GroupBy, string][]).map(([k, label]) => (
+              <button
+                key={k}
+                type="button"
+                data-on={groupBy === k ? '' : undefined}
+                aria-pressed={groupBy === k}
+                onClick={() => onGroupBy(k)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {showFilters && (
@@ -1162,7 +1250,8 @@ export default function TicketBoard({
               <tr>
                 <th scope="col" className="tickets__num">#</th>
                 <th scope="col">Title</th>
-                {spansLists && <th scope="col">List</th>}
+                {spansLists && !byList && <th scope="col">{listNoun}</th>}
+                {byList && <th scope="col">Status</th>}
                 <th scope="col">Priority</th>
                 <th scope="col">Accountable</th>
                 <th scope="col">Responsible</th>
@@ -1173,15 +1262,22 @@ export default function TicketBoard({
             </thead>
             <tbody>
               {groups.map(g => (
-                <Fragment key={g.status || '_all'}>
-                  {g.status && (
+                <Fragment key={g.key}>
+                  {(g.status || g.list) && (
                     <tr className="grouprow">
-                      {/* #, Title, (List), Priority, Accountable, Responsible, Time,
-                          Due, Move. The List column only exists on the all-lists board,
-                          and a group row that spans the wrong count leaves a visible
-                          notch in the table. */}
+                      {/* #, Title, (List | Status), Priority, Accountable, Responsible,
+                          Time, Due, Move. The third column only exists on the all-lists
+                          board - List in status mode, Status in list mode - and a group
+                          row that spans the wrong count leaves a visible notch in the
+                          table. */}
                       <td colSpan={spansLists ? 9 : 8}>
-                        <span className="pill" data-status={g.status.replace(/\s+/g, '')}>{g.status}</span>
+                        {g.list ? (
+                          g.list.clientId
+                            ? <Link className="grouprow__list" to={`/clients/${g.list.clientId}/tickets`}>{g.list.name}</Link>
+                            : <span className="grouprow__list">{g.list.name}</span>
+                        ) : (
+                          <span className="pill" data-status={g.status.replace(/\s+/g, '')}>{g.status}</span>
+                        )}
                         <span className="grouprow__n">{g.rows.length}</span>
                       </td>
                     </tr>

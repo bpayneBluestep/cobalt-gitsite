@@ -1709,6 +1709,54 @@ select:hover:not(:focus) { border-color: var(--text-mute); }
   border-radius: var(--r);
 }
 .board2__search::placeholder { color: var(--text-mute); }
+
+/* Group-by toggle: two segments, the current one filled, so the mode reads as a
+   position. Same idiom as the user menu's density switch, sized for the tools row. */
+.seg {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  background: var(--bg-sunk);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  white-space: nowrap;
+}
+.seg__label {
+  padding: 0 0.45rem 0 0.4rem;
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  color: var(--text-mute);
+}
+.seg button {
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--text-dim);
+  background: none;
+  border: 0;
+  border-radius: calc(var(--r) - 1px);
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+}
+.seg button:hover { color: var(--text); }
+.seg button[data-on] { color: #fff; background: var(--cobalt); }
+.seg button:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 1px; }
+
+/* A list's name as a group header: the same weight as a status pill's slot, linked
+   to the record when there is one. */
+.grouprow__list {
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+}
+a.grouprow__list:hover { color: var(--cobalt); text-decoration: underline; }
+.tickets__status { white-space: nowrap; }
 .board2__search:focus { border-color: var(--cobalt); outline: none; }
 
 .board2__filters {

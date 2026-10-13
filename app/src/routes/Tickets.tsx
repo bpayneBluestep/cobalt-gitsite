@@ -4,7 +4,7 @@ import {
   ApiError, getLists, getTickets, formatHours,
   type List, type Ticket,
 } from '../api'
-import TicketBoard from '../components/TicketBoard'
+import TicketBoard, { type GroupBy } from '../components/TicketBoard'
 
 /*
  * Tickets: every board in one place, scoped by list.
@@ -77,6 +77,8 @@ export default function Tickets() {
   const rawScope = params.get('scope')
   const scope: ScopeKey = rawScope === 'dev' ? 'dev' : 'client'
   const selected = params.get('list') || ALL
+  // Status is the default and the absent value, so a plain /tickets link stays plain.
+  const groupBy: GroupBy = params.get('group') === 'list' ? 'list' : 'status'
   const [state, setState] = useState<State>({ phase: 'loading' })
 
   /*
@@ -197,6 +199,13 @@ export default function Tickets() {
     setParams(next, { replace: true })
   }
 
+  const pickGroup = (g: GroupBy) => {
+    const next = new URLSearchParams(params)
+    if (g === 'status') next.delete('group')
+    else next.set('group', g)
+    setParams(next, { replace: true })
+  }
+
   const patchTicket = useCallback((updated: Ticket) => {
     setState(s => (s.phase === 'ready'
       ? { ...s, tickets: s.tickets.map(t => (t.entryId === updated.entryId ? updated : t)) }
@@ -314,6 +323,9 @@ export default function Tickets() {
               onChanged={load}
               onTicket={patchTicket}
               spansLists={spansLists}
+              groupBy={groupBy}
+              onGroupBy={pickGroup}
+              listNoun={scope === 'client' ? 'Client' : 'List'}
             />
           )}
         </>
