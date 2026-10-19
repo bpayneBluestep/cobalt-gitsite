@@ -13,7 +13,7 @@ import {
   type Ticket, type TicketFieldKey, type TimeEntry, type ComponentRef, type ActivityItem,
 } from '../api'
 import {
-  recordingSupported, startRecording, blobToBase64, recordingExt, formatClock, REC_MAX_MS,
+  recordingSupported, startRecording, blobToBase64, recordingExt, recordingLooksValid, base64MatchesBlob, formatClock, REC_MAX_MS,
   type Recording, type RecResult,
 } from '../lib/recorder'
 import { sanitizeHtml, htmlToText, noteHtml } from '../lib/html'
@@ -549,12 +549,20 @@ export default function TicketPage() {
       )
     }
 
+    if (!(await recordingLooksValid(result.videoBlob, result.videoMime))) {
+      setRecWarn('That recording came out damaged, so it wasn’t attached. Please record it again.')
+      return
+    }
+
     const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ').replace(':', '.')
     const fileName = `screen-recording ${stamp}.${recordingExt(result.videoMime)}`
     const on = { listId: ticket.listId, entryId: ticket.entryId }
     setBusy('attach')
     try {
       const dataBase64 = await blobToBase64(result.videoBlob)
+      if (!(await base64MatchesBlob(dataBase64, result.videoBlob))) {
+        throw new Error('The recording could not be prepared for upload. Please record it again.')
+      }
       const fresh = await uploadAttachment(on, {
         fileName,
         mimeType: result.videoMime || 'video/webm',

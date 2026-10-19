@@ -231,21 +231,51 @@ export async function startRecording(
   return { stop, startedAt }
 }
 
-/** Base64 without the `data:…;base64,` prefix, what the endpoint expects. */
-export function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onerror = () => reject(new Error('That file could not be read.'))
-    reader.onload = () => {
-      // Cut at the `;base64,` marker, never the first comma: a recorder's mime carries
-      // its own comma (`video/webm;codecs=vp9,opus`), and cutting there sent
-      // `opus;base64,` as the start of the data, which shifted and corrupted every recording.
-      const result = String(reader.result || '')
-      const marker = result.indexOf(';base64,')
-      resolve(marker >= 0 ? result.slice(marker + 8) : result.slice(result.indexOf(',') + 1))
-    }
-    reader.readAsDataURL(blob)
-  })
+/**
+ * Base64 of a blob's bytes, what the endpoint expects.
+ *
+ * Encoded straight from the bytes rather than by trimming a `readAsDataURL` string.
+ * Trimming is what corrupted every screen recording: the recorder's mime carries its
+ * own comma (`video/webm;codecs=vp9,opus`), the old code cut at the first comma, and
+ * `opus;base64,` went up as the start of the file. No data URL, nothing to mis-cut.
+ */
+export async function blobToBase64(blob: Blob): Promise<string> {
+  let bytes: Uint8Array
+  try { bytes = new Uint8Array(await blob.arrayBuffer()) }
+  catch { throw new Error('That file could not be read.') }
+  // Chunked: String.fromCharCode(...all) overflows the argument limit on a big file.
+  let bin = ''
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    bin += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + 0x8000)))
+  }
+  return btoa(bin)
+}
+
+/**
+ * Whether a recording's first bytes are the container its mime claims: WebM starts with
+ * the EBML magic, MP4 has `ftyp` at offset 4. Checked before upload, so a broken
+ * recording is caught while the person can still record it again, not by the engineer
+ * who later finds it won't play. The Maestro checks the same thing as the backstop.
+ */
+export async function recordingLooksValid(blob: Blob, mime: string): Promise<boolean> {
+  const head = new Uint8Array(await blob.slice(0, 12).arrayBuffer())
+  const m = (mime || blob.type || '').toLowerCase()
+  if (m.startsWith('video/webm') || m.startsWith('audio/webm')) {
+    return head[0] === 0x1a && head[1] === 0x45 && head[2] === 0xdf && head[3] === 0xa3
+  }
+  if (m.startsWith('video/mp4')) {
+    return String.fromCharCode(head[4], head[5], head[6], head[7]) === 'ftyp'
+  }
+  return head.length > 0
+}
+
+/** Round-trip check on an encoding: the first bytes of the base64 decode back to the blob's. */
+export async function base64MatchesBlob(dataBase64: string, blob: Blob): Promise<boolean> {
+  const want = new Uint8Array(await blob.slice(0, 48).arrayBuffer())
+  const got = atob(dataBase64.slice(0, 64))
+  if (got.length < want.length) return false
+  for (let i = 0; i < want.length; i++) if (got.charCodeAt(i) !== want[i]) return false
+  return true
 }
 
 /** `9:05`, elapsed and remaining, on the recording chip. */

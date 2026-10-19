@@ -6,7 +6,7 @@ import {
   type IqAttachment, type IqMessage, type IqProposal, type List,
 } from '../api'
 import {
-  blobToBase64, recordingExt, formatClock, recordingSupported, startRecording,
+  blobToBase64, recordingExt, recordingLooksValid, formatClock, recordingSupported, startRecording,
   REC_MAX_MS, REC_DEFAULT_BUDGET, type Recording, type RecResult,
 } from '../lib/recorder'
 import { sanitizeHtml } from '../lib/html'
@@ -232,6 +232,12 @@ export default function Intake() {
         `${formatBytes(recBudget)} limit, so it hasn't been attached. Record a shorter ` +
         `stretch, or just tell me what it showed.`,
       )
+      setRecBusy('')
+      return
+    }
+
+    if (!(await recordingLooksValid(result.videoBlob, result.videoMime))) {
+      setRecWarn("That recording came out damaged, so it hasn't been attached. Record it again, or just tell me what it showed.")
       setRecBusy('')
       return
     }
