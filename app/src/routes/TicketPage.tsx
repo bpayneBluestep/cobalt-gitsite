@@ -13,7 +13,7 @@ import {
   type Ticket, type TicketFieldKey, type TimeEntry, type ComponentRef, type ActivityItem,
 } from '../api'
 import {
-  recordingSupported, startRecording, blobToBase64, formatClock, REC_MAX_MS,
+  recordingSupported, startRecording, blobToBase64, recordingExt, formatClock, REC_MAX_MS,
   type Recording, type RecResult,
 } from '../lib/recorder'
 import { sanitizeHtml, htmlToText, noteHtml } from '../lib/html'
@@ -96,20 +96,6 @@ function changedFields(draft: Draft, saved: Ticket): Partial<Record<TicketFieldK
     if (now !== was) out[key] = now
   }
   return out
-}
-
-/** Read a File as base64 without the data: prefix. */
-function toBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onerror = () => reject(new Error('That file could not be read.'))
-    reader.onload = () => {
-      const result = String(reader.result || '')
-      const comma = result.indexOf(',')
-      resolve(comma >= 0 ? result.slice(comma + 1) : result)
-    }
-    reader.readAsDataURL(file)
-  })
 }
 
 /*
@@ -465,7 +451,7 @@ export default function TicketPage() {
       return
     }
     setBusy('attach'); setFailure(''); setNotice('')
-    toBase64(file)
+    blobToBase64(file)
       .then(dataBase64 => uploadAttachment(on, {
         fileName: file.name,
         mimeType: file.type || 'application/octet-stream',
@@ -564,7 +550,7 @@ export default function TicketPage() {
     }
 
     const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ').replace(':', '.')
-    const fileName = `screen-recording ${stamp}.webm`
+    const fileName = `screen-recording ${stamp}.${recordingExt(result.videoMime)}`
     const on = { listId: ticket.listId, entryId: ticket.entryId }
     setBusy('attach')
     try {

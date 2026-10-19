@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { blobToBase64 } from '../lib/recorder'
 import {
   ApiError, getFiles, addFile, updateFile, deleteFile,
   createFolder, renameFolder, deleteFolder, formatBytes,
@@ -22,20 +23,6 @@ function splitPath(p: string): string[] { return (p || '').split('/').filter(Boo
 function parentPath(p: string): string { const s = splitPath(p); s.pop(); return s.join('/') }
 function lastSeg(p: string): string { const s = splitPath(p); return s.length ? s[s.length - 1] : '' }
 function joinPath(parent: string, name: string): string { return parent ? parent + '/' + name : name }
-
-/** Read a File as base64 without the data: prefix. */
-function toBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onerror = () => reject(new Error('That file could not be read.'))
-    reader.onload = () => {
-      const result = String(reader.result || '')
-      const comma = result.indexOf(',')
-      resolve(comma >= 0 ? result.slice(comma + 1) : result)
-    }
-    reader.readAsDataURL(file)
-  })
-}
 
 export default function FilesPanel({ companyId }: { companyId: string }) {
   const [data, setData] = useState<FileCabinet | null>(null)
@@ -124,7 +111,7 @@ export default function FilesPanel({ companyId }: { companyId: string }) {
       return
     }
     setBusy('upload'); setFailure(''); setNotice('')
-    toBase64(file)
+    blobToBase64(file)
       .then(dataBase64 => addFile(companyId, {
         filename: file.name,
         name: file.name,

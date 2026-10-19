@@ -6,7 +6,7 @@ import {
   type IqAttachment, type IqMessage, type IqProposal, type List,
 } from '../api'
 import {
-  blobToBase64, formatClock, recordingSupported, startRecording,
+  blobToBase64, recordingExt, formatClock, recordingSupported, startRecording,
   REC_MAX_MS, REC_DEFAULT_BUDGET, type Recording, type RecResult,
 } from '../lib/recorder'
 import { sanitizeHtml } from '../lib/html'
@@ -245,7 +245,7 @@ export default function Intake() {
 
     addAttachment({
       kind: 'video',
-      fileName: `screen-recording-${Date.now()}.webm`,
+      fileName: `screen-recording-${Date.now()}.${recordingExt(result.videoMime)}`,
       url: '',
       mime: result.videoMime,
       blob: result.videoBlob,

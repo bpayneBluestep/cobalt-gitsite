@@ -83,8 +83,15 @@ function pickMime(candidates: string[], fallback: string): string {
   return fallback
 }
 
+// MP4 (H.264 + AAC) first where the browser can record it, so a downloaded recording
+// opens in any desktop player; WebM is the fallback for browsers that can't.
 const videoMime = () => pickMime(
-  ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'], 'video/webm')
+  ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4;codecs=avc1,opus', 'video/mp4',
+   'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'], 'video/webm')
+
+/** The file extension that matches a recorder's mime. */
+export const recordingExt = (mime: string): string =>
+  (mime || '').toLowerCase().startsWith('video/mp4') ? 'mp4' : 'webm'
 
 const audioMime = () => pickMime(
   ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'], '')
@@ -230,9 +237,12 @@ export function blobToBase64(blob: Blob): Promise<string> {
     const reader = new FileReader()
     reader.onerror = () => reject(new Error('That file could not be read.'))
     reader.onload = () => {
+      // Cut at the `;base64,` marker, never the first comma: a recorder's mime carries
+      // its own comma (`video/webm;codecs=vp9,opus`), and cutting there sent
+      // `opus;base64,` as the start of the data, which shifted and corrupted every recording.
       const result = String(reader.result || '')
-      const comma = result.indexOf(',')
-      resolve(comma >= 0 ? result.slice(comma + 1) : result)
+      const marker = result.indexOf(';base64,')
+      resolve(marker >= 0 ? result.slice(marker + 8) : result.slice(result.indexOf(',') + 1))
     }
     reader.readAsDataURL(blob)
   })
