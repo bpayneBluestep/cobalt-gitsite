@@ -2644,6 +2644,18 @@ a.grouprow__list:hover { color: var(--cobalt); text-decoration: underline; }
 .att:first-child { border-top: none; }
 .att__name { font-size: 0.84rem; color: var(--cobalt); word-break: break-all; }
 .att__meta { flex: 1 1 auto; font-size: 0.72rem; color: var(--text-mute); }
+.att__player {
+  flex: 1 1 100%;
+  display: block;
+  width: 100%;
+  max-height: 70vh;
+  margin-top: 0.3rem;
+  border-radius: 6px;
+  background: #000;
+}
+audio.att__player { background: none; max-height: none; }
+img.att__player { width: auto; max-width: 100%; background: none; }
+.att__player--fail { background: none; font-size: 0.78rem; color: var(--text-mute); }
 
 /* ===========================================================================
    Under construction: the placeholder for a section that is not built yet

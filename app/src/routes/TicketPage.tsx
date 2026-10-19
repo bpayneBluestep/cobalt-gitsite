@@ -21,6 +21,7 @@ import { openInClaudeCode } from '../lib/claudeCode'
 import { parseDuration, elapsedSince, todayISO, whenLabel, whenExact } from '../lib/time'
 import RichTextEditor from '../components/RichTextEditor'
 import UserPicker from '../components/UserPicker'
+import { previewKind, PreviewToggle, PreviewPane } from '../components/AttachmentPreview'
 
 /*
  * One ticket, as a page of its own at /tickets/<number>.
@@ -181,6 +182,8 @@ export default function TicketPage() {
   const [recElapsed, setRecElapsed] = useState(0)
   const [recBytes, setRecBytes] = useState(0)
   const [recWarn, setRecWarn] = useState('')
+  // The attachment whose inline player is open: one at a time, so two recordings never talk over each other.
+  const [playing, setPlaying] = useState('')
   /** True while a file is over the drop box, so it can say it will take it. */
   const [dropOver, setDropOver] = useState(false)
   // Leaving the page mid-recording must not leave the screen shared and the clip in limbo.
@@ -1009,18 +1012,24 @@ export default function TicketPage() {
               <p className="muted tsec__empty">Nothing attached yet.</p>
             ) : (
               <ul className="atts">
-                {ticket.attachments.map(a => (
+                {ticket.attachments.map(a => {
+                  const kind = previewKind(a)
+                  const open = playing === a.id
+                  return (
                   <li key={a.id} className="att">
                     <a className="att__name" href={a.url} target="_blank" rel="noopener noreferrer">{a.name}</a>
                     <span className="att__meta">
                       {formatBytes(a.size)}{a.by ? ` · ${a.by}` : ''}{a.at ? ` · ${a.at}` : ''}
                     </span>
+                    <PreviewToggle kind={kind} open={open} onToggle={() => setPlaying(open ? '' : a.id)} />
                     <button type="button" className="linkbtn linkbtn--danger" disabled={!!busy}
                       onClick={() => run('attach', deleteAttachment(on, a.id), () => setNotice(`Removed ${a.name}.`))}>
                       Remove
                     </button>
+                    {open && <PreviewPane a={a} kind={kind} />}
                   </li>
-                ))}
+                  )
+                })}
               </ul>
             )}
           </section>
