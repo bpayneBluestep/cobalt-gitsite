@@ -101,6 +101,7 @@ export default function CompanyAgreements() {
   const [notice, setNotice] = useState('')
   const [showNew, setShowNew] = useState(false)
   const [picks, setPicks] = useState<PickOpt[]>([])
+  const [delTarget, setDelTarget] = useState<EnvelopeListRow | null>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
 
   const canEdit = can('editAgreements')
@@ -234,6 +235,9 @@ export default function CompanyAgreements() {
                 {canEdit && r.status !== 'Completed' && r.status !== 'Voided' && (
                   <button type="button" className="btn btn--ghost btn--sm" onClick={() => doVoid(r.entryId)}>Void</button>
                 )}
+                {canEdit && (r.status === 'Completed' || r.status === 'Voided') && (
+                  <button type="button" className="btn btn--ghost btn--sm env-del-btn" onClick={() => setDelTarget(r)}>Delete</button>
+                )}
               </div>
             </div>
           ))}
@@ -247,11 +251,94 @@ export default function CompanyAgreements() {
           notify={setNotice}
         />
       )}
+      {delTarget && (
+        <DeleteEnvelopeModal
+          company={company} row={delTarget}
+          onClose={() => setDelTarget(null)}
+          onDeleted={title => { setDelTarget(null); load(true); setNotice(`Deleted “${title}”.`) }}
+        />
+      )}
     </div>
   )
 }
 
 /* ---- new envelope: pick templates (packet) or start blank ---- */
+/*
+ * Permanent delete for Completed / Voided envelopes (test data, junk). The server
+ * action has always existed; it hard-deletes the agreement entry and the envelope's
+ * source files. Nothing is recoverable from the app, so the dialog makes the user
+ * type DELETE before the button arms.
+ */
+function DeleteEnvelopeModal({
+  company, row, onClose, onDeleted,
+}: {
+  company: Company
+  row: EnvelopeListRow
+  onClose: () => void
+  onDeleted: (title: string) => void
+}) {
+  const [typed, setTyped] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const armed = typed.trim().toUpperCase() === 'DELETE' && !busy
+  const completed = row.status === 'Completed'
+  const signers = (row.recipients || []).filter(x => x.status === 'signed').length
+
+  async function go() {
+    if (!armed) return
+    setBusy(true); setErr('')
+    try {
+      await deleteEnvelope(company.id, row.entryId)
+      onDeleted(row.title)
+    } catch (e) {
+      setErr('Delete failed: ' + errMsg(e))
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="agr-modal-back" onMouseDown={e => { if (e.target === e.currentTarget && !busy) onClose() }}>
+      <div className="agr-modal env-del" role="alertdialog" aria-modal="true" aria-labelledby="env-del-h">
+        <div className="env-del-banner">
+          <span className="env-del-icon" aria-hidden="true">!</span>
+          <div>
+            <b id="env-del-h">Permanently delete this agreement?</b>
+            <p>This cannot be undone. There is no trash and no restore.</p>
+          </div>
+        </div>
+        <div className="env-del-what">
+          <div><b>{row.title}</b> <StatusPill status={row.status} /></div>
+          <div className="agr-meta">
+            {company.name} · {row.docCount} document{row.docCount === 1 ? '' : 's'} · created {fmtDate(row.createdAt)}
+            {row.completedAt ? ' · completed ' + fmtDate(row.completedAt) : ''}
+          </div>
+        </div>
+        <ul className="env-del-list">
+          {completed && (
+            <li><b>This is a fully signed agreement{signers ? ` (${signers} signature${signers === 1 ? '' : 's'})` : ''}.</b> If it is a real contract, stop here. Deleting destroys the only copy Cobalt holds.</li>
+          )}
+          <li>The signed PDFs, certificate, uploaded source documents and the full audit trail are erased.</li>
+          <li>Any signing links already sent stop working.</li>
+          <li>Download anything you need to keep before you continue.</li>
+        </ul>
+        <label className="env-del-confirm">
+          Type <b>DELETE</b> to confirm
+          <input autoFocus value={typed} disabled={busy}
+            onChange={e => setTyped(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') go(); if (e.key === 'Escape' && !busy) onClose() }} />
+        </label>
+        {err && <p className="env-del-err" role="alert">{err}</p>}
+        <div className="agr-modal-foot">
+          <button type="button" className="btn btn--ghost" disabled={busy} onClick={onClose}>Cancel</button>
+          <button type="button" className="btn btn--danger" disabled={!armed} onClick={go}>
+            {busy ? 'Deleting…' : 'Delete forever'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function NewEnvelopeModal({
   company, picks, onClose, onCreated, notify,
 }: {

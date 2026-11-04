@@ -246,3 +246,33 @@
 .dsg-props-head .dsg-side-h { margin: 0 }
 
 @media (max-width: 900px) { .dsg-layout { grid-template-columns: 1fr } .dsg-side { position: static } }
+
+/* ---- permanent delete (Completed / Voided) ---- */
+.agr .env-del-btn { color: var(--danger) }
+.agr .env-del-btn:hover { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent) }
+.agr-modal.env-del { width: min(520px, 94vw); border: 2px solid var(--danger); padding: 0; overflow: hidden }
+.env-del-banner {
+  display: flex; gap: 14px; align-items: center;
+  background: var(--danger); color: #fff; padding: 16px 20px;
+}
+.env-del-banner b { font-size: var(--t-subtitle1, 18px); display: block }
+.env-del-banner p { margin: 3px 0 0; font-size: var(--t-body1, 14px); opacity: .95 }
+.env-del-icon {
+  flex: none; width: 40px; height: 40px; border-radius: 50%;
+  background: #fff; color: var(--danger); font-weight: 800; font-size: 24px;
+  display: flex; align-items: center; justify-content: center;
+}
+.env-del-what { margin: 16px 20px 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r-md, 6px); background: var(--bg-subtle, transparent) }
+.env-del-what .agr-meta { margin-top: 4px }
+.env-del-list { margin: 14px 20px 0; padding-left: 20px; display: grid; gap: 6px; font-size: var(--t-body1, 14px) }
+.env-del-list b { color: var(--danger) }
+.env-del-confirm { display: grid; gap: 6px; margin: 16px 20px 0; font-size: var(--t-body1, 14px) }
+.env-del-confirm input {
+  font: inherit; padding: 8px 10px; border-radius: var(--r-md, 6px);
+  border: 1px solid var(--line); background: var(--bg-panel); color: var(--text);
+  letter-spacing: .08em;
+}
+.env-del-confirm input:focus { outline: 2px solid var(--danger); outline-offset: 1px; border-color: var(--danger) }
+.env-del-err { margin: 10px 20px 0; color: var(--danger); font-size: var(--t-caption1) }
+.env-del .agr-modal-foot { padding: 0 20px 18px }
+.btn--danger:disabled { opacity: .45; cursor: not-allowed }
