@@ -976,7 +976,10 @@ function RecipientRow({
           <button type="button" className="btn btn--ghost btn--sm" onClick={onResend}>Resend</button>
         )}
         {canEdit && inflight && r.status === 'pending' && turn && r.kind === 'consultant' && (
-          <button type="button" className="btn btn--sm" onClick={onSignNow}>Sign now</button>
+          <>
+            <button type="button" className="btn btn--ghost btn--sm" onClick={onResend} title="Email them a link to sign in Cobalt">Resend</button>
+            <button type="button" className="btn btn--sm" onClick={onSignNow}>Sign now</button>
+          </>
         )}
         {canEdit && inflight && r.status === 'pending' && turn && r.kind === 'inperson' && (
           <button type="button" className="btn btn--sm" onClick={onHandOff}>Hand off to sign</button>
