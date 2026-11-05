@@ -52,4 +52,16 @@ export const REPORTS: ReportCard[] = [
       'which is why entries can be flipped here.',
     needs: 'viewReports',
   },
+  {
+    key: 'agreements',
+    path: '/reports/agreements',
+    name: 'Agreements',
+    description:
+      'Every agreement sent for signature, in one place: what is still out, who it is ' +
+      'waiting on and for how long, and what has been signed, declined or voided.',
+    source:
+      'The e-signature envelopes on every company record, read live each time the ' +
+      'report opens. Test and demo envelopes are hidden unless you ask for them.',
+    needs: 'viewAgreements',
+  },
 ]

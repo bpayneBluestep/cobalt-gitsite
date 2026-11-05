@@ -30,6 +30,7 @@ import Settings from './routes/Settings'
 import Reports from './routes/Reports'
 import TimeReport from './routes/TimeReport'
 import BillableReport from './routes/BillableReport'
+import AgreementsReport from './routes/AgreementsReport'
 import TicketPage from './routes/TicketPage'
 import Intake from './routes/Intake'
 import CompanyAgreements from './routes/CompanyAgreements'
@@ -246,6 +247,8 @@ function Shell() {
               element={<Guarded needs="viewReports" what="The time report"><TimeReport /></Guarded>} />
             <Route path="/reports/billable"
               element={<Guarded needs="viewReports" what="The billable time report"><BillableReport /></Guarded>} />
+            <Route path="/reports/agreements"
+              element={<Guarded needs="viewAgreements" what="The agreements report"><AgreementsReport /></Guarded>} />
 
             <Route path="/settings" element={<Guarded needs="viewSettings" what="Settings"><Settings /></Guarded>} />
             {/* A person gets a page of their own, the same as a company. Same gate as the

@@ -276,3 +276,24 @@
 .env-del-err { margin: 10px 20px 0; color: var(--danger); font-size: var(--t-caption1) }
 .env-del .agr-modal-foot { padding: 0 20px 18px }
 .btn--danger:disabled { opacity: .45; cursor: not-allowed }
+
+/* ── Reports > Agreements ──────────────────────────────────────────────────── */
+.agrep__filters { align-items: center; }
+.agrep__n { opacity: 0.7; font-weight: 500; margin-left: 2px; }
+.agrep__search input { min-width: 15rem; }
+.agrep__toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--text-dim); cursor: pointer; }
+.agrep td { vertical-align: top; }
+.agrep__sub { font-size: 0.72rem; margin-top: 2px; }
+.agrep__sub:empty { display: none; }
+.agrep__age { font-weight: 600; }
+.agrep__age[data-tone="warn"] { color: var(--warn); }
+.agrep__age[data-tone="bad"] { color: #ce4a5b; }
+.agrep__who { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.agrep__signers { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.agrep__count { font-size: 0.72rem; color: var(--text-mute); margin-right: 2px; white-space: nowrap; }
+.agrep__links { white-space: nowrap; }
+.agrep__foot { margin-top: var(--s-m); font-size: 0.75rem; }
+@media (max-width: 640px) {
+  .agrep__search input { min-width: 0; width: 100%; }
+  .agrep__filters .seg { flex-wrap: wrap; white-space: normal; }
+}

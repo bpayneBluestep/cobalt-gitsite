@@ -74,6 +74,34 @@ export interface VerifyResult {
   documentHash: { stored: string; match: boolean | null } | null
 }
 
+// ---------------------------------------------------------------- report
+
+export interface AgreementsReportRecipient {
+  name: string; email?: string; role?: string; kind: string; routingOrder: number
+  status: string; notifiedAt?: string; viewedAt?: string; signedAt?: string
+  declinedAt?: string; declineReason?: string
+}
+
+export interface AgreementsReportRow {
+  entryId: string; companyId: string; companyName: string
+  title: string; status: string; legacy: boolean
+  createdAt: string; createdBy: string; senderName: string
+  sentAt: string; completedAt: string; voidReason: string
+  expiresAt: string; lastReminderAt: string; routing: string
+  dealId: string; signedPdf: string; docCount: number; lastActivityAt: string
+  recipients: AgreementsReportRecipient[]
+  /** Who the envelope is blocked on right now (sequential: the active routing order only). */
+  waitingOn: AgreementsReportRecipient[]
+  error?: string
+}
+
+export interface AgreementsReport {
+  generatedAt: string; companies: number; total: number; rows: AgreementsReportRow[]
+}
+
+/** Every envelope on every company, for Reports > Agreements. */
+export const getAgreementsReport = (): Promise<AgreementsReport> => maestroGet('agreementsReport')
+
 // ---------------------------------------------------------------- envelopes
 
 export const listEnvelopes = (companyId: string): Promise<EnvelopeListRow[]> =>
