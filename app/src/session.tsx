@@ -114,6 +114,34 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setState(s => (s.signedOut ? s : { ...INITIAL, loading: false, signedOut: true }))
   }), [])
 
+  /*
+   * Keep the session alive while Cobalt is open, the way every classic BlueStep page does.
+   *
+   * The platform session is a 60-minute IDLE timeout (Bluestep-Systems/web,
+   * application.yml `server.servlet.session.timeout: 60m`). Classic pages survive all day
+   * because common_js.jsp loops `fetch("/keep-alive")` at 90% of that interval for as long
+   * as the tab is open. This SPA talks to the server only when you click, so a tab left
+   * alone for an hour came back signed out. Same endpoint, same behaviour, here.
+   *
+   * Every 15 minutes rather than at 54: a background tab's timers get throttled and
+   * delayed, and missing one ping by a few minutes must not cost the session. Also pinged
+   * the moment the tab becomes visible again, which covers a long-throttled tab as long as
+   * the hour has not already run out (a laptop asleep for more than an hour still ends it).
+   * Only while signed in: a ping on a dead session would just mint an anonymous one.
+   */
+  const signedIn = !!state.session && !state.signedOut
+  useEffect(() => {
+    if (!signedIn) return
+    const ping = () => { fetch('/keep-alive', { credentials: 'same-origin', cache: 'no-store' }).catch(() => {}) }
+    const timer = window.setInterval(ping, 15 * 60 * 1000)
+    const onVisible = () => { if (document.visibilityState === 'visible') ping() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [signedIn])
+
   return <Ctx.Provider value={{ ...state, reload, signOut }}>{children}</Ctx.Provider>
 }
 
