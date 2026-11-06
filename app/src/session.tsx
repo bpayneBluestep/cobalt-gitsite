@@ -16,7 +16,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import {
-  ApiError, getSession, getSessionRefusal, logout, onSessionLost,
+  ApiError, detectRefusal, getSession, logout, onSessionLost,
   type Capability, type Session, type SessionRefusal,
 } from './api'
 
@@ -34,7 +34,8 @@ interface SessionState {
    * Set when the platform's access gate refuses a session that IS signed in: most often a
    * password someone else set, which must be changed before anything works. Takes the
    * place of `signedOut` (which stays false), because the answer is "put this right", not
-   * "sign in". Asked of `/gql` only once Cobalt already believes it is signed out.
+   * "sign in". Asked (`detectRefusal`: `/gql`, else the profile page) only once Cobalt already
+   * believes it is signed out.
    */
   refusal: SessionRefusal | null
   /**
@@ -95,7 +96,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
    * land on the matching gate. Only reached on the signed-out path.
    */
   const settleSignedOut = useCallback(async (isCurrent: () => boolean) => {
-    const refusal = await getSessionRefusal()
+    const refusal = await detectRefusal()
     if (!isCurrent()) return
     setState({ ...INITIAL, loading: false, signedOut: !refusal, refusal })
   }, [])
@@ -154,7 +155,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setState(s => (s.signedOut || s.refusal ? s : { ...INITIAL, loading: false, signedOut: true }))
       if (checking) return
       checking = true
-      void getSessionRefusal().then(refusal => {
+      void detectRefusal().then(refusal => {
         checking = false
         if (refusal) setState(s => (s.signedOut ? { ...INITIAL, loading: false, refusal } : s))
       })

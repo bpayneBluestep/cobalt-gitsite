@@ -341,10 +341,20 @@ export async function login(username: string, password: string): Promise<LoginRe
 
   // Before "no access": a refused session also looks signed out to the Maestro, and its
   // answer is the opposite one (set a new password), not "ask an admin for access".
-  const refusal = (await getSessionRefusal()) || refusalFromLoginResponse(res, html)
+  const probe = await probeSessionRefusal()
+  let refusal = probe.refusal || refusalFromLoginResponse(res, html)
+  let signedInSomewhere = looksSignedIn(html)
+  if (!refusal && !probe.supported) {
+    // No `sessionRefusal` on this pod, and login.jsp's response is no help: on a GitSite
+    // host it redirects to the site root, which is Cobalt's own index.html. Ask the
+    // platform's profile page instead (see `refusalFromProfilePage`).
+    const page = await refusalFromProfilePage()
+    refusal = page.refusal
+    signedInSomewhere = signedInSomewhere || page.signedIn
+  }
   if (refusal) return { ok: false, reason: 'refused', refusal }
 
-  if (looksSignedIn(html)) {
+  if (signedInSomewhere) {
     return {
       ok: false,
       reason: 'noAccess',
@@ -352,7 +362,9 @@ export async function login(username: string, password: string): Promise<LoginRe
         'Your username and password were accepted. You are signed in to BlueStep. But ' +
         'this account has no access to the endpoint Cobalt reads its data from, so there ' +
         'is nothing to show you. An administrator needs to grant this account access to ' +
-        'the Cobalt Maestro endpoint; signing in again will not help.',
+        'the Cobalt Maestro endpoint; signing in again will not help. (If an administrator ' +
+        'just set your password, open My Account at /shared/user/myprofile.jsp to choose ' +
+        'your own.)',
     }
   }
 
@@ -490,6 +502,12 @@ export interface SessionRefusal {
   message: string
   /** For CREDENTIAL only: the platform page that puts it right, a path on this host. */
   fixUrl: string | null
+  /**
+   * Read off the profile page rather than `/gql` (a pod without `sessionRefusal`). Its
+   * fixUrl is myprofile.jsp, which serves the Online Profile edit form to a refused
+   * tenant user, so the in-place save still works from it.
+   */
+  fromProfilePage?: boolean
 }
 
 const GQL_URL = '/gql'
@@ -584,7 +602,70 @@ function refusalFromLoginResponse(res: Response, html: string): SessionRefusal |
 export function canChangePasswordInApp(refusal: SessionRefusal): boolean {
   return refusal.reason === 'PASSWORD_CHANGE_REQUIRED'
     && !!refusal.fixUrl
-    && /\/shared\/user\/editprofile\.jsp/.test(refusal.fixUrl)
+    && (/\/shared\/user\/editprofile\.jsp/.test(refusal.fixUrl) || refusal.fromProfilePage === true)
+}
+
+const PROFILE_URL = '/shared/user/myprofile.jsp'
+const EMAIL_REQUIRED_TEXT = /required to confirm your e-?mail/i
+
+/**
+ * Read a refusal off the platform's own profile page, for a pod without `sessionRefusal`.
+ *
+ * `myprofile.jsp` is a credential page, so a refused session is still signed in there.
+ * The page's own access check (`AppInfo.checkApp` → `credentialRefusal`) then forwards a
+ * user whose password must change to their Online Profile edit form, server-side, with
+ * "You are required to change your password." on it. So the text, and the form itself, come
+ * back from this one GET. A signed-out caller is bounced to login.jsp; an unflagged one
+ * gets the profile page, signed in.
+ *
+ * Found on Dan Scott's account, 2026-11-06: Cobalt's pod has the gate but not the
+ * `/gql` field, so this was the only signal that he was refused rather than rejected.
+ */
+async function refusalFromProfilePage(): Promise<{ refusal: SessionRefusal | null; signedIn: boolean }> {
+  try {
+    const res = await fetch(PROFILE_URL, { credentials: 'include', cache: 'no-store' })
+    if (bouncedToLoginPage(res) || !res.ok) return { refusal: null, signedIn: false }
+    const html = await res.text()
+    if (PASSWORD_REQUIRED_TEXT.test(html)) {
+      const onEdit = res.redirected && /\/shared\/user\/editprofile\.jsp/.test(res.url)
+      const fixUrl = onEdit ? new URL(res.url).pathname + new URL(res.url).search : PROFILE_URL
+      return {
+        signedIn: true,
+        refusal: {
+          kind: 'CREDENTIAL',
+          reason: 'PASSWORD_CHANGE_REQUIRED',
+          message: 'You are required to change your password.',
+          fixUrl,
+          fromProfilePage: true,
+        },
+      }
+    }
+    if (EMAIL_REQUIRED_TEXT.test(html)) {
+      return {
+        signedIn: true,
+        refusal: {
+          kind: 'CREDENTIAL',
+          reason: 'EMAIL_CONFIRMATION_REQUIRED',
+          message: 'You are required to confirm your email address.',
+          fixUrl: '/shared/login/confirmemail.jsp',
+        },
+      }
+    }
+    return { refusal: null, signedIn: looksSignedIn(html) }
+  } catch {
+    return { refusal: null, signedIn: false }
+  }
+}
+
+/**
+ * Why this session is refused, by whichever means this pod supports: `/gql`
+ * `sessionRefusal` where it exists, else the profile page. What the session provider asks
+ * once it believes it is signed out.
+ */
+export async function detectRefusal(): Promise<SessionRefusal | null> {
+  const probe = await probeSessionRefusal()
+  if (probe.supported) return probe.refusal
+  return (await refusalFromProfilePage()).refusal
 }
 
 /**
@@ -746,14 +827,16 @@ export async function changeExpiredPassword(fixUrl: string, password: string): P
     const probe = await probeSessionRefusal()
 
     if (!probe.supported) {
-      // No `sessionRefusal` on this pod: judge by the page. The commit lands on
-      // myprofile.jsp; a refusal re-renders the form with the platform's error.
+      // No `sessionRefusal` on this pod: ask the profile page again. Still refused means
+      // the save did not take; the re-rendered form says why.
+      const again = await refusalFromProfilePage()
+      if (!again.refusal || again.refusal.reason !== 'PASSWORD_CHANGE_REQUIRED') {
+        if (again.signedIn || again.refusal) return { ok: true }
+        return { ok: false, reason: 'sessionLost' }
+      }
       const error = platformFormErrors(savedDoc, savedHtml)
       if (error) return { ok: false, reason: 'invalid', error }
-      if (PASSWORD_REQUIRED_TEXT.test(savedHtml)) {
-        return unsupported('The platform did not accept the new password, and did not say why.')
-      }
-      return { ok: true }
+      return unsupported('The platform did not accept the new password, and did not say why.')
     }
 
     // The authority: is the session still refused?

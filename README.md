@@ -173,10 +173,13 @@ A happy-path sign-in makes no `/gql` call.
 
 `sessionRefusal` reached pods unevenly. On 2026-11-06 config and directory answered it, but
 Cobalt's own pod returned "Field 'sessionRefusal' … is undefined". Where it is missing, the
-sign-in path reads the refusal off login.jsp's response instead (a redirect to
-editprofile.jsp, or "You are required to change your password." in the page). The save is
-then judged by the page it returns. Arrival and mid-session detection need the field, so
-on such a pod they show the sign-in form, and signing in catches the refusal.
+refusal is read off the platform's profile page instead (`detectRefusal` →
+`refusalFromProfilePage`). `/shared/user/myprofile.jsp` is a credential page, so a refused
+session is still signed in there, and the platform forwards a flagged user to their Online
+Profile edit form with "You are required to change your password." That one GET gives both
+the signal and the form the save posts back. login.jsp's own response is no help: on a
+GitSite host it redirects to the site root, which is Cobalt's index.html. That's why Dan
+Scott's flagged sign-in on 2026-11-06 read as "did not match".
 
 ## Agreements (e-signature)
 
