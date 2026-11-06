@@ -13,6 +13,7 @@ import Resources from './routes/Resources'
 import ArtifactPage from './routes/ArtifactPage'
 import NoAccess from './routes/NoAccess'
 import LoginGate from './routes/LoginGate'
+import RefusalGate from './routes/RefusalGate'
 import CrmDashboard from './routes/CrmDashboard'
 import Home from './routes/Home'
 import CrmPipeline from './routes/CrmPipeline'
@@ -114,7 +115,7 @@ const CAPABILITY_LABELS: Record<Capability, string> = {
 }
 
 function Shell() {
-  const { loading, error, signedOut, can, roles, reload } = useSession()
+  const { loading, error, signedOut, refusal, can, roles, reload, setRefusal } = useSession()
 
   /*
    * Three whole-screen states, ahead of the frame rather than inside it.
@@ -133,7 +134,12 @@ function Shell() {
     )
   }
 
-  if (signedOut) return <LoginGate onAuthenticated={reload} />
+  // Signed in but refused by the platform's access gate (a password to change, an e-mail
+  // to confirm, a locked org): its own screen, ahead of the sign-in form it would
+  // otherwise be mistaken for.
+  if (refusal) return <RefusalGate refusal={refusal} />
+
+  if (signedOut) return <LoginGate onAuthenticated={reload} onRefused={setRefusal} />
 
   if (error) {
     return (

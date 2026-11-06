@@ -15,7 +15,10 @@
  */
 
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
-import { ApiError, getSession, logout, onSessionLost, type Capability, type Session } from './api'
+import {
+  ApiError, getSession, getSessionRefusal, logout, onSessionLost,
+  type Capability, type Session, type SessionRefusal,
+} from './api'
 
 interface SessionState {
   session: Session | null
@@ -27,6 +30,13 @@ interface SessionState {
    * expired mid-use and some later call discovered it.
    */
   signedOut: boolean
+  /**
+   * Set when the platform's access gate refuses a session that IS signed in: most often a
+   * password someone else set, which must be changed before anything works. Takes the
+   * place of `signedOut` (which stays false), because the answer is "put this right", not
+   * "sign in". Asked of `/gql` only once Cobalt already believes it is signed out.
+   */
+  refusal: SessionRefusal | null
   /**
    * Whether the caller holds a capability.
    *
@@ -41,20 +51,23 @@ interface SessionState {
   reload: () => void
   /** Invalidate the session on the platform, then drop to the gate without a page load. */
   signOut: () => void
+  /** Show the refusal gate. What the login gate calls when a sign-in is refused. */
+  setRefusal: (refusal: SessionRefusal | null) => void
 }
 
 const NO_CAPABILITIES = () => false
 
-const INITIAL: Omit<SessionState, 'reload' | 'signOut'> = {
+const INITIAL: Omit<SessionState, 'reload' | 'signOut' | 'setRefusal'> = {
   session: null,
   loading: true,
   error: '',
   signedOut: false,
+  refusal: null,
   can: NO_CAPABILITIES,
   roles: [],
 }
 
-const Ctx = createContext<SessionState>({ ...INITIAL, reload: () => {}, signOut: () => {} })
+const Ctx = createContext<SessionState>({ ...INITIAL, reload: () => {}, signOut: () => {}, setRefusal: () => {} })
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState(INITIAL)
@@ -63,7 +76,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [attempt, setAttempt] = useState(0)
 
   const reload = useCallback(() => {
-    setState(s => ({ ...s, loading: true, error: '', signedOut: false }))
+    setState(s => ({ ...s, loading: true, error: '', signedOut: false, refusal: null }))
     setAttempt(n => n + 1)
   }, [])
 
@@ -73,16 +86,35 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     logout().then(() => setState({ ...INITIAL, loading: false, signedOut: true }))
   }, [])
 
+  const setRefusal = useCallback((refusal: SessionRefusal | null) => {
+    setState(s => ({ ...s, loading: false, refusal, signedOut: refusal ? false : s.signedOut }))
+  }, [])
+
+  /*
+   * Signed out, or refused? Both look the same to the Maestro. Ask the platform which, and
+   * land on the matching gate. Only reached on the signed-out path.
+   */
+  const settleSignedOut = useCallback(async (isCurrent: () => boolean) => {
+    const refusal = await getSessionRefusal()
+    if (!isCurrent()) return
+    setState({ ...INITIAL, loading: false, signedOut: !refusal, refusal })
+  }, [])
+
   useEffect(() => {
     let alive = true
     getSession()
       .then(session => {
         if (!alive) return
+        if (!session.loggedIn) {
+          void settleSignedOut(() => alive)
+          return
+        }
         setState({
           session,
           loading: false,
           error: '',
-          signedOut: !session.loggedIn,
+          signedOut: false,
+          refusal: null,
           can: (capability: Capability) => session.can?.[capability] === true,
           roles: session.roles || [],
         })
@@ -90,6 +122,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       .catch((e: unknown) => {
         if (!alive) return
         const err = e instanceof ApiError ? e : null
+        if (err?.needsLogin) {
+          void settleSignedOut(() => alive)
+          return
+        }
         setState({
           ...INITIAL,
           loading: false,
@@ -110,9 +146,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
    * through; this turns that into the gate, so an expired session behaves the same as
    * arriving signed out instead of surfacing as a random failed panel.
    */
-  useEffect(() => onSessionLost(() => {
-    setState(s => (s.signedOut ? s : { ...INITIAL, loading: false, signedOut: true }))
-  }), [])
+  useEffect(() => {
+    let checking = false
+    return onSessionLost(() => {
+      // Show the gate at once; then, if the platform says the session is refused rather
+      // than gone (an admin reset the password mid-use), swap in the refusal gate.
+      setState(s => (s.signedOut || s.refusal ? s : { ...INITIAL, loading: false, signedOut: true }))
+      if (checking) return
+      checking = true
+      void getSessionRefusal().then(refusal => {
+        checking = false
+        if (refusal) setState(s => (s.signedOut ? { ...INITIAL, loading: false, refusal } : s))
+      })
+    })
+  }, [])
 
   /*
    * Keep the session alive while Cobalt is open, the way every classic BlueStep page does.
@@ -129,7 +176,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
    * the hour has not already run out (a laptop asleep for more than an hour still ends it).
    * Only while signed in: a ping on a dead session would just mint an anonymous one.
    */
-  const signedIn = !!state.session && !state.signedOut
+  const signedIn = !!state.session && !state.signedOut && !state.refusal
   useEffect(() => {
     if (!signedIn) return
     const ping = () => { fetch('/keep-alive', { credentials: 'same-origin', cache: 'no-store' }).catch(() => {}) }
@@ -142,7 +189,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }, [signedIn])
 
-  return <Ctx.Provider value={{ ...state, reload, signOut }}>{children}</Ctx.Provider>
+  return <Ctx.Provider value={{ ...state, reload, signOut, setRefusal }}>{children}</Ctx.Provider>
 }
 
 export const useSession = () => useContext(Ctx)

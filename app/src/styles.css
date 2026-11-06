@@ -4306,6 +4306,28 @@ a.subcrumb:hover { color: var(--cobalt); }
 .login__alt { margin: 0.9rem 0 0; text-align: center; font-size: 0.875rem; }
 .login__alt a { color: var(--cobalt); }
 
+/* ---- refused session (forced password change, e-mail confirmation, lock) ---- */
+
+.refusal__go { display: block; margin-top: 0.6rem; text-decoration: none; }
+
+.refusal__hint {
+  margin: 0.15rem 0 0;
+  color: var(--text-mute);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.refusal__signout {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--cobalt);
+  font: inherit;
+  cursor: pointer;
+}
+.refusal__signout:hover { text-decoration: underline; }
+.refusal__signout:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 2px; border-radius: 2px; }
+
 .login__legal {
   margin: 1.15rem 0 0;
   padding-top: 0.9rem;

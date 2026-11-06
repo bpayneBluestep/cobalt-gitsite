@@ -146,6 +146,31 @@ curl -sk https://cobalt.bluestep.net/spa/assets/index-<hash>.js               # 
 `index.html` is served `no-cache`, other files `public, max-age=300`, so the hashed
 filenames are load-bearing for a deploy to actually be visible.
 
+## Refused sessions (forced password change)
+
+The platform's access gate (`AccessGate` in `Bluestep-Systems/web`) can refuse a session
+that is signed in. Most often this is because someone other than the user set the password
+(an admin reset or a script). That sets **Password Expire Start** on the Online Profile, and
+once it passes (plus the login type's grace days) every request reads as anonymous except
+the platform's profile pages. To Cobalt that looks like being signed out.
+
+So whenever Cobalt believes it is signed out (after a sign-in, on arrival, or mid-session),
+it asks `/gql { sessionRefusal { kind reason message fixUrl } }` (`getSessionRefusal` in
+`app/src/api.ts`). A refusal shows `routes/RefusalGate.tsx` instead of the sign-in form:
+
+- **Forced password change, tenant user:** a "Set a new password" form. There is no API for
+  a user's own password, so `changeExpiredPassword` reads the platform's profile form at
+  `fixUrl`, posts it back with the password and its `_confirm` twin, and then checks
+  `sessionRefusal` again. Saving your own password clears Password Expire Start. A
+  platform rejection (too weak, breached) is shown in its own words. If the form can't
+  be driven from here, the gate falls back to the hand-off below.
+- **Global user, or e-mail confirmation:** an explainer and a link to the platform's
+  page (`fixUrl`).
+- **Org locked, address not allowed, gate unavailable:** the platform's message (sanitised)
+  and Sign out.
+
+A happy-path sign-in makes no `/gql` call.
+
 ## Agreements (e-signature)
 
 Two pages, one repo. The app carries the Agreements tab (envelopes, packet wizard,

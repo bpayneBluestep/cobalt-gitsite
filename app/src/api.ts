@@ -260,10 +260,13 @@ function loginFormBody(username: string, password: string): URLSearchParams {
  *   noAccess   credentials were RIGHT and the platform session exists, but this account
  *              cannot reach the Maestro. Retyping the password will never fix it.
  *   rejected   the username and password genuinely did not match
+ *   refused    credentials were RIGHT but the platform's access gate refuses the session:
+ *              usually a password someone else set that must now be changed
  */
 export type LoginResult =
   | { ok: true }
   | { ok: false; reason: 'twoFactor' }
+  | { ok: false; reason: 'refused'; refusal: SessionRefusal }
   | { ok: false; reason: 'noAccess'; error: string }
   | { ok: false; reason: 'rejected'; error: string }
 
@@ -335,6 +338,11 @@ export async function login(username: string, password: string): Promise<LoginRe
   } catch {
     /* fall through and work out WHICH failure this is */
   }
+
+  // Before "no access": a refused session also looks signed out to the Maestro, and its
+  // answer is the opposite one (set a new password), not "ask an admin for access".
+  const refusal = await getSessionRefusal()
+  if (refusal) return { ok: false, reason: 'refused', refusal }
 
   if (looksSignedIn(html)) {
     return {
@@ -443,6 +451,273 @@ export async function logout(): Promise<void> {
  */
 export function logoutUrl(): string {
   return `${LOGOUT_URL}?desturl=${encodeURIComponent(returnPath())}`
+}
+
+// ------------------------------------------------------------------ refused sessions
+
+/*
+ * A session the platform's access gate refuses (Bluestep-Systems/web `AccessGate`).
+ *
+ * The session is still signed in, but on every request except the platform's credential
+ * pages it reads as anonymous. To Cobalt that looks exactly like being signed out, which is
+ * why a user whose password an admin reset used to be told "Signed in, but not to Cobalt".
+ * The gate refuses for three kinds of reason:
+ *
+ *   CREDENTIAL   the password must be changed (an admin or script set it, so Password Expire
+ *                Start is set and past its grace days), or the e-mail must be confirmed
+ *   PLACE        the organization is locked, or the IP filter does not admit this address
+ *   UNAVAILABLE  the gate could not be evaluated; a retry may succeed
+ *
+ * `/gql`'s `sessionRefusal` answers an anonymous caller about its own session, and its
+ * schema doc names exactly this use: after a login.jsp sign-in, a null user plus a
+ * refusal is a correct password whose account cannot be used yet. Cobalt asks the platform
+ * rather than re-deriving the rules, so there is no second copy of the gate to drift.
+ */
+
+export type SessionRefusalKind = 'CREDENTIAL' | 'PLACE' | 'UNAVAILABLE'
+export type SessionRefusalReason =
+  | 'PASSWORD_CHANGE_REQUIRED'
+  | 'EMAIL_CONFIRMATION_REQUIRED'
+  | 'ORGANIZATION_LOCKED'
+  | 'ADDRESS_NOT_ALLOWED'
+  | 'ADDRESS_UNREADABLE'
+  | 'GATE_UNAVAILABLE'
+
+export interface SessionRefusal {
+  kind: SessionRefusalKind
+  reason: SessionRefusalReason
+  /** As a classic page shows it. HTML for ORGANIZATION_LOCKED (the org's lock message). */
+  message: string
+  /** For CREDENTIAL only: the platform page that puts it right, a path on this host. */
+  fixUrl: string | null
+}
+
+const GQL_URL = '/gql'
+const CSRF_URL = '/csrf-token'
+
+/**
+ * Why the platform refuses this session, or null when it does not.
+ *
+ * Never throws: on any failure (no `/gql`, no token, an unexpected shape) it answers null,
+ * and Cobalt behaves as it did before this existed. It is only asked once Cobalt already
+ * believes it is signed out, so the happy path never pays for it.
+ */
+export async function getSessionRefusal(): Promise<SessionRefusal | null> {
+  try {
+    const tokenRes = await fetch(CSRF_URL, { credentials: 'include', cache: 'no-store' })
+    if (!tokenRes.ok) return null
+    const token = (await tokenRes.text()).trim()
+    const res = await fetch(GQL_URL, {
+      method: 'POST',
+      credentials: 'include',
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json', 'b6p-csrf-token': token },
+      body: JSON.stringify({ query: '{ sessionRefusal { kind reason message fixUrl } }' }),
+    })
+    if (!res.ok) return null
+    const json = await res.json()
+    const r = json?.data?.sessionRefusal
+    if (!r || typeof r.kind !== 'string' || typeof r.reason !== 'string') return null
+    return {
+      kind: r.kind,
+      reason: r.reason,
+      message: typeof r.message === 'string' ? r.message : '',
+      fixUrl: typeof r.fixUrl === 'string' && r.fixUrl ? r.fixUrl : null,
+    }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Whether Cobalt can set the new password itself for this refusal.
+ *
+ * Only a tenant user's forced change: their fix page is `editprofile.jsp`, the Online
+ * Profile form for their own entity. A global user's is `myprofile.jsp`, a different page
+ * with no such form, so that one (and e-mail confirmation) is handed to the platform.
+ */
+export function canChangePasswordInApp(refusal: SessionRefusal): boolean {
+  return refusal.reason === 'PASSWORD_CHANGE_REQUIRED'
+    && !!refusal.fixUrl
+    && /\/shared\/user\/editprofile\.jsp/.test(refusal.fixUrl)
+}
+
+/**
+ * The outcome of `changeExpiredPassword`.
+ *
+ *   invalid      the platform refused this password (too weak, breached, or another error on
+ *                the form); `error` is its own words. Try another.
+ *   unsupported  the profile page could not be driven from here, or the save did not take
+ *                and the platform said nothing readable. Hand off to `fixUrl`.
+ *   sessionLost  the session really is gone; sign in again.
+ */
+export type PasswordChangeResult =
+  | { ok: true }
+  | { ok: false; reason: 'invalid'; error: string }
+  | { ok: false; reason: 'unsupported'; error: string }
+  | { ok: false; reason: 'sessionLost' }
+
+/*
+ * The platform's own wording for a password it will not store
+ * (`FieldValidationException.passwordTooWeak` / `passwordRejected`), prefixed by the field's
+ * label. Matched in the re-rendered page when no error element can be found.
+ */
+const PLATFORM_PASSWORD_ERRORS = [
+  /[^.<>\n]{0,80}: this value is too weak\. Choose a longer or less predictable one\./,
+  /[^.<>\n]{0,80}: this value cannot be used\. Choose a different one\./,
+  /Password is too weak[^.<>\n]{0,120}\.?/,
+  /Invalid password for[^.<>\n]{0,120}\./,
+]
+
+/** Is this response the platform bouncing us to its login page? */
+function bouncedToLoginPage(res: Response): boolean {
+  return res.status === 401 || (res.redirected && /\/shared\/login\/login\.jsp/.test(res.url))
+}
+
+/**
+ * The body a browser would post for `form`: every successful control, hidden event and
+ * change-management inputs included. Submit buttons are left out; the event is named by
+ * `_postEvent`, as the platform's own pages and `login()` both do.
+ */
+function serializeForm(form: HTMLFormElement): URLSearchParams {
+  const body = new URLSearchParams()
+  for (const el of Array.from(form.elements)) {
+    const name = el.getAttribute('name')
+    if (!name || el.hasAttribute('disabled')) continue
+    if (el instanceof HTMLInputElement) {
+      const type = (el.getAttribute('type') || 'text').toLowerCase()
+      if (type === 'submit' || type === 'button' || type === 'image' || type === 'reset' || type === 'file') continue
+      if ((type === 'checkbox' || type === 'radio') && !el.hasAttribute('checked')) continue
+      body.append(name, type === 'checkbox' || type === 'radio' ? (el.getAttribute('value') ?? 'on') : (el.getAttribute('value') ?? ''))
+    } else if (el instanceof HTMLSelectElement) {
+      const chosen = Array.from(el.options).filter(o => o.hasAttribute('selected'))
+      const picks = chosen.length ? chosen : (el.multiple ? [] : el.options.length ? [el.options[0]] : [])
+      for (const o of picks) body.append(name, o.getAttribute('value') ?? o.textContent ?? '')
+    } else if (el instanceof HTMLTextAreaElement) {
+      body.append(name, el.textContent ?? '')
+    }
+  }
+  return body
+}
+
+/**
+ * The event the profile form's Save control fires, when the page names one.
+ *
+ * The form's hidden `_postEvent` already carries its default event, which on editprofile.jsp
+ * is the commit declared first. A Save control that names its own event in its markup wins,
+ * because that is what a click would have posted.
+ */
+function saveEventId(form: HTMLFormElement): string | null {
+  const controls = Array.from(form.querySelectorAll('a, button, input[type="submit"], input[type="button"]'))
+  for (const c of controls) {
+    const text = (c.textContent || c.getAttribute('value') || c.querySelector('img')?.getAttribute('alt') || '').trim()
+    if (text !== 'Save') continue
+    const markup = `${c.getAttribute('onclick') || ''} ${c.getAttribute('href') || ''} ${c.getAttribute('data-event') || ''}`
+    const m = markup.match(/['"](commit[^'"]*)['"]/)
+    if (m) return m[1]
+  }
+  return null
+}
+
+/** The platform's error text on a re-rendered form page, or ''. */
+function platformFormErrors(doc: Document, html: string): string {
+  const found: string[] = []
+  const nodes = doc.querySelectorAll('[role="alert"], .alert-danger, .formErrors, .formError, .errorMessage, .error, .errors')
+  for (const n of Array.from(nodes)) {
+    const t = (n.textContent || '').replace(/\s+/g, ' ').trim()
+    if (t && t.length < 400 && !found.includes(t)) found.push(t)
+  }
+  if (found.length) return found.join(' ')
+  for (const re of PLATFORM_PASSWORD_ERRORS) {
+    const m = html.match(re)
+    if (m) return m[0].trim()
+  }
+  return ''
+}
+
+/**
+ * Set a new password for a session refused with PASSWORD_CHANGE_REQUIRED, without
+ * leaving Cobalt.
+ *
+ * There is no API for this. No GraphQL or REST call sets a user's own password, BsJs
+ * cannot write the system password field, and a refused session reads as anonymous to
+ * `/gql`. The one write path is the platform's Online Profile form at `fixUrl`, which is a
+ * credential page: the refused session is signed in there. So this does what `login()`
+ * does, a same-origin form POST to a classic handler, against a form it reads first:
+ *
+ *   1. GET fixUrl and parse it.
+ *   2. Find the password input (the platform renders `<name>` plus a `_confirm<name>` twin)
+ *      and post the whole form back with both set, as a browser would.
+ *   3. Trust the outcome, not the status code: the save worked only if the platform no
+ *      longer refuses the session. Saving your own password nulls Password Expire Start
+ *      (`DynoDataRecordModelRemote.passwordChanged`), so the next request passes the gate.
+ *
+ * The password goes to this host only. It is never sent to the Maestro, logged, or kept.
+ */
+export async function changeExpiredPassword(fixUrl: string, password: string): Promise<PasswordChangeResult> {
+  const unsupported = (error: string): PasswordChangeResult => ({ ok: false, reason: 'unsupported', error })
+  try {
+    const page = await fetch(fixUrl, { credentials: 'include', cache: 'no-store' })
+    if (bouncedToLoginPage(page)) return { ok: false, reason: 'sessionLost' }
+    if (!page.ok) return unsupported(`Your profile page did not load (HTTP ${page.status}).`)
+    const html = await page.text()
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+
+    const forms = Array.from(doc.querySelectorAll('form'))
+    const form = forms.find(f => f.getAttribute('name') === 'Relate' && f.querySelector('input[type="password"]'))
+      || forms.find(f => f.querySelector('input[type="password"]'))
+    if (!form) return unsupported('Your profile page has no password field Cobalt can fill in.')
+
+    const pwInputs = Array.from(form.querySelectorAll('input[type="password"]'))
+      .map(i => i.getAttribute('name') || '')
+      .filter(Boolean)
+    // The real field is the one with a `_confirm` twin; failing that, the only non-confirm one.
+    const primaries = pwInputs.filter(n => !n.startsWith('_confirm'))
+    const field = primaries.find(n => pwInputs.includes(`_confirm${n}`))
+      || (primaries.length === 1 ? primaries[0] : '')
+    if (!field) return unsupported('Cobalt could not tell which field on your profile is the password.')
+
+    const body = serializeForm(form)
+    body.set(field, password)
+    if (pwInputs.includes(`_confirm${field}`)) body.set(`_confirm${field}`, password)
+    const event = saveEventId(form)
+    if (event) body.set('_postEvent', event)
+    else if (!body.get('_postEvent')) body.set('_postEvent', 'commit')
+
+    const action = new URL(form.getAttribute('action') || page.url, page.url)
+    if (action.origin !== window.location.origin) return unsupported('Your profile form posts somewhere Cobalt will not send a password.')
+
+    const saved = await fetch(action.toString(), {
+      method: 'POST',
+      credentials: 'include',
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    })
+    if (bouncedToLoginPage(saved)) return { ok: false, reason: 'sessionLost' }
+    const savedHtml = await saved.text().catch(() => '')
+
+    // The authority: is the session still refused?
+    const after = await getSessionRefusal()
+    if (!after) {
+      try {
+        const session = await getSession()
+        if (session.loggedIn) return { ok: true }
+      } catch { /* fall through */ }
+      return { ok: false, reason: 'sessionLost' }
+    }
+    if (after.reason !== 'PASSWORD_CHANGE_REQUIRED') {
+      // The password took, but something else now refuses the session (e-mail, place).
+      // Report success; the caller re-probes and shows whatever is next.
+      return { ok: true }
+    }
+
+    const error = platformFormErrors(new DOMParser().parseFromString(savedHtml, 'text/html'), savedHtml)
+    if (error) return { ok: false, reason: 'invalid', error }
+    return unsupported('The platform did not accept the new password, and did not say why.')
+  } catch {
+    return unsupported('Cobalt could not reach your profile page.')
+  }
 }
 
 /**

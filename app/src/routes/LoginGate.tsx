@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { globalLoginUrl, login, nativeLoginSubmit, ssoLoginUrl } from '../api'
+import { globalLoginUrl, login, nativeLoginSubmit, ssoLoginUrl, type SessionRefusal } from '../api'
 import ThemeToggle from '../components/ThemeToggle'
 
 /*
@@ -27,7 +27,11 @@ const PROVIDERS = [
   { id: 'google', label: 'Google', favicon: 'https://www.google.com/favicon.ico' },
 ] as const
 
-export default function LoginGate({ onAuthenticated }: { onAuthenticated: () => void }) {
+export default function LoginGate({ onAuthenticated, onRefused }: {
+  onAuthenticated: () => void
+  /** The password was right but the platform refuses the session: show the refusal gate. */
+  onRefused: (refusal: SessionRefusal) => void
+}) {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
@@ -64,6 +68,13 @@ export default function LoginGate({ onAuthenticated }: { onAuthenticated: () => 
       // A global account needs the platform's e-mail verification step, which cannot be
       // completed inside a fetch. Hand the browser over; it comes back here after.
       nativeLoginSubmit(username.trim(), password)
+      return
+    }
+
+    if (result.reason === 'refused') {
+      // Most often a password someone else set, which must now be changed. Not a form
+      // error and not "no access": hand over to the screen that puts it right.
+      onRefused(result.refusal)
       return
     }
 
