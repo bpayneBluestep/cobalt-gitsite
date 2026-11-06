@@ -128,7 +128,7 @@ export default function FinanceReport() {
   const monthParam = params.get('month') || ''
   const ym = model ? (model.months.includes(monthParam) ? monthParam : model.defaultMonth) : ''
   const streamParam = params.get('stream') as StreamId | null
-  const stream: StreamId = STREAMS.some(s => s.id === streamParam) ? streamParam! : 'all'
+  const stream: StreamId = STREAMS.some(s => s.id === streamParam) ? streamParam! : 'recurring'
   const client = params.get('client') || ''
 
   /** A search string with some params changed and the rest kept. Defaults are dropped. */
@@ -138,7 +138,7 @@ export default function FinanceReport() {
       if (v) next.set(k, v); else next.delete(k)
     }
     if (next.get('tab') === 'overview') next.delete('tab')
-    if (next.get('stream') === 'all') next.delete('stream')
+    if (next.get('stream') === 'recurring') next.delete('stream')
     if (next.get('tab') !== 'clients') next.delete('client')
     const s = next.toString()
     return s ? `?${s}` : ''

@@ -73,8 +73,8 @@ export interface Kpis {
 
 export type StreamId = 'all' | RevenueStream
 export const STREAMS: { id: StreamId; label: string }[] = [
-  { id: 'all', label: 'All revenue' },
   { id: 'recurring', label: 'Recurring (MRR)' },
+  { id: 'all', label: 'All revenue' },
   { id: 'ps', label: 'Professional services' },
   { id: 'setup', label: 'Setup & licensing' },
 ]
