@@ -64,4 +64,17 @@ export const REPORTS: ReportCard[] = [
       'report opens. Test and demo envelopes are hidden unless you ask for them.',
     needs: 'viewAgreements',
   },
+  {
+    key: 'finance',
+    path: '/reports/finance',
+    name: 'Finance',
+    description:
+      'Are we growing and are we profitable: recurring revenue, who is expanding or ' +
+      'churning, where the money goes, and what needs attention this month.',
+    source:
+      'The QuickBooks revenue and expense exports attached to the Behavioral record\'s ' +
+      'Financial Data form, read fresh each time the report opens. Replace either file ' +
+      'there and the report follows.',
+    needs: 'viewReports',
+  },
 ]

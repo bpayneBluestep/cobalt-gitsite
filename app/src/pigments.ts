@@ -28,6 +28,23 @@ const RAMP = [
   PIGMENTS.cobaltMagenta,
 ]
 
+/*
+ * Series order for multi-series charts (TrendChart). Not the RAMP order: that one walks
+ * the blues first, which is right for field types (related types read as related) and
+ * wrong for series, where the first three colours must be as far apart as the family
+ * allows - blue, magenta, teal - so two adjacent lines never read as one.
+ */
+export const SERIES: readonly string[] = [
+  PIGMENTS.cobaltBlue,
+  PIGMENTS.cobaltMagenta,
+  PIGMENTS.cobaltTeal,
+  PIGMENTS.aureolin,
+  PIGMENTS.cobaltViolet,
+  PIGMENTS.cerulean,
+  PIGMENTS.cobaltGreen,
+  PIGMENTS.slate,
+]
+
 const NAMED: Record<string, string> = {
   // Text-ish types stay in the blues; each step is a distinct pigment so a
   // stripe of TEXT + MEMO still reads as two bands.

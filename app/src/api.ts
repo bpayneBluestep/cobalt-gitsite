@@ -3458,6 +3458,37 @@ export const getTimeReport = (from: string, to: string): Promise<TimeReport> =>
   maestroGet('timeReport', { from, to })
 
 /*
+ * ── Finance report ──────────────────────────────────────────────────────────
+ *
+ * The two QuickBooks exports from the Behavioral record's Financial Data form, as
+ * bytes, plus the company aliases. The server parses nothing: BsJs cannot read .xlsx,
+ * so `lib/xlsx.ts` + `lib/finance.ts` do it here, once per load.
+ */
+export interface FinanceFile {
+  filename: string
+  size: number
+  base64: string
+}
+
+export interface FinanceCompany {
+  id: string
+  name: string
+  /** QuickBooks customer names that bill as this company (Company Info). */
+  quickbooksNames: string[]
+}
+
+export interface FinanceInputs {
+  orgName: string
+  revenue: FinanceFile | null
+  expenses: FinanceFile | null
+  /** Which of 'revenue' / 'expenses' are not attached. */
+  missing: string[]
+  companies: FinanceCompany[]
+}
+
+export const getFinanceData = (): Promise<FinanceInputs> => maestroGet('financeData', {})
+
+/*
  * ── Ticket templates ────────────────────────────────────────────────────────
  *
  * A template is a named tree of tasks, two levels deep at most, stored on the

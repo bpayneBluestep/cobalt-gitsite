@@ -6070,6 +6070,66 @@ input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) opacit
 .heat__scale { display: flex; align-items: center; gap: 0.3rem; margin: 0.55rem 0 0; font-size: 0.68rem; }
 .heat__sw { width: 15px; height: 10px; border-radius: 2px; }
 
+/* --- TrendChart ---------------------------------------------------------- */
+
+/*
+ * The SVG is drawn at the container's measured pixel width (viewBox = real width), so
+ * axis text stays 10px at every size instead of shrinking with the plot on a phone.
+ * Series colours arrive inline from pigments.ts (or a status token); everything else
+ * here is a token, which is what makes the same markup right in both themes.
+ */
+.trend { min-width: 0; }
+.trend__read {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.2rem 0.85rem;
+  margin: 0 0 0.4rem;
+  min-height: 1.15rem;
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.trend__rv { display: inline-flex; align-items: baseline; gap: 0.3rem; white-space: nowrap; }
+.trend__dot { align-self: center; width: 8px; height: 8px; border-radius: 50%; }
+/* A line series gets a line in the legend, so a dashed series shows its dash. */
+.trend__swl { width: 14px; height: 0; border-top: 2px solid; }
+.trend__swl[data-dashed] { border-top-style: dashed; }
+
+.trend__svg { display: block; overflow: visible; }
+.trend__ax {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  fill: var(--text-mute);
+}
+/* Gridlines whisper; the zero line speaks. In a chart that goes negative, zero is the
+   line every bar and every margin is read against. */
+.trend__grid { stroke: var(--line); stroke-width: 1; opacity: 0.6; }
+.trend__zero { stroke: var(--line-strong); stroke-width: 1; }
+.trend__base { stroke: var(--line); stroke-width: 1; }
+.trend__band { fill: var(--cobalt-wash); }
+
+/* The 1px panel-coloured stroke is the surface gap between stacked segments, as in
+   BarRows and ColumnChart: two fills touching read as one bar that changes colour. */
+.trend__bar { stroke: var(--bg-panel); stroke-width: 1; transition: opacity var(--d-faster) var(--curve-ease); }
+.trend__stack[data-hover] .trend__bar { opacity: 0.82; }
+.trend__nil { fill: var(--line-strong); }
+
+.trend__line {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+/* Ringed in the panel colour so a marker on top of a bar or another line stays legible. */
+.trend__pt { fill: currentColor; stroke: var(--bg-panel); stroke-width: 1; }
+.trend__guide { stroke: var(--text-mute); stroke-width: 1; stroke-dasharray: 2 3; pointer-events: none; }
+
+.trend__hit { fill: transparent; cursor: default; outline: none; }
+.trend__hit:focus-visible { stroke: var(--cobalt); stroke-width: 2; }
+
 /* --- the report page ----------------------------------------------------- */
 
 .trep__filters {
@@ -6364,3 +6424,135 @@ input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) opacit
   .tpl__main { flex-basis: 100%; }
   .tpl__pri { flex: 1 1 6rem; }
 }
+
+/* ===========================================================================
+   Finance report
+   ---------------------------------------------------------------------------
+   The page is built from the report pieces above (.kpi, .tcard, .trep__*, .seg,
+   .subnav, .fields, .pill). What follows is only what those do not cover: tone on
+   a pill and on a signed change, the floating waterfall, the table sparkline, and
+   the Action List. Tokens only, so both themes come for free.
+   =========================================================================== */
+
+/* Tone on a pill: the old Critical / Watch / Note and the client status badges. */
+.pill[data-tone="good"] { color: var(--good); border-color: color-mix(in srgb, var(--good) 60%, var(--line)); }
+.pill[data-tone="warn"] { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 60%, var(--line)); }
+.pill[data-tone="bad"]  { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 60%, var(--line)); }
+
+/* A signed change: ▲ +4.3% YoY. Coloured by whether the move is good, not by its sign. */
+.frep__d { font-family: var(--font-display); font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--text-dim); }
+.frep__d[data-tone="good"] { color: var(--good); }
+.frep__d[data-tone="bad"]  { color: var(--danger); }
+.frep__ds { display: flex; flex-wrap: wrap; gap: 0 0.6rem; margin: 0.25rem 0 0; font-size: 0.72rem; }
+
+.frep__filters { align-items: center; }
+.frep__filters .ef { flex-direction: row; align-items: center; gap: 0.5rem; }
+.frep__month { min-width: 11rem; }
+.frep__hint { margin: 0; font-size: 0.74rem; }
+
+/* Panel head with something on its right: a flag, a search box. */
+.frep__ph { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.4rem 0.8rem; }
+.frep__ph .tcard__h { display: inline-flex; align-items: center; gap: 0.4rem; }
+
+/* Overview: alerts above the cards, the one-paragraph story under them. */
+.frep__alerts { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin: 0 0 1rem; font-size: 0.78rem; }
+.frep__alerts .pill { white-space: normal; }
+.frep__more { margin-left: 0.2rem; font-size: 0.78rem; }
+.frep__story p { margin: 0; max-width: 90ch; font-size: var(--t-body1); line-height: 1.55; color: var(--text); }
+
+/* Tables sit in their panel and scroll sideways inside it on a phone. */
+.frep__t th[scope="row"] { font-weight: 500; }
+.frep__t td.num { font-variant-numeric: tabular-nums; }
+.frep__t--wide { min-width: 44rem; }
+.tcard .tablewrap { margin-top: 0.4rem; }
+.frep__sub { width: 100%; }
+.frep__detail > td { padding: 0.3rem 0.5rem 0.6rem 2rem; background: var(--bg-sunk); }
+.frep__detail .fields thead th { background: transparent; }
+.fields tbody tr.frep__detail:hover { background: transparent; }
+
+/* The floating waterfall: label, a track with the bar placed on it, the amount. */
+.frep__wf { list-style: none; margin: 0.4rem 0 0; padding: 0; display: grid; gap: 0.35rem; }
+.frep__wfr {
+  display: grid;
+  grid-template-columns: minmax(5.5rem, 8rem) 1fr minmax(4.5rem, auto);
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.78rem;
+}
+.frep__wfr[data-kind="total"] .frep__wfl,
+.frep__wfr[data-kind="total"] .frep__wfv { font-weight: 600; color: var(--text); }
+.frep__wfl { color: var(--text-dim); }
+.frep__wft { position: relative; height: 18px; background: var(--bg-raise); border-radius: var(--r-sm); }
+.frep__wfb { position: absolute; top: 2px; bottom: 2px; border-radius: var(--r-sm); background: var(--cobalt); }
+.frep__wfb[data-kind="inc"] { background: var(--good); }
+.frep__wfb[data-kind="dec"] { background: var(--danger); }
+.frep__wfv { text-align: right; font-family: var(--font-display); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.frep__spark { display: block; overflow: visible; }
+.frep__spark polyline { fill: none; stroke-width: 1.5; stroke: var(--good); }
+.frep__spark[data-tone="bad"] polyline { stroke: var(--danger); }
+
+/* Clients: the stream switch, the movers, the name cell, the deep-dive head. */
+.frep__bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.9rem; margin: 0 0 1rem; }
+.frep__seg { flex-wrap: wrap; white-space: normal; }
+.frep__search input { min-width: 12rem; }
+.frep__movers { list-style: none; margin: 0.3rem 0 0; padding: 0; display: grid; gap: 0.35rem; }
+.frep__movers li { display: flex; justify-content: space-between; gap: 0.8rem; font-size: 0.8rem; }
+.frep__cname { display: inline-flex; align-items: center; gap: 0.35rem; }
+.frep__caret { padding: 0.05rem 0.3rem; }
+.frep__caret:disabled { opacity: 0.35; cursor: default; }
+.frep__caret:disabled:hover { border-color: transparent; background: none; }
+.frep__client {
+  display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between;
+  gap: 0.6rem 1rem; margin: 0 0 1rem;
+}
+.frep__client .crumb { margin: 0 0 0.3rem; }
+.frep__cn {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
+  margin: 0; font-family: var(--font-display); font-size: var(--t-subtitle1); font-weight: 600;
+}
+.frep__cm { margin: 0.2rem 0 0; font-size: 0.78rem; }
+.frep__client select { min-width: 14rem; max-width: 100%; }
+
+/* Lists of findings: spend anomalies and the Action List. */
+.frep__list { list-style: none; margin: 0.3rem 0 0; padding: 0; display: grid; gap: 0.4rem; font-size: 0.8rem; }
+.frep__list li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.2rem 0.5rem; }
+.frep__intro { margin: 0 0 0.9rem; font-size: 0.85rem; color: var(--text-dim); }
+.frep__acts { list-style: none; margin: 0.4rem 0 0; padding: 0; display: grid; gap: 0.5rem; }
+.frep__act {
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line-strong);
+  border-radius: var(--r);
+  background: var(--bg-raise);
+}
+.frep__act[data-tone="warn"] { border-left-color: var(--warn); }
+.frep__act[data-tone="bad"]  { border-left-color: var(--danger); }
+.frep__act p { margin: 0; }
+.frep__act-t { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 0.5rem; font-size: 0.84rem; }
+.frep__act-d { margin-top: 0.25rem !important; font-size: 0.78rem; color: var(--text-dim); }
+.frep__act-do { margin-top: 0.15rem !important; font-size: 0.78rem; color: var(--cobalt); }
+
+.frep__after { margin: 0.6rem 0 0; }
+
+/* Source and data notes: small print under everything. */
+.frep__foot { margin-top: 1.4rem; padding-top: 0.8rem; border-top: 1px solid var(--line); }
+.frep__foot .tcard__sub { margin-top: 0.4rem; }
+.frep__src { margin: 0 0 0.4rem; padding-left: 1.1rem; font-size: 0.74rem; color: var(--text-dim); }
+.frep__src li { margin: 0.15rem 0; overflow-wrap: anywhere; }
+
+@media (max-width: 720px) {
+  .frep__filters { align-items: stretch; }
+  .frep__month { min-width: 0; flex: 1; }
+  .frep__filters .bweek { width: 100%; }
+  .frep__wfr { grid-template-columns: 5rem 1fr auto; gap: 0.4rem; }
+  .frep__search, .frep__search input { min-width: 0; width: 100%; }
+  .frep__client select { min-width: 0; width: 100%; }
+  .frep__client .ef { width: 100%; }
+}
+/* Long tables (every client, the whole cohort) scroll inside their panel under a
+   sticky header, so the page keeps the panels below within reach. */
+.frep__tall { position: relative; max-height: 36rem; overflow-y: auto; }
+.frep__sub tfoot th { text-align: left; }
+.frep__sub tfoot th, .frep__sub tfoot td { padding: 0.35rem 0.5rem; border-top: 2px solid var(--line-strong); }
+@media (min-width: 721px) { .frep__client .ef { width: 20rem; } }
