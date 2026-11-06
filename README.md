@@ -171,6 +171,13 @@ it asks `/gql { sessionRefusal { kind reason message fixUrl } }` (`getSessionRef
 
 A happy-path sign-in makes no `/gql` call.
 
+`sessionRefusal` reached pods unevenly. On 2026-11-06 config and directory answered it, but
+Cobalt's own pod returned "Field 'sessionRefusal' … is undefined". Where it is missing, the
+sign-in path reads the refusal off login.jsp's response instead (a redirect to
+editprofile.jsp, or "You are required to change your password." in the page). The save is
+then judged by the page it returns. Arrival and mid-session detection need the field, so
+on such a pod they show the sign-in form, and signing in catches the refusal.
+
 ## Agreements (e-signature)
 
 Two pages, one repo. The app carries the Agreements tab (envelopes, packet wizard,

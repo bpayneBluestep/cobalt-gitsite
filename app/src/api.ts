@@ -341,7 +341,7 @@ export async function login(username: string, password: string): Promise<LoginRe
 
   // Before "no access": a refused session also looks signed out to the Maestro, and its
   // answer is the opposite one (set a new password), not "ask an admin for access".
-  const refusal = await getSessionRefusal()
+  const refusal = (await getSessionRefusal()) || refusalFromLoginResponse(res, html)
   if (refusal) return { ok: false, reason: 'refused', refusal }
 
   if (looksSignedIn(html)) {
@@ -503,9 +503,22 @@ const CSRF_URL = '/csrf-token'
  * believes it is signed out, so the happy path never pays for it.
  */
 export async function getSessionRefusal(): Promise<SessionRefusal | null> {
+  return (await probeSessionRefusal()).refusal
+}
+
+/**
+ * `getSessionRefusal`, plus whether the answer means anything.
+ *
+ * `sessionRefusal` reached production pods unevenly: in November 2026 config and directory
+ * answered it while Cobalt's own pod (U142140) still said "Field 'sessionRefusal' … is
+ * undefined". There a null is "unknown", not "not refused", and the callers that verify
+ * a save need to know the difference.
+ */
+async function probeSessionRefusal(): Promise<{ supported: boolean; refusal: SessionRefusal | null }> {
+  const none = { supported: false, refusal: null }
   try {
     const tokenRes = await fetch(CSRF_URL, { credentials: 'include', cache: 'no-store' })
-    if (!tokenRes.ok) return null
+    if (!tokenRes.ok) return none
     const token = (await tokenRes.text()).trim()
     const res = await fetch(GQL_URL, {
       method: 'POST',
@@ -514,18 +527,50 @@ export async function getSessionRefusal(): Promise<SessionRefusal | null> {
       headers: { 'Content-Type': 'application/json', 'b6p-csrf-token': token },
       body: JSON.stringify({ query: '{ sessionRefusal { kind reason message fixUrl } }' }),
     })
-    if (!res.ok) return null
+    if (!res.ok) return none
     const json = await res.json()
-    const r = json?.data?.sessionRefusal
-    if (!r || typeof r.kind !== 'string' || typeof r.reason !== 'string') return null
+    if (!json || !json.data || !('sessionRefusal' in json.data)) return none
+    const r = json.data.sessionRefusal
+    if (!r || typeof r.kind !== 'string' || typeof r.reason !== 'string') return { supported: true, refusal: null }
     return {
-      kind: r.kind,
-      reason: r.reason,
-      message: typeof r.message === 'string' ? r.message : '',
-      fixUrl: typeof r.fixUrl === 'string' && r.fixUrl ? r.fixUrl : null,
+      supported: true,
+      refusal: {
+        kind: r.kind,
+        reason: r.reason,
+        message: typeof r.message === 'string' ? r.message : '',
+        fixUrl: typeof r.fixUrl === 'string' && r.fixUrl ? r.fixUrl : null,
+      },
     }
   } catch {
-    return null
+    return none
+  }
+}
+
+const PASSWORD_REQUIRED_TEXT = /required to change your password/i
+
+/**
+ * A forced password change read off a login.jsp response, for a pod without
+ * `sessionRefusal`. A classic page sends a refused user to their profile with "You are
+ * required to change your password.", so either the response landed on editprofile.jsp
+ * (its URL is the fixUrl) or the page carries that sentence.
+ */
+function refusalFromLoginResponse(res: Response, html: string): SessionRefusal | null {
+  const onProfile = res.redirected && /\/shared\/user\/(editprofile|myprofile)\.jsp/.test(res.url)
+  if (!onProfile && !PASSWORD_REQUIRED_TEXT.test(html)) return null
+  let fixUrl = '/shared/user/myprofile.jsp'
+  if (onProfile) {
+    const u = new URL(res.url)
+    fixUrl = u.pathname + u.search
+  } else {
+    // The page may link the fix itself: an editprofile event URL in an href or a redirect.
+    const m = html.match(/["'](\/shared\/user\/editprofile\.jsp[^"'\s]*)["']/)
+    if (m) fixUrl = m[1].replace(/&amp;/g, '&')
+  }
+  return {
+    kind: 'CREDENTIAL',
+    reason: 'PASSWORD_CHANGE_REQUIRED',
+    message: 'You are required to change your password.',
+    fixUrl,
   }
 }
 
@@ -697,8 +742,22 @@ export async function changeExpiredPassword(fixUrl: string, password: string): P
     if (bouncedToLoginPage(saved)) return { ok: false, reason: 'sessionLost' }
     const savedHtml = await saved.text().catch(() => '')
 
+    const savedDoc = new DOMParser().parseFromString(savedHtml, 'text/html')
+    const probe = await probeSessionRefusal()
+
+    if (!probe.supported) {
+      // No `sessionRefusal` on this pod: judge by the page. The commit lands on
+      // myprofile.jsp; a refusal re-renders the form with the platform's error.
+      const error = platformFormErrors(savedDoc, savedHtml)
+      if (error) return { ok: false, reason: 'invalid', error }
+      if (PASSWORD_REQUIRED_TEXT.test(savedHtml)) {
+        return unsupported('The platform did not accept the new password, and did not say why.')
+      }
+      return { ok: true }
+    }
+
     // The authority: is the session still refused?
-    const after = await getSessionRefusal()
+    const after = probe.refusal
     if (!after) {
       try {
         const session = await getSession()
@@ -712,7 +771,7 @@ export async function changeExpiredPassword(fixUrl: string, password: string): P
       return { ok: true }
     }
 
-    const error = platformFormErrors(new DOMParser().parseFromString(savedHtml, 'text/html'), savedHtml)
+    const error = platformFormErrors(savedDoc, savedHtml)
     if (error) return { ok: false, reason: 'invalid', error }
     return unsupported('The platform did not accept the new password, and did not say why.')
   } catch {
