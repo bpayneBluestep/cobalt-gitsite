@@ -37,6 +37,14 @@ export const NET_BAND = 5000
 export const PAYROLL_INCOMPLETE = 5000
 /** Months the revenue export may lag today before the report says so. */
 export const STALE_MONTHS = 2
+/**
+ * Losing at least this % of an account's recurring revenue is churn, not contraction.
+ * Accounts that leave often keep a data-retention plan for pennies on the dollar, so
+ * "dropped to $0" alone misses most real churn (Brandon, 2026-11-07).
+ */
+export const CHURN_LOSS_PCT = 80
+/** Monthly recurring-revenue churn (% of last month's MRR) that turns the alert red. */
+export const MRR_CHURN_RED = 3
 
 /** The old green / yellow / red, in Cobalt's `data-tone` words. */
 export type Tone = 'good' | 'warn' | 'bad' | undefined
@@ -117,8 +125,12 @@ export const netTone = (n: number): Tone =>
 export const newMrrTone = (n: number): Tone =>
   n >= NEW_MRR_GOOD ? 'good' : n >= NEW_MRR_FLOOR ? 'warn' : 'bad'
 
+/** `prev` → `cur` lost at least CHURN_LOSS_PCT of a positive `prev`. */
+export const isChurn = (prev: number, cur: number): boolean =>
+  prev > 0 && ((prev - Math.max(cur, 0)) / prev) * 100 >= CHURN_LOSS_PCT
+
 export const cohortTag = (r: NdrRow): CohortTag =>
-  num(r.current) <= 0 ? 'Churned'
+  isChurn(num(r.base), num(r.current)) ? 'Churned'
     : num(r.current) > num(r.base) ? 'Expanded'
       : num(r.current) < num(r.base) ? 'Contracted' : 'Flat'
 
@@ -220,7 +232,7 @@ export function makeModel(D: FinanceData, today: Date) {
   const retentionCounts = (ym: string) => {
     const out = { churned: 0, contracted: 0, expanded: 0 }
     for (const r of ndrBy[ym]?.rows ?? []) {
-      if (num(r.current) <= 0) out.churned += 1
+      if (isChurn(num(r.base), num(r.current))) out.churned += 1
       else if (num(r.current) < num(r.base)) out.contracted += 1
       else if (num(r.current) > num(r.base)) out.expanded += 1
     }
@@ -275,7 +287,7 @@ export function makeModel(D: FinanceData, today: Date) {
     for (const n of names) {
       const p = prevMap[n] || 0, c = curMap[n] || 0
       if (p <= 0 && c > 0) nw += c
-      else if (p > 0 && c <= 0) churn += -p
+      else if (isChurn(p, c)) churn += c - p
       else if (c > p) exp += c - p
       else if (c < p) con += c - p
     }
@@ -292,6 +304,65 @@ export function makeModel(D: FinanceData, today: Date) {
     return { prev, start, end, nw, exp, con, churn, hasPrev: Object.keys(prevMap).length > 0, steps }
   }
 
+  /** One account's recurring in a month, from the MRR view. */
+  const mrrOf = (name: string, ym: string): number =>
+    num(mrrBy[ym]?.customers.find(c => c.name === name)?.amount)
+
+  /*
+   * Already churned: the account churned in an earlier month and has stayed at or under
+   * the retention level since. When its retention plan finally stops, that is not a
+   * second churn, so it is listed apart and not counted.
+   */
+  const alreadyChurned = (name: string, prevYm: string): boolean => {
+    let m = prevYm
+    let peakSince = 0
+    for (let i = 0; i < 36; i++) {
+      const before = addMonthsYm(m, -1)
+      const b = mrrOf(name, before), c = mrrOf(name, m)
+      peakSince = Math.max(peakSince, c)
+      // The most recent churn: still churned if nothing since climbed back over it.
+      if (isChurn(b, c)) return isChurn(b, peakSince)
+      if (b <= 0) return false
+      m = before
+    }
+    return false
+  }
+
+  /**
+   * Month-over-month churn: accounts billing recurring last month that lost at least
+   * CHURN_LOSS_PCT of it this month. Accounts still billing a little are on a
+   * retention plan; they count. A month that is not over yet is `partial`: anyone not
+   * billed so far would read as churned.
+   */
+  const momChurn = (ym: string) => {
+    const prev = addMonthsYm(ym, -1)
+    const prevCusts = (mrrBy[prev]?.customers ?? []).filter(c => num(c.amount) > 0)
+    const curMap: { [n: string]: number } = {}
+    for (const c of mrrBy[ym]?.customers ?? []) curMap[c.name] = num(c.amount)
+    const all = prevCusts
+      .map(c => {
+        const p = num(c.amount), cur = curMap[c.name] || 0
+        return { name: c.name, prev: p, cur, lost: p - cur, lostPct: ((p - cur) / p) * 100 }
+      })
+      .filter(r => isChurn(r.prev, r.cur))
+      .sort((a, b) => b.lost - a.lost)
+    const repeat = all.filter(r => alreadyChurned(r.name, prev))
+    const rows = all.filter(r => !repeat.includes(r))
+    const startCount = prevCusts.length
+    const startMrr = prevCusts.reduce((s, c) => s + num(c.amount), 0)
+    const lostMrr = rows.reduce((s, r) => s + r.lost, 0)
+    const retention = rows.filter(r => r.cur > 0)
+    return {
+      prev, rows, repeat, startCount, startMrr, lostMrr,
+      retainedCount: retention.length,
+      retainedMrr: retention.reduce((s, r) => s + r.cur, 0),
+      logoRate: startCount > 0 ? (rows.length / startCount) * 100 : null,
+      mrrRate: startMrr > 0 ? (lostMrr / startMrr) * 100 : null,
+      hasPrev: prevCusts.length > 0,
+      partial: ym >= nowYm,
+    }
+  }
+
   /** Year-over-year cohort movement from the NDR rows; null with no prior-year base. */
   const ndrWaterfall = (ym: string) => {
     const c = ndrBy[ym]
@@ -299,7 +370,7 @@ export function makeModel(D: FinanceData, today: Date) {
     let exp = 0, con = 0, churn = 0
     for (const r of c.rows ?? []) {
       const b = num(r.base), cur = num(r.current)
-      if (cur <= 0) churn += -b
+      if (isChurn(b, cur)) churn += cur - b
       else if (cur > b) exp += cur - b
       else if (cur < b) con += cur - b
     }
@@ -427,6 +498,17 @@ export function makeModel(D: FinanceData, today: Date) {
         })
       }
     }
+    const ch = momChurn(ym)
+    if (!ch.partial && ch.rows.length) {
+      const rate = ch.mrrRate ?? 0
+      a.push({
+        area: 'Retention', severity: rate >= MRR_CHURN_RED ? 'red' : 'yellow',
+        title: ch.rows.length + ' account' + (ch.rows.length === 1 ? '' : 's') + ' churned MoM (−' + money(ch.lostMrr) + ' MRR)',
+        detail: pct1(rate) + ' of ' + ymLabel(ch.prev) + ' recurring revenue. Largest: ' +
+          ch.rows.slice(0, 3).map(r => r.name).join(', ') + '.',
+        action: 'See who churned (Retention).',
+      })
+    }
     if (k.mrrMoM !== null && k.mrrMoM < 0) {
       a.push({
         area: 'Revenue', severity: 'yellow', title: 'Recurring revenue down ' + signedPct(k.mrrMoM) + ' MoM',
@@ -516,8 +598,8 @@ export function makeModel(D: FinanceData, today: Date) {
     if (!c) return 'Inactive'
     const cur = num(c.recurring[ym])
     const prev = num(c.recurring[addMonthsYm(ym, -1)])
-    if (cur <= 0 && prev > 0) return 'Churned'
     if (cur <= 0 && prev <= 0) return 'Inactive'
+    if (isChurn(prev, cur)) return 'Churned'
     if (cur > prev) return 'Growing'
     if (cur < prev) return 'Declining'
     return 'Flat'
@@ -622,7 +704,7 @@ export function makeModel(D: FinanceData, today: Date) {
     hasRevenue: !!D.mrr, hasExpenses: !!D.expenses,
     hasExpenseData, earliestExpMonth, expMonthsSorted,
     revTotal, expTotal, netOf, computeKpis, largestExpenseCategory, retentionCounts, buildNarrative, trailing,
-    mrrWaterfall, ndrWaterfall, concentration, streamsAt, newMrrAt, ndrAt, marginAt,
+    mrrWaterfall, momChurn, ndrWaterfall, concentration, streamsAt, newMrrAt, ndrAt, marginAt,
     payrollOf, platformOf, catsForMonth, vendorsForMonth, topCategoriesOverall, expenseAnomalies,
     expenseWindow, expenseMonthTotal, categoryAt, categoryNames,
     breakEven, trailingBurn, contributionMarginExPayroll,
