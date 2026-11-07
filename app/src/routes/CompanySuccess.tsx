@@ -277,9 +277,7 @@ export default function CompanySuccess() {
                   <button type="button" className="btn btn--ghost" disabled={busy === 'log'}
                     onClick={() => setLogging(false)}>Cancel</button>
                   <span className="editcard__status">
-                    {temperature === 'Red'
-                      ? 'A Red reading also sets a follow-up on this company, two days out.'
-                      : 'Resets this account’s cadence clock.'}
+                    Resets this account’s cadence clock.
                   </span>
                 </div>
               </div>
