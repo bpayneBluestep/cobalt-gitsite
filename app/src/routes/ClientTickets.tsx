@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ApiError, getClientList, getTickets, type List, type Ticket } from '../api'
+import ClientAccessPanel from '../components/ClientAccessPanel'
 import TicketBoard from '../components/TicketBoard'
 import { useRecord } from './CompanyRecord'
 
@@ -61,6 +62,8 @@ export default function ClientTickets() {
 
   return (
     <>
+      <ClientAccessPanel companyId={id} />
+
       {state.phase === 'loading' && <p className="empty">Loading tickets…</p>}
 
       {state.phase === 'error' && (

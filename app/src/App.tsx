@@ -113,6 +113,7 @@ const CAPABILITY_LABELS: Record<Capability, string> = {
   viewAgreements: 'Leadership, Accounting or Sales',
   editAgreements: 'Leadership or Sales',
   manageAgreementTemplates: 'Leadership or Sales',
+  manageClientAccess: 'Leadership or Client Success',
 }
 
 function Shell() {

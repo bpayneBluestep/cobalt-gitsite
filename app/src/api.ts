@@ -195,6 +195,8 @@ export type Capability =
    */
   | 'viewAgreements' | 'editAgreements'
   | 'manageAgreementTemplates'
+  /** Generating, rotating and revoking a client's site access secret (Client Tickets). */
+  | 'manageClientAccess'
 
 /**
  * Who is signed in and what they may do.
@@ -1400,6 +1402,41 @@ export const getLists = (params: { clientId?: string; kind?: string } = {}): Pro
 /** Create or find the list for a client: how a client's board comes into being. */
 export const getClientList = (clientId: string): Promise<List & { created: boolean; tickets: Ticket[] }> =>
   maestroPost('clientList', { clientId })
+
+/*
+ * Client site access: whether a client can read its open tickets from its own BlueStep
+ * site through the public /b/clientTickets endpoint. The server stores only a hash of
+ * the secret, so `generateClientAccess` is the one and only time the secret is seen.
+ */
+
+/** Whether a client's site access is on, and since when and by whom. Never the secret. */
+export interface ClientAccessState {
+  enabled: boolean
+  /** ISO instant, or '' when off. */
+  setAt: string
+  /** Full name of whoever generated the current secret, or '' when off. */
+  setBy: string
+  /** The Company record id: what the client's site sends as its Cobalt Program ID. */
+  programId: string
+}
+
+/** A freshly generated secret. Shown once and held only in component state. */
+export interface ClientAccessSecret {
+  programId: string
+  secret: string
+  setAt: string
+  setBy: string
+}
+
+export const getClientAccess = (companyId: string): Promise<ClientAccessState> =>
+  maestroGet('clientAccess', { companyId })
+
+/** Generate or regenerate: any previous secret stops working at once. */
+export const generateClientAccess = (companyId: string): Promise<ClientAccessSecret> =>
+  maestroPost('generateClientAccess', { companyId })
+
+export const revokeClientAccess = (companyId: string): Promise<{ enabled: false; programId: string }> =>
+  maestroPost('revokeClientAccess', { companyId })
 
 /**
  * Create a ticket. The two owners ride alongside `fields` rather than inside it,
