@@ -5537,7 +5537,7 @@ input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) opacit
  * the confirm dialog above and only adds the value rows.
  * ------------------------------------------------------------------------- */
 
-.caccess { margin: 0 0 var(--s-m); padding: var(--s-m) var(--s-l); }
+.caccess { margin: var(--s-l) 0 0; padding: var(--s-m) var(--s-l); }
 .caccess__row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-s) var(--s-l); }
 .caccess__text { flex: 1 1 18rem; min-width: 0; }
 .caccess__title {

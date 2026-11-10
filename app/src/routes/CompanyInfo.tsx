@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { ApiError, updateCompany, COMPANY_FIELDS, type Company, type CompanyFieldKey } from '../api'
 import { useSession } from '../session'
 import AccountOwnerCard from '../components/AccountOwnerCard'
+import ClientAccessPanel from '../components/ClientAccessPanel'
 import { useRecord } from './CompanyRecord'
 
 /*
@@ -149,6 +150,8 @@ export default function CompanyInfo() {
           )}
         </div>
       </div>
+
+      <ClientAccessPanel companyId={company.id} />
     </>
   )
 }

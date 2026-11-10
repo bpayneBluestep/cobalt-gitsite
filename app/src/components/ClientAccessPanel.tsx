@@ -10,7 +10,7 @@ import {
 import { useSession } from '../session'
 
 /*
- * Client site access, at the top of a client's Tickets tab.
+ * Client site access, at the bottom of a client's Info tab.
  *
  * Whether this client can read its own open tickets from its own BlueStep site, through
  * the public /b/clientTickets endpoint. The site sends a Cobalt Program ID (this Company's
