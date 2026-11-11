@@ -55,7 +55,11 @@ export default function DesignerPage({ mode }: { mode: 'env' | 'tpl' }) {
           correcting: env.status !== 'Draft',
           locked,
           save: (tabs) => saveEnvelopeTabs(id, entryId, tabs),
-          onBack: () => navigate(`/clients/${id}/agreements`),
+          // A standalone envelope (on an Organization record) has no company tab to
+          // return to: go back to Reports > Agreements with it reopened.
+          onBack: () => navigate(env.hostEntity === 'org'
+            ? `/reports/agreements?org=${encodeURIComponent(id)}&env=${encodeURIComponent(entryId)}`
+            : `/clients/${id}/agreements`),
           toast: setNotice,
         })
       } else {

@@ -45,6 +45,8 @@ export interface Envelope {
   activeOrder?: number; senderName?: string; senderValues?: Record<string, unknown>
   disclosure?: { version: string; text: string } | null
   notified?: unknown[]
+  /** 'company' or 'org' (standalone): where the server found this envelope. */
+  hostEntity?: 'company' | 'org'
 }
 
 export interface EnvelopeListRow {
@@ -84,6 +86,8 @@ export interface AgreementsReportRecipient {
 
 export interface AgreementsReportRow {
   entryId: string; companyId: string; companyName: string
+  /** 'company' (+ the company id) or 'org' (+ the Organization record id) for a standalone envelope. */
+  hostEntity?: 'company' | 'org'; hostId?: string
   title: string; status: string; legacy: boolean
   createdAt: string; createdBy: string; senderName: string
   sentAt: string; completedAt: string; voidReason: string
@@ -96,7 +100,7 @@ export interface AgreementsReportRow {
 }
 
 export interface AgreementsReport {
-  generatedAt: string; companies: number; total: number; rows: AgreementsReportRow[]
+  generatedAt: string; companies: number; standalone?: number; total: number; rows: AgreementsReportRow[]
 }
 
 /** Every envelope on every company, for Reports > Agreements. */
@@ -104,66 +108,78 @@ export const getAgreementsReport = (): Promise<AgreementsReport> => maestroGet('
 
 // ---------------------------------------------------------------- envelopes
 
-export const listEnvelopes = (companyId: string): Promise<EnvelopeListRow[]> =>
-  maestroGet('listEnvelopes', { id: companyId })
+/**
+ * Where an envelope lives. A plain string is a company id (every existing caller);
+ * `{ entity: 'org', id }` is a STANDALONE envelope on an Organization record, sent
+ * from Reports > Agreements with no company attached (Leadership + Sales only).
+ * The server also resolves a plain id that matches no company to the org records,
+ * which is how the in-app sign / designer routes reach a standalone envelope.
+ */
+export type EnvHost = string | { entity: 'company' | 'org'; id: string }
+const hp = (h: EnvHost): { id: string; entity?: string } =>
+  typeof h === 'string' ? { id: h } : { id: h.id, entity: h.entity }
+export const hostId = (h: EnvHost): string => (typeof h === 'string' ? h : h.id)
 
-export const getEnvelope = (companyId: string, entryId: string): Promise<Envelope> =>
-  maestroGet('getEnvelope', { id: companyId, entryId })
+export const listEnvelopes = (host: EnvHost): Promise<EnvelopeListRow[]> =>
+  maestroGet('listEnvelopes', { ...hp(host) })
 
-export const createEnvelope = (companyId: string, title: string): Promise<Envelope> =>
-  maestroPost('createEnvelope', { id: companyId, title })
+export const getEnvelope = (host: EnvHost, entryId: string): Promise<Envelope> =>
+  maestroGet('getEnvelope', { ...hp(host), entryId })
+
+export const createEnvelope = (host: EnvHost, title: string): Promise<Envelope> =>
+  maestroPost('createEnvelope', { ...hp(host), title })
 
 export const uploadEnvelopeDoc = (
-  companyId: string, entryId: string, name: string, dataBase64: string, pages: number,
+  host: EnvHost, entryId: string, name: string, dataBase64: string, pages: number,
 ): Promise<Envelope> =>
-  maestroPost('uploadEnvelopeDoc', { id: companyId, entryId, name, dataBase64, pages })
+  maestroPost('uploadEnvelopeDoc', { ...hp(host), entryId, name, dataBase64, pages })
 
-export const removeEnvelopeDoc = (companyId: string, entryId: string, docId: string): Promise<Envelope> =>
-  maestroPost('removeEnvelopeDoc', { id: companyId, entryId, docId })
+export const removeEnvelopeDoc = (host: EnvHost, entryId: string, docId: string): Promise<Envelope> =>
+  maestroPost('removeEnvelopeDoc', { ...hp(host), entryId, docId })
 
-export const reorderEnvelopeDocs = (companyId: string, entryId: string, docIds: string[]): Promise<Envelope> =>
-  maestroPost('reorderEnvelopeDocs', { id: companyId, entryId, docIds })
+export const reorderEnvelopeDocs = (host: EnvHost, entryId: string, docIds: string[]): Promise<Envelope> =>
+  maestroPost('reorderEnvelopeDocs', { ...hp(host), entryId, docIds })
 
 export const setEnvelopeRecipients = (
-  companyId: string, entryId: string, recipients: unknown[], title?: string,
+  host: EnvHost, entryId: string, recipients: unknown[], title?: string,
 ): Promise<Envelope> =>
-  maestroPost('setEnvelopeRecipients', { id: companyId, entryId, recipients, title: title || '' })
+  maestroPost('setEnvelopeRecipients', { ...hp(host), entryId, recipients, title: title || '' })
 
-export const saveEnvelopeTabs = (companyId: string, entryId: string, tabs: unknown[]): Promise<Envelope> =>
-  maestroPost('saveEnvelopeTabs', { id: companyId, entryId, tabs })
+export const saveEnvelopeTabs = (host: EnvHost, entryId: string, tabs: unknown[]): Promise<Envelope> =>
+  maestroPost('saveEnvelopeTabs', { ...hp(host), entryId, tabs })
 
 export const sendEnvelope = (
-  companyId: string, entryId: string,
+  host: EnvHost, entryId: string,
   opts?: { routing?: string; expireDays?: number; remindEveryDays?: number; senderValues?: Record<string, unknown> },
 ): Promise<Envelope> =>
-  maestroPost('sendEnvelope', { id: companyId, entryId, ...(opts || {}) })
+  maestroPost('sendEnvelope', { ...hp(host), entryId, ...(opts || {}) })
 
-export const resendEnvelope = (companyId: string, entryId: string, recipientId: string): Promise<Envelope> =>
-  maestroPost('resendEnvelope', { id: companyId, entryId, recipientId })
+export const resendEnvelope = (host: EnvHost, entryId: string, recipientId: string): Promise<Envelope> =>
+  maestroPost('resendEnvelope', { ...hp(host), entryId, recipientId })
 
-export const voidEnvelope = (companyId: string, entryId: string, reason: string): Promise<Envelope> =>
-  maestroPost('voidEnvelope', { id: companyId, entryId, reason })
+export const voidEnvelope = (host: EnvHost, entryId: string, reason: string): Promise<Envelope> =>
+  maestroPost('voidEnvelope', { ...hp(host), entryId, reason })
 
-export const deleteEnvelope = (companyId: string, entryId: string): Promise<{ ok: boolean }> =>
-  maestroPost('deleteEnvelope', { id: companyId, entryId })
+export const deleteEnvelope = (host: EnvHost, entryId: string): Promise<{ ok: boolean }> =>
+  maestroPost('deleteEnvelope', { ...hp(host), entryId })
 
-export const verifyEnvelope = (companyId: string, entryId: string): Promise<VerifyResult> =>
-  maestroGet('verifyEnvelope', { id: companyId, entryId })
+export const verifyEnvelope = (host: EnvHost, entryId: string): Promise<VerifyResult> =>
+  maestroGet('verifyEnvelope', { ...hp(host), entryId })
 
 // In-app signing (consultant / in-person). The recipient id names who is signing;
 // the server checks kind, turn and status — this is the same write path the
 // public page's submit uses, minus the token (a session stands in for it).
 export const saveEnvelopeProgress = (
-  companyId: string, entryId: string, recipientId: string,
+  host: EnvHost, entryId: string, recipientId: string,
   tabValues: Record<string, unknown>, typedName: string, hasAdopted: boolean,
 ): Promise<{ ok: boolean; savedAt: string }> =>
-  maestroPost('saveEnvelopeProgress', { id: companyId, entryId, recipientId, tabValues, typedName, hasAdopted })
+  maestroPost('saveEnvelopeProgress', { ...hp(host), entryId, recipientId, tabValues, typedName, hasAdopted })
 
 export const signEnvelope = (
-  companyId: string, entryId: string, recipientId: string,
+  host: EnvHost, entryId: string, recipientId: string,
   signatureData: string, typedName: string, tabValues: Record<string, unknown>, initialsData: string,
 ): Promise<Envelope & { completed?: boolean }> =>
-  maestroPost('signEnvelope', { id: companyId, entryId, recipientId, signatureData, typedName, tabValues, initialsData })
+  maestroPost('signEnvelope', { ...hp(host), entryId, recipientId, signatureData, typedName, tabValues, initialsData })
 
 // ---------------------------------------------------------------- templates
 

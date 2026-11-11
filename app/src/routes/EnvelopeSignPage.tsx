@@ -21,7 +21,11 @@ export default function EnvelopeSignPage() {
   const [env, setEnv] = useState<Envelope | null>(null)
   const [error, setError] = useState('')
 
-  const back = () => navigate(`/clients/${id}/agreements`)
+  // A standalone envelope (on an Organization record) has no company tab: its home
+  // is Reports > Agreements, reopened on this envelope.
+  const back = () => navigate(env && env.hostEntity === 'org'
+    ? `/reports/agreements?org=${encodeURIComponent(id)}&env=${encodeURIComponent(entryId)}`
+    : `/clients/${id}/agreements`)
 
   useEffect(() => {
     let dead = false

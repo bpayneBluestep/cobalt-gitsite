@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useRecord } from './CompanyRecord'
 import { useSession } from '../session'
@@ -7,7 +7,7 @@ import {
   reorderEnvelopeDocs, setEnvelopeRecipients, saveEnvelopeTabs, sendEnvelope,
   resendEnvelope, voidEnvelope, deleteEnvelope, verifyEnvelope,
   listAgreementTemplates, fileToBase64, bufToBase64, randomTabId,
-  type Envelope, type EnvelopeListRow, type EnvRecipient, type AgreementTemplate, type VerifyResult,
+  type EnvHost, type Envelope, type EnvelopeListRow, type EnvRecipient, type AgreementTemplate, type VerifyResult,
 } from '../agreements/api'
 import { getContacts, getUsers, type Company } from '../api'
 import { pdfOpen, pdfRenderPage, geoScale, geoApplyTabRect } from '../agreements/pdf'
@@ -89,10 +89,28 @@ function packKeys(body: any): { slot: { id: string; label: string; optional: boo
   })
 }
 
-interface PickOpt { label: string; name: string; email: string; kind: string }
+export interface PickOpt { label: string; name: string; email: string; kind: string }
+
+/*
+ * Where the envelope pieces below send their API calls. On a company's Agreements
+ * tab there is no provider and the host is the company id, as it always was.
+ * Reports > Agreements wraps them in a provider carrying `{ entity: 'org', id }` for
+ * a STANDALONE envelope on an Organization record; `company` is then a stand-in whose
+ * id is the org record id and whose CRM fields are blank (no company to fill from).
+ */
+export const EnvHostContext = createContext<EnvHost | null>(null)
+function useHost(company: Company): EnvHost {
+  return useContext(EnvHostContext) ?? company.id
+}
+/* A standalone envelope offers only the templates of the org library it lives in,
+   so the finished PDFs land beside their template. '' = no restriction. */
+function orgOnly(host: EnvHost): string {
+  return typeof host === 'object' && host.entity === 'org' ? host.id : ''
+}
 
 export default function CompanyAgreements() {
   const { company } = useRecord()
+  const host = useHost(company)
   const { can, session } = useSession()
   const fullName = session?.fullName || ''
   const [rows, setRows] = useState<EnvelopeListRow[] | null>(null)
@@ -154,7 +172,7 @@ export default function CompanyAgreements() {
   useEffect(() => { renderThumbs(rootRef.current) })
 
   async function openEnvelope(entryId: string) {
-    try { setOpen(await getEnvelope(company.id, entryId)) }
+    try { setOpen(await getEnvelope(host, entryId)) }
     catch (e) { setNotice(errMsg(e)) }
   }
 
@@ -162,7 +180,7 @@ export default function CompanyAgreements() {
     const reason = prompt('Void this envelope? Recipients will no longer be able to sign.\nReason (optional):', '')
     if (reason == null) return
     try {
-      await voidEnvelope(company.id, entryId, reason)
+      await voidEnvelope(host, entryId, reason)
       if (open && open.entryId === entryId) setOpen(null)
       load(true)
       setNotice('Envelope voided.')
@@ -277,6 +295,7 @@ function DeleteEnvelopeModal({
   onClose: () => void
   onDeleted: (title: string) => void
 }) {
+  const host = useHost(company)
   const [typed, setTyped] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
@@ -288,7 +307,7 @@ function DeleteEnvelopeModal({
     if (!armed) return
     setBusy(true); setErr('')
     try {
-      await deleteEnvelope(company.id, row.entryId)
+      await deleteEnvelope(host, row.entryId)
       onDeleted(row.title)
     } catch (e) {
       setErr('Delete failed: ' + errMsg(e))
@@ -339,7 +358,7 @@ function DeleteEnvelopeModal({
   )
 }
 
-function NewEnvelopeModal({
+export function NewEnvelopeModal({
   company, picks, onClose, onCreated, notify,
 }: {
   company: Company; picks: PickOpt[]
@@ -347,6 +366,7 @@ function NewEnvelopeModal({
   onCreated: (env: Envelope) => void
   notify: (m: string) => void
 }) {
+  const host = useHost(company)
   const [tpls, setTpls] = useState<AgreementTemplate[] | null>(null)
   const [checked, setChecked] = useState<Record<string, boolean>>({})
   const [step, setStep] = useState<'pick' | 'roles'>('pick')
@@ -360,7 +380,8 @@ function NewEnvelopeModal({
     // Only ACTIVE upload-based templates are offered for sending.
     listAgreementTemplates()
       .then(list => setTpls((list || []).filter(t =>
-        t.bodyJson && t.bodyJson.schemaVersion === 3 && (t.bodyJson.documents || []).length > 0 && t.status === 'Active')))
+        t.bodyJson && t.bodyJson.schemaVersion === 3 && (t.bodyJson.documents || []).length > 0 && t.status === 'Active'
+        && (!orgOnly(host) || t.orgId === orgOnly(host)))))
       .catch(() => setTpls([]))
   }, [])
 
@@ -370,7 +391,7 @@ function NewEnvelopeModal({
     const t = prompt('Envelope title (e.g. "Master Services Agreement"):', '')
     if (t == null) return
     try {
-      const env = await createEnvelope(company.id, t.trim() || 'Untitled envelope')
+      const env = await createEnvelope(host, t.trim() || 'Untitled envelope')
       onCreated(env)
     } catch (e) { notify('Create failed: ' + errMsg(e)) }
   }
@@ -418,8 +439,8 @@ function NewEnvelopeModal({
     const finalTitle = title.trim() || (sel.length === 1 ? sel[0].name : `Signing packet (${sel.length} agreements)`)
     try {
       setStatus('Creating envelope…')
-      env = await createEnvelope(company.id, finalTitle)
-      env = await setEnvelopeRecipients(company.id, env.entryId, filled, finalTitle)
+      env = await createEnvelope(host, finalTitle)
+      env = await setEnvelopeRecipients(host, env.entryId, filled, finalTitle)
       // consolidated role key -> real recipient id (server materializes in order sent)
       const keyToRid: Record<string, string> = {}
       for (const k in keyToIdx) keyToRid[k] = env.recipients[keyToIdx[k]] ? env.recipients[keyToIdx[k]].id : ''
@@ -438,7 +459,7 @@ function NewEnvelopeModal({
           const resp = await fetch(doc.sourceUrl, { credentials: 'include' })
           if (!resp.ok) throw new Error(`Could not fetch template PDF "${doc.name}" (${resp.status}).`)
           const b64 = bufToBase64(await resp.arrayBuffer())
-          env = await uploadEnvelopeDoc(company.id, env!.entryId, doc.name, b64, doc.pages || 0)
+          env = await uploadEnvelopeDoc(host, env!.entryId, doc.name, b64, doc.pages || 0)
           const newDoc = env.documents[env.documents.length - 1]
           for (const tb of (body.tabs || [])) {
             if (tb.docId !== doc.id) continue
@@ -450,12 +471,12 @@ function NewEnvelopeModal({
         failedTpl = ''
       }
       setStatus(`Saving ${allTabs.length} fields…`)
-      env = await saveEnvelopeTabs(company.id, env.entryId, allTabs)
+      env = await saveEnvelopeTabs(host, env.entryId, allTabs)
       notify(`Envelope created — ${sel.length} agreement${sel.length === 1 ? '' : 's'}, ${allTabs.length} fields.`)
       onCreated(env)
     } catch (e) {
       // Keep what copied so far — the draft stays valid and editable.
-      if (env && allTabs.length) { try { env = await saveEnvelopeTabs(company.id, env.entryId, allTabs) } catch { /* best-effort */ } }
+      if (env && allTabs.length) { try { env = await saveEnvelopeTabs(host, env.entryId, allTabs) } catch { /* best-effort */ } }
       setBusy(false); setStatus('')
       if (env) {
         notify((failedTpl ? `"${failedTpl}" failed: ` : 'Packet failed: ') + errMsg(e) + ' — the draft keeps what was copied.')
@@ -480,7 +501,7 @@ function NewEnvelopeModal({
             <div className="agr-modal-head">
               <div>
                 <b>New envelope</b>
-                <p>Pick every agreement this company needs — they combine into one envelope, one signing session.</p>
+                <p>Pick every agreement {orgOnly(host) ? "to send" : "this company needs"} — they combine into one envelope, one signing session.</p>
               </div>
               <button type="button" className="ico-mini" onClick={onClose}>✕</button>
             </div>
@@ -587,7 +608,7 @@ function genAccessCode(): string {
 }
 
 /* ---- envelope detail: Draft editor / in-flight controls / read-only viewer ---- */
-function EnvelopeDetail({
+export function EnvelopeDetail({
   company, env, picks, canEdit, setEnv, onClose, onVoid, notify, reloadList,
 }: {
   company: Company; env: Envelope; picks: PickOpt[]; canEdit: boolean
@@ -597,6 +618,7 @@ function EnvelopeDetail({
   notify: (m: string) => void
   reloadList: () => void
 }) {
+  const host = useHost(company)
   const navigate = useNavigate()
   const [correct, setCorrect] = useState(false)
   const [title, setTitle] = useState(env.title)
@@ -619,7 +641,7 @@ function EnvelopeDetail({
     setEnv(next)
     if (saveTimer.current) clearTimeout(saveTimer.current)
     const doSave = () => {
-      setEnvelopeRecipients(company.id, next.entryId, next.recipients, title.trim())
+      setEnvelopeRecipients(host, next.entryId, next.recipients, title.trim())
         .then(setEnv)
         .catch(e => notify('Save failed: ' + errMsg(e)))
     }
@@ -673,7 +695,7 @@ function EnvelopeDetail({
           let pages = 0
           try { const pdf = await pdfOpen(URL.createObjectURL(f)); pages = pdf.numPages; try { pdf.destroy() } catch { /* */ } } catch { /* */ }
           const name = f.name.replace(/\.pdf$/i, '')
-          cur = await uploadEnvelopeDoc(company.id, cur.entryId, name, b64, pages)
+          cur = await uploadEnvelopeDoc(host, cur.entryId, name, b64, pages)
           setEnv(cur)
         } catch (e) { notify('Upload failed: ' + errMsg(e)) }
       }
@@ -684,7 +706,7 @@ function EnvelopeDetail({
 
   async function removeDoc(docId: string) {
     if (!confirm('Remove this document from the envelope?')) return
-    try { setEnv(await removeEnvelopeDoc(company.id, env.entryId, docId)) }
+    try { setEnv(await removeEnvelopeDoc(host, env.entryId, docId)) }
     catch (e) { notify('Remove failed: ' + errMsg(e)) }
   }
 
@@ -694,26 +716,26 @@ function EnvelopeDetail({
     const j = i + dir
     if (i < 0 || j < 0 || j >= ids.length) return
     ids[i] = ids[j]; ids[j] = docId
-    try { setEnv(await reorderEnvelopeDocs(company.id, env.entryId, ids)) }
+    try { setEnv(await reorderEnvelopeDocs(host, env.entryId, ids)) }
     catch (e) { notify('Reorder failed: ' + errMsg(e)) }
   }
 
   async function doResend(recipientId: string) {
     try {
-      setEnv(await resendEnvelope(company.id, env.entryId, recipientId))
+      setEnv(await resendEnvelope(host, env.entryId, recipientId))
       notify('Signing link re-emailed.')
     } catch (e) { notify('Resend failed: ' + errMsg(e)) }
   }
 
   async function doVerify() {
-    try { setVerify(await verifyEnvelope(company.id, env.entryId)) }
+    try { setVerify(await verifyEnvelope(host, env.entryId)) }
     catch (e) { notify('Verify failed: ' + errMsg(e)) }
   }
 
   async function doDelete() {
     if (!confirm('Delete this draft envelope? This cannot be undone.')) return
     try {
-      await deleteEnvelope(company.id, env.entryId)
+      await deleteEnvelope(host, env.entryId)
       notify('Draft deleted.')
       onClose()
     } catch (e) { notify('Delete failed: ' + errMsg(e)) }
@@ -772,7 +794,7 @@ function EnvelopeDetail({
           {correct && (
             <button type="button" className="btn" onClick={async () => {
               setCorrect(false)
-              try { setEnv(await getEnvelope(company.id, env.entryId)) } catch { /* keep local */ }
+              try { setEnv(await getEnvelope(host, env.entryId)) } catch { /* keep local */ }
               notify('Corrections saved. Pending signers see the updated envelope on their existing links — use Resend to nudge them.')
             }}>Done correcting</button>
           )}
@@ -998,6 +1020,7 @@ function SendModal({
   onSent: (env: Envelope) => void
   notify: (m: string) => void
 }) {
+  const host = useHost(company)
   const { session } = useSession()
   const fullName = session?.fullName || ''
   const [seq, setSeq] = useState(env.status === 'Draft' ? true : env.routing === 'sequential')
@@ -1112,7 +1135,7 @@ function SendModal({
     }
     setBusy(true)
     try {
-      const fresh = await sendEnvelope(company.id, env.entryId, {
+      const fresh = await sendEnvelope(host, env.entryId, {
         routing: seq ? 'sequential' : 'parallel',
         expireDays: Math.max(0, exp || 0),
         remindEveryDays: Math.max(0, rem || 0),
@@ -1172,6 +1195,7 @@ function AddTemplateModal({
   onApplied: (env: Envelope, msg: string) => void
   notify: (m: string) => void
 }) {
+  const host = useHost(company)
   const [tpls, setTpls] = useState<AgreementTemplate[] | null>(null)
   const [picked, setPicked] = useState<AgreementTemplate | null>(null)
   const [status, setStatus] = useState('')
@@ -1182,7 +1206,8 @@ function AddTemplateModal({
   useEffect(() => {
     listAgreementTemplates()
       .then(list => setTpls((list || []).filter(t =>
-        t.bodyJson && t.bodyJson.schemaVersion === 3 && (t.bodyJson.documents || []).length > 0 && t.status === 'Active')))
+        t.bodyJson && t.bodyJson.schemaVersion === 3 && (t.bodyJson.documents || []).length > 0 && t.status === 'Active'
+        && (!orgOnly(host) || t.orgId === orgOnly(host)))))
       .catch(() => setTpls([]))
   }, [])
 
@@ -1227,7 +1252,7 @@ function AddTemplateModal({
         // existing recipients go back verbatim WITH ids (the server preserves
         // state by id); new ones follow and come back in order after them.
         const keep = (cur.recipients || []).map(r => ({ id: r.id, role: r.role, name: r.name, email: r.email, kind: r.kind, routingOrder: r.routingOrder, accessCode: (r as any).accessCode }))
-        cur = await setEnvelopeRecipients(company.id, cur.entryId, keep.concat(adds.map(a => a.add)), cur.title)
+        cur = await setEnvelopeRecipients(host, cur.entryId, keep.concat(adds.map(a => a.add)), cur.title)
         for (let j = 0; j < adds.length; j++) {
           const nr = cur.recipients[keep.length + j]
           if (nr) adds[j].rid = nr.id
@@ -1244,7 +1269,7 @@ function AddTemplateModal({
         const resp = await fetch(doc.sourceUrl, { credentials: 'include' })
         if (!resp.ok) throw new Error(`Could not fetch template PDF "${doc.name}" (${resp.status}).`)
         const b64 = bufToBase64(await resp.arrayBuffer())
-        cur = await uploadEnvelopeDoc(company.id, cur.entryId, doc.name, b64, doc.pages || 0)
+        cur = await uploadEnvelopeDoc(host, cur.entryId, doc.name, b64, doc.pages || 0)
         const newDoc = cur.documents[cur.documents.length - 1]
         for (const tb of (body.tabs || [])) {
           if (tb.docId !== doc.id) continue
@@ -1254,7 +1279,7 @@ function AddTemplateModal({
         }
       }
       setStatus(`Saving ${newTabs.length} fields…`)
-      cur = await saveEnvelopeTabs(company.id, cur.entryId, (cur.tabs || []).concat(newTabs))
+      cur = await saveEnvelopeTabs(host, cur.entryId, (cur.tabs || []).concat(newTabs))
       onApplied(cur, `"${picked.name}" added — ${docs.length} document${docs.length === 1 ? '' : 's'}, ${newTabs.length} fields.`)
     } catch (e) {
       setBusy(false); setStatus('')

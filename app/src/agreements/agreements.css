@@ -297,3 +297,10 @@
   .agrep__search input { min-width: 0; width: 100%; }
   .agrep__filters .seg { flex-wrap: wrap; white-space: normal; }
 }
+
+/* Standalone agreements on Reports > Agreements (no company attached). */
+.agrep__libs { display: flex; flex-wrap: wrap; gap: 8px }
+.agrep__standalone { color: var(--text-dim); font-style: italic }
+.agrep__open { margin-left: 0; font-size: inherit; text-align: left }
+.agrep__standalone-note { margin: 0 0 10px; font-size: var(--t-caption1) }
+.agrep__editor { margin-top: 8px }

@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { ApiError } from '../api'
+import { Link, useSearchParams } from 'react-router-dom'
+import { ApiError, getUsers, type Company } from '../api'
+import { useSession } from '../session'
 import {
-  getAgreementsReport,
+  getAgreementsReport, getEnvelope, voidEnvelope, listAgreementTemplates,
   type AgreementsReport as Report, type AgreementsReportRow as Row,
-  type AgreementsReportRecipient as Recipient,
+  type AgreementsReportRecipient as Recipient, type Envelope, type EnvHost,
 } from '../agreements/api'
+import { EnvHostContext, EnvelopeDetail, NewEnvelopeModal, type PickOpt } from './CompanyAgreements'
 import { downloadCsv } from '../lib/csv'
 import '../agreements/agreements.css'
 
@@ -23,6 +25,13 @@ import '../agreements/agreements.css'
  *
  * Test and demo envelopes (the E2E and self-test companies) are hidden by default. The
  * rule is a name match, so it is stated on screen and one click undoes it.
+ *
+ * STANDALONE agreements (Leadership + Sales only) are also started and worked here:
+ * one-off paperwork with no company attached, such as a referral agreement. They live
+ * on the Organization record whose template library they came from, so the signed PDFs
+ * land beside it. "New agreement" opens the same envelope editor the company tab uses,
+ * wrapped in an org host; a standalone row opens back into it. The server returns
+ * standalone rows only to callers with editAgreements.
  */
 
 type Bucket = 'open' | 'draft' | 'completed' | 'closed' | 'all'
@@ -53,6 +62,18 @@ type State =
   | { phase: 'loading' }
   | { phase: 'ready'; report: Report }
   | { phase: 'error'; error: string; needsLogin?: boolean }
+
+/** The org library a standalone envelope lives in. */
+interface OrgLib { orgId: string; orgName: string }
+
+/* The envelope editor takes a company; a standalone envelope has none, so it gets a
+   stand-in whose id is the org record id and whose CRM fields are blank (sender
+   fields bound to the company record then start empty, to be typed at send). */
+function standIn(orgId: string, orgName: string): Company {
+  return { id: orgId, name: orgName } as unknown as Company
+}
+const orgHost = (orgId: string): EnvHost => ({ entity: 'org', id: orgId })
+const errText = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
 const LOGIN_URL = '/shared/login/login.jsp?desturl=' +
   encodeURIComponent(window.location.pathname + window.location.search)
@@ -107,6 +128,18 @@ export default function AgreementsReport() {
   const [bucket, setBucket] = useState<Bucket>('open')
   const [query, setQuery] = useState('')
   const [showTests, setShowTests] = useState(false)
+  const [onlyStandalone, setOnlyStandalone] = useState(false)
+  const { can, session } = useSession()
+  const canEdit = can('editAgreements')
+  const fullName = session?.fullName || ''
+  const [params, setParams] = useSearchParams()
+  const [notice, setNotice] = useState('')
+  // Standalone editing: the org libraries, the one being created in, the open envelope.
+  const [libs, setLibs] = useState<OrgLib[] | null>(null)
+  const [choosing, setChoosing] = useState(false)
+  const [newIn, setNewIn] = useState<OrgLib | null>(null)
+  const [openEnv, setOpenEnv] = useState<{ lib: OrgLib; env: Envelope } | null>(null)
+  const [picks, setPicks] = useState<PickOpt[]>([])
 
   const load = useCallback(() => {
     setState({ phase: 'loading' })
@@ -121,12 +154,79 @@ export default function AgreementsReport() {
 
   useEffect(() => { load() }, [load])
 
+  // Org libraries = the Organization records that hold templates (Behavioral,
+  // Assisted Living). Read once, only for people who can send standalone agreements.
+  useEffect(() => {
+    if (!canEdit) return
+    listAgreementTemplates().then(list => {
+      const seen: Record<string, OrgLib> = {}
+      for (const t of list || []) if (t.orgId && !seen[t.orgId]) seen[t.orgId] = { orgId: t.orgId, orgName: t.orgName }
+      setLibs(Object.values(seen).sort((a, b) => a.orgName.localeCompare(b.orgName)))
+    }).catch(() => setLibs([]))
+  }, [canEdit])
+
+  // Recipient picker: me + current staff as in-app signers. Everyone else is typed in;
+  // a standalone envelope has no contacts to pick from.
+  useEffect(() => {
+    if (!canEdit) return
+    let dead = false
+    const signerName = (n: string) => {
+      const m = (n || '').match(/^([^,]+),\s*(.+)$/)
+      return m ? (m[2] + ' ' + m[1]).trim() : (n || '').trim()
+    }
+    getUsers().then(ul => {
+      if (dead) return
+      const out: PickOpt[] = []
+      if (fullName) out.push({ label: fullName + ' — me, signs in-app', name: fullName, email: '', kind: 'consultant' })
+      const staff = ((ul && ul.rows) || []).map(u => signerName(u.name))
+        .filter(n => n && n !== fullName).sort((a, b) => a.localeCompare(b))
+        .map(n => ({ label: n + ' — staff, signs in-app', name: n, email: '', kind: 'consultant' }))
+      setPicks(out.concat(staff))
+    }).catch(() => { /* picker stays empty; recipients can still be typed */ })
+    return () => { dead = true }
+  }, [canEdit, fullName])
+
+  const libName = useCallback((orgId: string) =>
+    (libs || []).find(l => l.orgId === orgId)?.orgName || 'Organization', [libs])
+
+  const openStandalone = useCallback(async (orgId: string, entryId: string) => {
+    try {
+      const env = await getEnvelope(orgHost(orgId), entryId)
+      setOpenEnv({ lib: { orgId, orgName: libName(orgId) }, env })
+    } catch (e) { setNotice('Could not open that agreement: ' + errText(e)) }
+  }, [libName])
+
+  // ?org=&env= reopens a standalone envelope (the designer and in-app signing page
+  // send people back here, since there is no company tab to return to).
+  useEffect(() => {
+    const org = params.get('org'), env = params.get('env')
+    if (!org || !env || !canEdit) return
+    setParams({}, { replace: true })
+    openStandalone(org, env)
+  }, [params, setParams, canEdit, openStandalone])
+
+  function startNew() {
+    if (!libs || libs.length === 0) { setNotice('No template library found: add a template first.'); return }
+    if (libs.length === 1) setNewIn(libs[0])
+    else setChoosing(true)
+  }
+
+  async function voidStandalone(lib: OrgLib, entryId: string) {
+    const reason = prompt('Void this agreement? Recipients will no longer be able to sign.\nReason (optional):', '')
+    if (reason == null) return
+    try {
+      await voidEnvelope(orgHost(lib.orgId), entryId, reason)
+      setOpenEnv(null); load(); setNotice('Agreement voided.')
+    } catch (e) { setNotice('Void failed: ' + errText(e)) }
+  }
+
   const report = state.phase === 'ready' ? state.report : null
   const today = todayIso()
 
   const base = useMemo(
-    () => (report?.rows || []).filter(r => showTests || !isTest(r)),
-    [report, showTests],
+    () => (report?.rows || []).filter(r =>
+      (showTests || !isTest(r)) && (!onlyStandalone || r.hostEntity === 'org')),
+    [report, showTests, onlyStandalone],
   )
   const hiddenTests = (report?.rows.length || 0) - base.length
 
@@ -201,8 +301,69 @@ export default function AgreementsReport() {
             waiting on, and what has closed.
           </p>
         </div>
-        <Link className="btn btn--ghost btn--sm" to="/reports">All reports</Link>
+        <span className="env-head-acts">
+          {canEdit && (
+            <button type="button" className="btn btn--sm" onClick={startNew} disabled={libs === null}>
+              + New agreement
+            </button>
+          )}
+          <Link className="btn btn--ghost btn--sm" to="/reports">All reports</Link>
+        </span>
       </header>
+
+      {notice && <p className="board2__notice" role="status" onClick={() => setNotice('')}>{notice}</p>}
+
+      {openEnv && (
+        <EnvHostContext.Provider value={orgHost(openEnv.lib.orgId)}>
+          <div className="agr agrep__editor">
+            <p className="muted agrep__standalone-note">
+              Standalone agreement · {openEnv.lib.orgName} library · no company attached
+            </p>
+            <EnvelopeDetail
+              company={standIn(openEnv.lib.orgId, openEnv.lib.orgName)}
+              env={openEnv.env} picks={picks} canEdit={canEdit}
+              setEnv={env => setOpenEnv(o => (o ? { ...o, env } : o))}
+              onClose={() => { setOpenEnv(null); load() }}
+              onVoid={() => voidStandalone(openEnv.lib, openEnv.env.entryId)}
+              notify={setNotice}
+              reloadList={load}
+            />
+          </div>
+        </EnvHostContext.Provider>
+      )}
+
+      {choosing && libs && (
+        <div className="agr agr-modal-back" onMouseDown={e => { if (e.target === e.currentTarget) setChoosing(false) }}>
+          <div className="agr-modal" role="dialog" aria-modal="true" aria-labelledby="agrep-lib-h">
+            <div className="agr-modal-head">
+              <div>
+                <b id="agrep-lib-h">New standalone agreement</b>
+                <p>Which template library? The signed agreement is filed on that organization's record.</p>
+              </div>
+              <button type="button" className="ico-mini" onClick={() => setChoosing(false)}>✕</button>
+            </div>
+            <div className="agrep__libs">
+              {libs.map(l => (
+                <button key={l.orgId} type="button" className="btn btn--ghost"
+                  onClick={() => { setChoosing(false); setNewIn(l) }}>{l.orgName}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {newIn && (
+        <EnvHostContext.Provider value={orgHost(newIn.orgId)}>
+          <div className="agr">
+            <NewEnvelopeModal
+              company={standIn(newIn.orgId, newIn.orgName)} picks={picks}
+              onClose={() => setNewIn(null)}
+              onCreated={env => { const lib = newIn; setNewIn(null); setOpenEnv({ lib, env }); load() }}
+              notify={setNotice}
+            />
+          </div>
+        </EnvHostContext.Provider>
+      )}
 
       {state.phase === 'loading' && <p className="muted">Reading every company's agreements…</p>}
 
@@ -220,7 +381,7 @@ export default function AgreementsReport() {
         </div>
       )}
 
-      {report && (
+      {report && !openEnv && (
         <>
           <div className="kpis">
             <div className="kpi" data-tone={kpi.open ? 'warn' : 'good'}>
@@ -263,6 +424,12 @@ export default function AgreementsReport() {
               <input type="checkbox" checked={showTests} onChange={e => setShowTests(e.target.checked)} />
               Show test records{hiddenTests && !showTests ? ` (${hiddenTests} hidden)` : ''}
             </label>
+            {canEdit && (
+              <label className="agrep__toggle">
+                <input type="checkbox" checked={onlyStandalone} onChange={e => setOnlyStandalone(e.target.checked)} />
+                Standalone only{report.standalone ? ` (${report.standalone})` : ''}
+              </label>
+            )}
             <span className="tpage__spacer" />
             <button type="button" className="btn btn--ghost btn--sm" onClick={load}>Refresh</button>
             <button type="button" className="btn btn--ghost btn--sm" disabled={!rows.length} onClick={exportCsv}>
@@ -297,7 +464,10 @@ export default function AgreementsReport() {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map(r => <ReportRow key={r.companyId + r.entryId} r={r} today={today} />)}
+                  {rows.map(r => (
+                    <ReportRow key={(r.hostId || r.companyId) + r.entryId} r={r} today={today}
+                      onOpenStandalone={canEdit ? openStandalone : undefined} />
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -315,7 +485,11 @@ export default function AgreementsReport() {
   )
 }
 
-function ReportRow({ r, today }: { r: Row; today: string }) {
+function ReportRow({ r, today, onOpenStandalone }: {
+  r: Row; today: string
+  onOpenStandalone?: (orgId: string, entryId: string) => void
+}) {
+  const standalone = r.hostEntity === 'org' && !!r.hostId && !!r.entryId && !r.legacy
   const b = bucketOf(r.status)
   const s = signers(r)
   const signedCount = s.filter(x => x.status === 'signed').length
@@ -330,10 +504,14 @@ function ReportRow({ r, today }: { r: Row; today: string }) {
       <td>
         {r.companyId
           ? <Link to={`/clients/${encodeURIComponent(r.companyId)}/agreements`}>{r.companyName || '(unnamed)'}</Link>
-          : r.companyName}
+          : standalone ? <span className="agrep__standalone">{r.companyName}</span> : r.companyName}
       </td>
       <td>
-        <strong>{r.title || 'Untitled'}</strong>
+        {standalone && onOpenStandalone
+          ? <button type="button" className="linkbtn agrep__open" onClick={() => onOpenStandalone(r.hostId!, r.entryId)}>
+              <strong>{r.title || 'Untitled'}</strong>
+            </button>
+          : <strong>{r.title || 'Untitled'}</strong>}
         <div className="agrep__sub muted">
           {r.status === 'Completed' && r.completedAt
             ? `Signed ${fmtDate(r.completedAt)}`
