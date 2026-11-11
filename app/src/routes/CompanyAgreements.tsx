@@ -33,7 +33,7 @@ const ENV_KINDS: { v: string; label: string }[] = [
    so a thumbnail renders once per url per session (module-level survives remounts). */
 const ENV_THUMBS: { [url: string]: string } = {}
 
-async function renderThumbs(rootEl: HTMLElement | null): Promise<void> {
+export async function renderThumbs(rootEl: HTMLElement | null): Promise<void> {
   if (!rootEl) return
   const canvases = rootEl.querySelectorAll('canvas[data-thumb]')
   for (let i = 0; i < canvases.length; i++) {

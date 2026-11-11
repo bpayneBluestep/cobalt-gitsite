@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ApiError, getUsers, type Company } from '../api'
 import { useSession } from '../session'
@@ -7,7 +7,7 @@ import {
   type AgreementsReport as Report, type AgreementsReportRow as Row,
   type AgreementsReportRecipient as Recipient, type Envelope, type EnvHost,
 } from '../agreements/api'
-import { EnvHostContext, EnvelopeDetail, NewEnvelopeModal, type PickOpt } from './CompanyAgreements'
+import { EnvHostContext, EnvelopeDetail, NewEnvelopeModal, renderThumbs, type PickOpt } from './CompanyAgreements'
 import { downloadCsv } from '../lib/csv'
 import '../agreements/agreements.css'
 
@@ -140,6 +140,9 @@ export default function AgreementsReport() {
   const [newIn, setNewIn] = useState<OrgLib | null>(null)
   const [openEnv, setOpenEnv] = useState<{ lib: OrgLib; env: Envelope } | null>(null)
   const [picks, setPicks] = useState<PickOpt[]>([])
+  const editorRef = useRef<HTMLDivElement | null>(null)
+  // Document thumbnails in the open standalone envelope (pdf.js, cached per url).
+  useEffect(() => { renderThumbs(editorRef.current) })
 
   const load = useCallback(() => {
     setState({ phase: 'loading' })
@@ -315,7 +318,7 @@ export default function AgreementsReport() {
 
       {openEnv && (
         <EnvHostContext.Provider value={orgHost(openEnv.lib.orgId)}>
-          <div className="agr agrep__editor">
+          <div className="agr agrep__editor" ref={editorRef}>
             <p className="muted agrep__standalone-note">
               Standalone agreement · {openEnv.lib.orgName} library · no company attached
             </p>
@@ -475,7 +478,7 @@ export default function AgreementsReport() {
 
           <p className="muted agrep__foot">
             {plural(report.total, 'agreement')} on {plural(report.companies, 'company')}, read{' '}
-            {new Date(report.generatedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.
+            {new Date(String(report.generatedAt).replace(/\[.*\]$/, '')).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.
             {' '}Days out turns amber at {WARN_DAYS} and red at {BAD_DAYS}. On a Signed row, Days is
             how long it took to come back.
           </p>
