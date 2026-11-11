@@ -991,6 +991,18 @@ function RecipientRow({
         {r.status === 'declined' && r.declineReason && (
           <div className="agr-meta env-decline-reason">“{r.declineReason}”</div>
         )}
+        {/* The 6-digit code an emailed signer needs to open their link. It is never in
+            the invite email, so after send this row is the only place the sender sees it. */}
+        {canEdit && r.kind === 'external' && r.accessCode && r.status !== 'signed' && r.status !== 'declined' && (
+          <div className="agr-meta env-rec-codeline">
+            Access code <b className="env-rec-codeval">{r.accessCode}</b>
+            <button type="button" className="linkbtn" title="Copy the code to share with them out-of-band"
+              onClick={() => { try { navigator.clipboard.writeText(r.accessCode || '') } catch { /* select it by hand */ } }}>
+              Copy
+            </button>
+            <span> · share it separately (text or call); it isn't in their email</span>
+          </div>
+        )}
       </div>
       {pill}
       <span className="env-rec-acts">

@@ -304,3 +304,5 @@
 .agrep__open { margin-left: 0; font-size: inherit; text-align: left }
 .agrep__standalone-note { margin: 0 0 10px; font-size: var(--t-caption1) }
 .agrep__editor { margin-top: 8px }
+.env-rec-codeline { margin-top: 3px }
+.env-rec-codeval { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 0.12em; color: var(--text) }
