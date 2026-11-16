@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
   ApiError, getSprint, getTeam, createSprint, assignSprint, carryForward,
+  updateTicket, setTicketPeople,
   addEngineer, updateEngineer, deleteEngineer,
   formatHours, remainingHoursOf, shiftSprint, sprintLabel, isSprintKey, nameKey,
-  ENGINEER_DISCIPLINES, ENGINEER_READY_RULE, PRIORITY_RANK,
+  ENGINEER_DISCIPLINES, PLANNABLE_RULE, PLANNED_STATUS, PRIORITY_RANK,
   type SprintBoard, type SprintColumn, type Team, type Ticket, type EngineerFieldKey,
   type User,
 } from '../api'
@@ -66,11 +67,10 @@ const NEW_TAB = { target: '_blank' as const, rel: 'noopener', draggable: false }
 /*
  * How many backlog rows to pull.
  *
- * The server caps at 60 by default, and this page now filters and sorts in the browser,
- * where a truncated list quietly answers the wrong question. The Engineer-Ready gate
- * keeps the real backlog small - 24 today against thousands of open tickets - so asking
- * for 400 costs nothing and makes the controls honest. If it is ever still cut, the page
- * says so rather than pretending.
+ * The server caps at 60 by default, and this page filters and sorts in the browser, where
+ * a truncated list quietly answers the wrong question. The backlog is every open ticket
+ * with no sprint - about 190 on 2026-11-16 - so 400 holds all of it. If it is ever cut,
+ * the page says so rather than pretending.
  */
 const BACKLOG_LIMIT = 400
 
@@ -174,18 +174,34 @@ function moved(board: SprintBoard, ticket: Ticket, toKey: string, fresh?: Ticket
 }
 
 /**
+ * Swap one ticket for the server's fresh copy wherever it sits - a column, the
+ * nobody-yet column or the backlog - and re-derive the totals. This is what lets an
+ * estimate or an accountable owner be set from this page without rebuilding the board.
+ */
+function patched(board: SprintBoard, fresh: Ticket): SprintBoard {
+  const swap = (t: Ticket) => (t.entryId === fresh.entryId ? fresh : t)
+  return recomputed({
+    ...board,
+    columns: board.columns.map(c => ({ ...c, tickets: c.tickets.map(swap) })),
+    unassigned: board.unassigned.map(swap),
+    backlog: board.backlog.map(swap),
+  })
+}
+
+/**
  * The backlog's sortable columns.
  *
  * `est` descending is the default because it is the server's order and a deliberate one:
  * the backlog is a picking list, and the big items are the ones that decide whether a
  * sprint fits. Sorting is a way to ask a different question of it, not a correction.
  */
-type SortKey = 'num' | 'title' | 'list' | 'accountable' | 'priority' | 'est'
+type SortKey = 'num' | 'title' | 'list' | 'status' | 'accountable' | 'priority' | 'est'
 
 const SORT_COLUMNS: { key: SortKey; label: string; numeric?: boolean }[] = [
   { key: 'num', label: '#', numeric: true },
   { key: 'title', label: 'Ticket' },
   { key: 'list', label: 'For' },
+  { key: 'status', label: 'Status' },
   { key: 'accountable', label: 'Accountable' },
   { key: 'priority', label: 'Priority', numeric: true },
   { key: 'est', label: 'Est', numeric: true },
@@ -201,8 +217,12 @@ function sortValue(t: Ticket, key: SortKey): number | string {
   if (key === 'priority') return PRIORITY_RANK[t.priority] || 0
   if (key === 'list') return (t.clientName || t.listName || '').toLowerCase()
   if (key === 'accountable') return (t.accountableName || '').toLowerCase()
+  if (key === 'status') return STATUS_RANK[t.status] || 0
   return (t.title || '').toLowerCase()
 }
+
+/** Backlog status order, furthest along first: what is already moving sorts to the top. */
+const STATUS_RANK: Record<string, number> = { 'In Progress': 3, 'Up Next': 2, 'Open': 1 }
 
 type EngDraft = Record<EngineerFieldKey, string>
 
@@ -246,6 +266,129 @@ function EstCell({ t }: { t: Ticket }) {
       {formatHours(t.estHours)}
       <span className="estcell__left">{formatHours(left)} left</span>
     </span>
+  )
+}
+
+/*
+ * The estimate, editable where it is read.
+ *
+ * A ticket no longer needs an estimate to appear on this page, so this page has to be
+ * where it gets one: sending the planner to the ticket and back for every un-estimated
+ * row is what the old gate cost. Click, type the hours, Enter. Blur saves too, because
+ * the next thing a planner does is click the next row.
+ *
+ * Module-level, not declared inside `Sprints`: a component declared in a render is a new
+ * type on every render, which would unmount the open input each time the board updates.
+ */
+function EstField({
+  t, editable, inline, onSave, children,
+}: {
+  t: Ticket
+  editable: boolean
+  /** On a card the control sits in a line of text; in the table it fills the cell. */
+  inline?: boolean
+  onSave: (t: Ticket, hours: string) => Promise<unknown>
+  children: ReactNode
+}) {
+  const [open, setOpen] = useState(false)
+  const [draft, setDraft] = useState('')
+  const [saving, setSaving] = useState(false)
+  // Disabling the input for the write blurs it, and blur commits: without this the one
+  // edit would be sent twice.
+  const sent = useRef(false)
+
+  if (!editable) return <>{children}</>
+
+  const commit = () => {
+    if (sent.current) return
+    const raw = draft.trim()
+    const n = Number(raw)
+    // Empty, unchanged or not a number: nothing to save. An estimate is cleared on the
+    // ticket itself, not here - a stray blur must never be able to wipe one.
+    if (!raw || !isFinite(n) || n < 0 || n === t.estHours) { setOpen(false); return }
+    sent.current = true
+    setSaving(true)
+    onSave(t, String(n)).finally(() => { sent.current = false; setSaving(false); setOpen(false) })
+  }
+
+  if (open) {
+    return (
+      <input
+        className={`cellin cellin--n${inline ? ' cellin--inline' : ''}`}
+        type="number" min="0" step="0.25" inputMode="decimal"
+        aria-label={`Estimated hours for ${t.title}`}
+        placeholder="hours"
+        autoFocus
+        disabled={saving}
+        value={draft}
+        onChange={e => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={e => {
+          if (e.key === 'Enter') { e.preventDefault(); commit() }
+          if (e.key === 'Escape') setOpen(false)
+        }}
+      />
+    )
+  }
+  return (
+    <button
+      type="button"
+      className={`cellbtn${inline ? ' cellbtn--inline' : ''}`}
+      data-need={t.estHours === null ? '' : undefined}
+      title={t.estHours === null ? 'Set the estimate' : 'Change the estimate'}
+      onClick={() => { setDraft(t.estHours === null ? '' : String(t.estHours)); setOpen(true) }}
+    >
+      {t.estHours === null ? '+ hours' : children}
+    </button>
+  )
+}
+
+/** The accountable owner, picked where it is read. Same reasoning as `EstField`. */
+function AcctField({
+  t, editable, inline, prefix = '', onSave,
+}: {
+  t: Ticket
+  editable: boolean
+  inline?: boolean
+  prefix?: string
+  onSave: (t: Ticket, userId: string) => Promise<unknown>
+}) {
+  const [open, setOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  if (!editable) {
+    return t.accountableName
+      ? <>{prefix}{t.accountableName}</>
+      : <span className="muted">{inline ? 'nobody accountable' : '-'}</span>
+  }
+  if (open) {
+    return (
+      <UserPicker
+        className={`cellin${inline ? ' cellin--inline' : ''}`}
+        ariaLabel={`Accountable for ${t.title}`}
+        placeholder="Nobody"
+        autoFocus
+        disabled={saving}
+        value={t.accountableId || ''}
+        onBlur={() => { if (!saving) setOpen(false) }}
+        onChange={userId => {
+          if (userId === (t.accountableId || '')) { setOpen(false); return }
+          setSaving(true)
+          onSave(t, userId).finally(() => { setSaving(false); setOpen(false) })
+        }}
+      />
+    )
+  }
+  return (
+    <button
+      type="button"
+      className={`cellbtn${inline ? ' cellbtn--inline' : ''}`}
+      data-need={t.accountableName ? undefined : ''}
+      title={t.accountableName ? 'Change who is accountable' : 'Set who is accountable'}
+      onClick={() => setOpen(true)}
+    >
+      {t.accountableName ? `${prefix}${t.accountableName}` : '+ accountable'}
+    </button>
   )
 }
 
@@ -314,6 +457,7 @@ export default function Sprints() {
   // Roadblocked work is still plannable - a blocker often clears inside the week - so
   // this filters rather than hides. The tickets board offers the same three choices.
   const [bBlocked, setBBlocked] = useState('')
+  const [bStatus, setBStatus] = useState('')
   const [bSort, setBSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'est', dir: -1 })
 
   /** Move to a sprint and put it in the URL, so the view can be linked to. */
@@ -404,10 +548,10 @@ export default function Sprints() {
    * and THEN reloads quietly, because a refused write means the local picture is already
    * wrong in some way this page cannot infer.
    */
-  function move(t: Ticket, toKey: string, request: Promise<Ticket>, said: string) {
+  function move(t: Ticket, toKey: string, request: Promise<Ticket>, said: string, optimistic?: Ticket) {
     if (!mayPlan || !board) return
     const before = board
-    setState({ phase: 'ready', board: moved(before, t, toKey) })
+    setState({ phase: 'ready', board: moved(before, t, toKey, optimistic) })
     setFailure(''); setNotice(said)
 
     request
@@ -433,10 +577,43 @@ export default function Sprints() {
       return
     }
     const target = board?.columns.find(c => c.userId === userId)
+    // Planning an Open ticket makes it Up Next: the server does it, and the card shows
+    // it at once rather than flipping when the response lands.
+    const opening = t.status === 'Open'
+    const label = t.ticketNumber !== null ? `#${t.ticketNumber}` : t.title
     move(t, target ? (target.entryId || target.engineer) : BACKLOG,
       assignSprint(t.listId, t.entryId, sprint, userId),
-      `${t.ticketNumber !== null ? `#${t.ticketNumber}` : t.title} → ${who}.`)
+      `${label} → ${who}.${opening ? ` Status set to ${PLANNED_STATUS}.` : ''}`,
+      opening ? { ...t, status: PLANNED_STATUS } : undefined)
   }
+
+  /*
+   * Set an estimate or an accountable owner from this page.
+   *
+   * No optimistic copy here, unlike a drag: the editor stays open and disabled for the
+   * moment the write takes, so there is nothing on screen to get ahead of. The server's
+   * copy of the ticket is patched in when it lands, and the totals re-derive from it.
+   */
+  function amend(request: Promise<Ticket>, said: string): Promise<void> {
+    setFailure('')
+    return request
+      .then(fresh => {
+        setState(cur => (cur.phase === 'ready' ? { phase: 'ready', board: patched(cur.board, fresh) } : cur))
+        setNotice(said)
+      })
+      .catch(err => { setNotice(''); setFailure(err instanceof ApiError ? err.message : String(err)) })
+  }
+
+  const tag = (t: Ticket) => (t.ticketNumber !== null ? `#${t.ticketNumber}` : t.title)
+
+  const saveEst = (t: Ticket, hours: string) =>
+    amend(updateTicket(t.listId, t.entryId, { estHours: hours }), `${tag(t)} estimated at ${formatHours(Number(hours))}.`)
+
+  const saveAcct = (t: Ticket, userId: string) =>
+    amend(setTicketPeople({ listId: t.listId, entryId: t.entryId }, { accountableId: userId }),
+      userId
+        ? `${tag(t)}: ${users.find(u => u.id === userId)?.name || 'owner'} is accountable.`
+        : `${tag(t)}: nobody accountable.`)
 
   function unplan(t: Ticket) {
     if (!mayPlan) return
@@ -569,23 +746,10 @@ export default function Sprints() {
   const dash = <span className="muted">-</span>
   const templateRoster = !!board?.rosterIsTemplate
 
-  const skips = board?.backlogSkipped
-  const skipTotal = skips ? skips.wrongStatus + skips.noEstimate + skips.noAccountable : 0
-
   /*
-   * Everything carrying this sprint's number that the board does not show: work the
-   * Engineer-Ready gate excluded, plus work in the sprint with nobody responsible for it.
-   *
-   * Both are deliberately off this board - the sprint view has one strict definition of
-   * what appears on it - but a number that is silently missing from a capacity plan is
-   * the kind of thing you find out about late. So it is stated, with somewhere to go.
-   */
-  /*
-   * Work carrying this sprint's number that the board still cannot show.
-   *
-   * No longer includes `unassigned` - that has its own column now. What is left is work
-   * the Engineer-Ready gate excluded: it lost its estimate or its accountable owner
-   * after being planned.
+   * Work carrying this sprint's number that the board does not show: tickets In Review.
+   * A number silently missing from a sprint is the kind of thing you find out about
+   * late, so it is stated, with somewhere to go.
    */
   const offBoard = board?.hiddenInSprint || 0
 
@@ -600,6 +764,7 @@ export default function Sprints() {
   const blockedReady = useMemo(() => backlogRaw.filter(t => t.roadblocked).length, [backlogRaw])
 
   const backlogOptions = useMemo(() => {
+    const statuses = new Set<string>()
     const people = new Set<string>()
     const lists = new Set<string>()
     const prios = new Set<string>()
@@ -608,9 +773,11 @@ export default function Sprints() {
       const forWhom = t.clientName || t.listName
       if (forWhom) lists.add(forWhom)
       if (t.priority) prios.add(t.priority)
+      if (t.status) statuses.add(t.status)
     }
     const alpha = (set: Set<string>) => [...set].sort((a, b) => a.localeCompare(b))
     return {
+      statuses: [...statuses].sort((a, b) => (STATUS_RANK[b] || 0) - (STATUS_RANK[a] || 0)),
       people: alpha(people),
       lists: alpha(lists),
       // Ranked, not alphabetical, for the same reason the sort is.
@@ -618,11 +785,12 @@ export default function Sprints() {
     }
   }, [backlogRaw])
 
-  const backlogFilters = (bAcct ? 1 : 0) + (bList ? 1 : 0) + (bPriority ? 1 : 0) + (bBlocked ? 1 : 0)
+  const backlogFilters = (bAcct ? 1 : 0) + (bList ? 1 : 0) + (bPriority ? 1 : 0) + (bBlocked ? 1 : 0) + (bStatus ? 1 : 0)
 
   const backlogRows = useMemo(() => {
     const rows = backlogRaw.filter(t =>
-      (!bAcct || t.accountableName === bAcct) &&
+      (!bAcct || (bAcct === NOBODY ? !t.accountableName : t.accountableName === bAcct)) &&
+      (!bStatus || t.status === bStatus) &&
       (!bList || (t.clientName || t.listName) === bList) &&
       (!bPriority || t.priority === bPriority) &&
       (!bBlocked || (bBlocked === 'yes' ? t.roadblocked : !t.roadblocked)))
@@ -638,14 +806,14 @@ export default function Sprints() {
       if (cmp === 0) return (remainingHoursOf(b) || 0) - (remainingHoursOf(a) || 0)
       return cmp * bSort.dir
     })
-  }, [backlogRaw, bAcct, bList, bPriority, bBlocked, bSort])
+  }, [backlogRaw, bAcct, bList, bPriority, bBlocked, bStatus, bSort])
 
   /** Click a heading to sort by it; click the one already active to reverse it. */
   const sortBy = (key: SortKey) => setBSort(cur => (cur.key === key
     ? { key, dir: cur.dir === 1 ? -1 : 1 }
     : { key, dir: key === 'est' || key === 'priority' || key === 'num' ? -1 : 1 }))
 
-  const clearBacklogFilters = () => { setBAcct(''); setBList(''); setBPriority(''); setBBlocked('') }
+  const clearBacklogFilters = () => { setBAcct(''); setBList(''); setBPriority(''); setBBlocked(''); setBStatus('') }
 
   /* The one case where filtering in the browser would lie: the server cut the list. */
   const backlogTruncated = !!board && board.backlogTotal > board.backlog.length
@@ -986,9 +1154,7 @@ export default function Sprints() {
           {offBoard > 0 && (
             <p className="board2__notice">
               {offBoard} ticket{offBoard === 1 ? '' : 's'} in {sprintLabel(sprint)}{' '}
-              {offBoard === 1 ? 'is' : 'are'} not shown here - no longer ready to plan,
-              so {offBoard === 1 ? 'it lost' : 'they lost'} an estimate or an accountable
-              owner after being planned.{' '}
+              {offBoard === 1 ? 'is' : 'are'} In Review and not shown here.{' '}
               <Link className="inlink" to="/tickets">Find them on the tickets board</Link>.
             </p>
           )}
@@ -1036,7 +1202,7 @@ export default function Sprints() {
                     </p>
                     <p className="dcard__meta">
                       <span className="pill" data-status={(t.status || 'Open').replace(/\s+/g, '')}>{t.status}</span>
-                      <EstLeft t={t} />
+                      <EstField t={t} editable={mayPlan} inline onSave={saveEst}><EstLeft t={t} /></EstField>
                       {t.roadblocked && (
                         <span className="mark mark--block" title={t.roadblockReason || 'Roadblocked'}>
                           blocked
@@ -1048,9 +1214,9 @@ export default function Sprints() {
                         {t.clientName || t.listName}
                       </Link>
                     </p>
-                    {t.accountableName && (
-                      <p className="dcard__co muted">PM: {t.accountableName}</p>
-                    )}
+                    <p className="dcard__co muted">
+                      <AcctField t={t} editable={mayPlan} inline prefix="PM: " onSave={saveAcct} />
+                    </p>
                     {t.roadblocked && (
                       <p className="dcard__next">Blocked: {t.roadblockReason}</p>
                     )}
@@ -1136,7 +1302,7 @@ export default function Sprints() {
                     )}
                     <p className="dcard__meta">
                       <span className="pill" data-status={(t.status || 'Open').replace(/\s+/g, '')}>{t.status}</span>
-                      <EstLeft t={t} />
+                      <EstField t={t} editable={mayPlan} inline onSave={saveEst}><EstLeft t={t} /></EstField>
                       {t.loggedHours ? <span className="muted">{formatHours(t.loggedHours)} logged</span> : null}
                       {t.roadblocked && (
                         <span className="mark mark--block" title={t.roadblockReason || 'Roadblocked'}>
@@ -1149,9 +1315,9 @@ export default function Sprints() {
                         {t.clientName || t.listName}
                       </Link>
                     </p>
-                    {t.accountableName && (
-                      <p className="dcard__co muted">PM: {t.accountableName}</p>
-                    )}
+                    <p className="dcard__co muted">
+                      <AcctField t={t} editable={mayPlan} inline prefix="PM: " onSave={saveAcct} />
+                    </p>
                     {t.roadblocked && (
                       <p className="dcard__next">Blocked: {t.roadblockReason}</p>
                     )}
@@ -1192,11 +1358,11 @@ export default function Sprints() {
           >
             <div className="panel__head">
               <h2 className="tsec__h">
-                Ready to plan
+                Backlog
                 {board.backlogTotal > 0 && <span className="tsec__n">{board.backlogTotal}</span>}
               </h2>
               <span className="panel__note">
-                {ENGINEER_READY_RULE}
+                {PLANNABLE_RULE}
                 {backlogFilters > 0
                   ? ` · ${backlogRows.length} of ${backlogRaw.length} shown`
                   : backlogTruncated ? ` · showing ${board.backlog.length}` : ''}
@@ -1213,9 +1379,17 @@ export default function Sprints() {
             {backlogRaw.length > 4 && (
               <div className="board2__filters">
                 <div className="ef">
+                  <label htmlFor="b-status">Status</label>
+                  <select id="b-status" value={bStatus} onChange={e => setBStatus(e.target.value)}>
+                    <option value="">Any status</option>
+                    {backlogOptions.statuses.map(st => <option key={st} value={st}>{st}</option>)}
+                  </select>
+                </div>
+                <div className="ef">
                   <label htmlFor="b-acct">Accountable</label>
                   <select id="b-acct" value={bAcct} onChange={e => setBAcct(e.target.value)}>
                     <option value="">Anyone</option>
+                    <option value={NOBODY}>Nobody yet</option>
                     {backlogOptions.people.map(p => <option key={p} value={p}>{p}</option>)}
                   </select>
                 </div>
@@ -1252,8 +1426,8 @@ export default function Sprints() {
                 the difference between a narrowed list and a wrong one. */}
             {backlogTruncated && (
               <p className="board2__notice">
-                Showing the {board.backlog.length} biggest of {board.backlogTotal} ready to
-                plan. Sorting and filtering apply to those, not to the rest.
+                Showing the first {board.backlog.length} of {board.backlogTotal} in the
+                backlog. Sorting and filtering apply to those, not to the rest.
               </p>
             )}
 
@@ -1265,8 +1439,8 @@ export default function Sprints() {
               <div className="callout callout--plain">
                 <p className="callout__title">Nothing matches those filters</p>
                 <p>
-                  {backlogRaw.length} item{backlogRaw.length === 1 ? ' is' : 's are'} ready
-                  to plan, none of them matching all three.{' '}
+                  {backlogRaw.length} item{backlogRaw.length === 1 ? ' is' : 's are'} in the
+                  backlog, none of them matching every filter.{' '}
                   <button type="button" className="linkbtn" onClick={clearBacklogFilters}>
                     Clear the filters
                   </button>.
@@ -1274,39 +1448,10 @@ export default function Sprints() {
               </div>
             ) : board.backlog.length === 0 ? (
               <div className="callout callout--plain">
-                <p className="callout__title">Nothing is ready to plan</p>
+                <p className="callout__title">Nothing in the backlog</p>
                 <p>
-                  The planner only shows work that is {ENGINEER_READY_RULE}. Right now
-                  that leaves nothing{skipTotal > 0 ? ', because:' : '.'}
-                </p>
-                {skipTotal > 0 && (
-                  <ul className="cab__folders">
-                    {board.backlogSkipped.wrongStatus > 0 && (
-                      <li className="cab__folder">
-                        <span className="cab__name">
-                          {board.backlogSkipped.wrongStatus} not Up Next or In Progress
-                        </span>
-                      </li>
-                    )}
-                    {board.backlogSkipped.noEstimate > 0 && (
-                      <li className="cab__folder">
-                        <span className="cab__name">
-                          {board.backlogSkipped.noEstimate} with no time estimate
-                        </span>
-                      </li>
-                    )}
-                    {board.backlogSkipped.noAccountable > 0 && (
-                      <li className="cab__folder">
-                        <span className="cab__name">
-                          {board.backlogSkipped.noAccountable} with nobody accountable
-                        </span>
-                      </li>
-                    )}
-                  </ul>
-                )}
-                <p>
-                  <Link className="inlink" to="/tickets">Open the tickets board</Link> to
-                  set an estimate or an owner, and it will appear here.
+                  The backlog is every ticket that is {PLANNABLE_RULE}. Right now every
+                  open ticket is already in a sprint.
                 </p>
               </div>
             ) : (
@@ -1373,8 +1518,11 @@ export default function Sprints() {
                           )}
                         </th>
                         <td>{t.clientName || t.listName}</td>
-                        <td className="tickets__who" title={t.accountableName || ''}>
-                          {t.accountableName || dash}
+                        <td>
+                          <span className="pill" data-status={(t.status || 'Open').replace(/\s+/g, '')}>{t.status}</span>
+                        </td>
+                        <td className="tickets__who tickets__cell" title={t.accountableName || ''}>
+                          <AcctField t={t} editable={mayPlan} onSave={saveAcct} />
                         </td>
                         {/* Unset priority drew an empty bordered pill here - a blank
                             chip that looked like a rendering fault. Blank cell instead. */}
@@ -1384,9 +1532,11 @@ export default function Sprints() {
                             : null}
                         </td>
                         <td className="num">
-                          {t.estHours === null
-                            ? <span className="muted">no est</span>
-                            : <EstCell t={t} />}
+                          <EstField t={t} editable={mayPlan} onSave={saveEst}>
+                            {t.estHours === null
+                              ? <span className="muted">no est</span>
+                              : <EstCell t={t} />}
+                          </EstField>
                         </td>
                         <td>
                           <EngineerSelect
@@ -1405,8 +1555,9 @@ export default function Sprints() {
           <p className="panel__foot">
             Walked {board.listsScanned} list{board.listsScanned === 1 ? '' : 's'} to build this.
             Drag a card onto an engineer to plan it - they become its Responsible party,
-            and whoever is Accountable stays put. Drag it back to Ready to plan to take it
-            out of the sprint.
+            and whoever is Accountable stays put. An Open ticket becomes {PLANNED_STATUS} as
+            it is planned. Click an estimate or an accountable owner to set it here. Drag a
+            card back to the backlog to take it out of the sprint.
           </p>
         </>
       )}

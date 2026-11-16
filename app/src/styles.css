@@ -1876,6 +1876,15 @@ a.grouprow__list:hover { color: var(--cobalt); text-decoration: underline; }
 .cellin:disabled { opacity: 0.6; cursor: progress; }
 .cellin--n { max-width: 5.5rem; }
 
+/* The same two controls inside a sprint card's line of text, where a block button
+   would break the line and a full-width input would push the card wider. */
+.cellbtn--inline { display: inline-block; width: auto; min-height: 0; margin: 0 -4px; }
+.cellin--inline { width: auto; min-height: 22px; }
+/* Something the plan is still missing. Shown, not hover-only: on the sprint page the
+   gap is the thing being worked. */
+.cellbtn[data-need] { color: var(--cobalt); }
+td.num .cellbtn { text-align: right; }
+
 /* Reserve the width the editor needs, so opening one does not shove the other columns
    sideways and move the row being read. */
 .tickets__cell { min-width: 7rem; }

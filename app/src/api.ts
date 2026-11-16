@@ -2580,15 +2580,11 @@ export interface SprintBoard {
   unassigned: Ticket[]
   backlog: Ticket[]
   backlogTotal: number
-  /**
-   * Why work was held out of the backlog, counted against the FIRST condition each
-   * ticket failed. Turns "nothing is ready to plan" into a sentence that says which
-   * rule did it, instead of an empty table that reads like a failed load.
-   */
+  /** Unsprinted tickets held out of the backlog. Only `wrongStatus` is counted now. */
   backlogSkipped: { noEstimate: number; noAccountable: number; wrongStatus: number }
   /**
-   * Tickets carrying this sprint's number that the Engineer-Ready gate excluded, so the
-   * board can admit they exist rather than quietly showing a shorter column.
+   * Tickets carrying this sprint's number that the board does not show - in practice the
+   * ones In Review - so it can admit they exist rather than quietly showing a shorter column.
    */
   hiddenInSprint: number
   totals: {
@@ -2601,22 +2597,24 @@ export interface SprintBoard {
 }
 
 /*
- * ENGINEER READY, mirrored from the server.
+ * PLANNABLE, mirrored from the server.
  *
- * `actionSprint` enforces this; the client holds a copy only to EXPLAIN it - the rule in
- * the backlog note and the empty state. Same reason `nameKey` and `SPRINT_PATTERN` are
- * mirrored: when the two sides disagree the page describes a filter it is not getting,
- * which is harder to spot than a filter that is plainly wrong.
+ * `actionSprint` enforces this; the client holds a copy only to EXPLAIN it. Same reason
+ * `nameKey` and `SPRINT_PATTERN` are mirrored: when the two sides disagree the page
+ * describes a filter it is not getting.
  *
- * A ticket is ready when its status is one of these AND `estHours` is set AND
- * `accountableId` is set. `Complete` is additionally allowed for a ticket already in a
- * column, so finishing work does not erase it from the sprint that did it.
+ * The backlog is every ticket with no sprint in one of these statuses. An estimate and
+ * an accountable owner are NOT required: they are set from the sprint page as the work
+ * is planned. `Complete` is additionally allowed for a ticket already in a column, so
+ * finishing work does not erase it from the sprint that did it.
  */
-export const ENGINEER_READY_STATUSES = ['Up Next', 'In Progress'] as const
+export const PLANNABLE_STATUSES = ['Open', 'Up Next', 'In Progress'] as const
 
 /** The rule in one line, for the places the page has to state it. */
-export const ENGINEER_READY_RULE =
-  'Up Next or In Progress, with an estimate and an accountable owner'
+export const PLANNABLE_RULE = 'Open, Up Next or In Progress, and not in a sprint yet'
+
+/** What an `Open` ticket becomes when it is planned into a sprint. Mirrors the server. */
+export const PLANNED_STATUS = 'Up Next'
 
 export type EngineerFieldKey = 'userId' | 'name' | 'email' | 'role' | 'capacity' | 'active' | 'sprint'
 
