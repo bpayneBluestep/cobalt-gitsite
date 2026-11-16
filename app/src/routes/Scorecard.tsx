@@ -236,7 +236,7 @@ function buildCards(sc: ScorecardData | null, scNote: string, m: Model | null, f
   // ── Sales/Marketing ────────────────────────────────────────────────────────
   {
     const base = {
-      id: 'demos-30d', category: 'Sales/Marketing', owner: 'Roy Rasband',
+      id: 'demos-30d', category: 'Sales/Marketing', owner: 'Brandon Payne',
       name: 'Demos Given (Rolling 30 Days)',
       definition: 'Every deal, on prospects and current clients alike, whose Demo Date falls in ' +
         'the last 30 days. Counts demos, not companies. The team target is 8 a month. Higher is healthier.',
@@ -264,7 +264,7 @@ function buildCards(sc: ScorecardData | null, scNote: string, m: Model | null, f
   }
   {
     const base = {
-      id: 'new-mrr', category: 'Sales/Marketing', owner: 'Roy Rasband',
+      id: 'new-mrr', category: 'Sales/Marketing', owner: 'Brandon Payne',
       name: 'New MRR',
       definition: 'New recurring revenue in the selected month, from actual billing rather than ' +
         'deal records: revenue codes whose first-ever recurring charge falls in that month, so ' +
@@ -289,6 +289,10 @@ function buildCards(sc: ScorecardData | null, scNote: string, m: Model | null, f
       })
     }
   }
+  cards.push(soon('eccrm-signups', 'Sales/Marketing', 'New ECs Signed Up for the ECCRM', 'Brandon Payne',
+    'ECCRM sign-ups are not counted in Cobalt yet.'))
+  cards.push(soon('directory-claims', 'Sales/Marketing', 'Program Directory Listings Claimed', 'Brandon Payne',
+    'Claimed listings live in the Program Directory, which Cobalt does not read yet.'))
 
   // ── Finance ────────────────────────────────────────────────────────────────
   {
