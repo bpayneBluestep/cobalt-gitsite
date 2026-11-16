@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  ApiError, createSurveyInvite, formatMoney, getContacts, getCsQueue, logTouchpoint,
-  moneyWithheld, setSupportIntensity, INTENSITY_DEFINITIONS, TEMPERATURES, TOUCHPOINT_TYPES,
-  type Contact, type CsInfo, type CsQueue as CsQueueData, type CsRow, type CsVocabularies,
+  ApiError, formatMoney, getCsQueue, getSurveyProblems, logTouchpoint,
+  moneyWithheld, setSupportIntensity, surveyStateLabel, INTENSITY_DEFINITIONS, TEMPERATURES, TOUCHPOINT_TYPES,
+  type CsInfo, type CsQueue as CsQueueData, type CsRow, type CsVocabularies, type SurveyProblems,
 } from '../api'
 import CsNav from '../components/CsNav'
 import OwnerScope, { ScopeNote, useScope } from '../components/OwnerScope'
@@ -40,7 +40,6 @@ const LOGIN_URL = '/shared/login/login.jsp?desturl=' +
 type OpenForm =
   | { kind: 'none' }
   | { kind: 'log'; companyId: string }
-  | { kind: 'invite'; companyId: string }
   | { kind: 'intensity'; companyId: string }
 
 function Kpi({ label, value, note, tone }: {
@@ -65,47 +64,39 @@ const spine = (health: string) =>
   health === 'Red' ? 'overdue' : health === 'Yellow' ? 'today' : undefined
 
 /**
- * The four groups, in the order they are worked.
+ * The three groups, in the order they are worked.
  *
- * Surveys due is its own group rather than a flag on a row, because it is a different
- * action with a different rhythm, eight emails a week, and a healthy account can owe
- * one. A client that is both Red and survey-due appears in Act now: the call comes
- * first, and sending a survey to an account you already know is unhappy is a worse
- * version of ringing them.
+ * There used to be a fourth, Surveys due, with a Copy invite button. Surveys are now
+ * sent by Cobalt itself (the Survey Runner), so nobody owes one: each row says where
+ * its survey stands, and anything stopping one from going out is listed at the top.
  */
-type GroupKey = 'act' | 'check' | 'surveys' | 'healthy'
+type GroupKey = 'act' | 'check' | 'healthy'
 
 const GROUPS: { key: GroupKey; title: string; blurb: string }[] = [
-  { key: 'act', title: 'Act now', blurb: 'Never contacted, gone quiet, a Red reading, or a detractor nobody has answered.' },
+  { key: 'act', title: 'Act now', blurb: 'Never contacted, gone quiet, or a Red reading.' },
   { key: 'check', title: 'Check due', blurb: 'Past cadence, or the last reading was Yellow or has expired.' },
-  { key: 'surveys', title: 'Surveys due', blurb: 'No invite in 90 days. Copy the email, send it from your own address.' },
   { key: 'healthy', title: 'Healthy', blurb: 'Fresh Green reading, inside cadence. Nothing owed.' },
 ]
 
 /**
  * Where a row goes.
  *
- * Health decides the first three; a Green account that owes a survey lands in Surveys
- * due rather than Healthy, because "nothing owed" has to be true of the Healthy group
- * or the collapse hides work.
+ * Health alone decides. Surveys are not a group any more: Cobalt sends them itself, so
+ * a survey is never something a person owes. Each row just says where its survey stands.
  */
 function groupOf(r: CsRow): GroupKey {
   if (r.health === 'Red') return 'act'
   if (r.health === 'Yellow') return 'check'
-  if (r.surveyDue) return 'surveys'
   return 'healthy'
 }
 
-/** Never-touched first, then longest silence, then the oldest unanswered detractor. */
+/** Never-touched first, then longest silence. */
 function sortRows(rows: CsRow[]): CsRow[] {
   return rows.slice().sort((a, b) => {
     if (a.neverTouched !== b.neverTouched) return a.neverTouched ? -1 : 1
     const ageA = a.contactAgeDays === null ? Infinity : a.contactAgeDays
     const ageB = b.contactAgeDays === null ? Infinity : b.contactAgeDays
-    if (ageA !== ageB) return ageB - ageA
-    const detA = a.openDetractor ? a.openDetractor.daysAgo : -1
-    const detB = b.openDetractor ? b.openDetractor.daysAgo : -1
-    return detB - detA
+    return ageB - ageA
   })
 }
 
@@ -121,6 +112,12 @@ export default function CsQueue() {
   const [failure, setFailure] = useState('')
   const [open, setOpen] = useState<OpenForm>({ kind: 'none' })
   const [showHealthy, setShowHealthy] = useState(false)
+  /* What is stopping surveys from going out. Its own call, and allowed to fail quietly:
+     the queue is still the queue without it. */
+  const [surveys, setSurveys] = useState<SurveyProblems | null>(null)
+  useEffect(() => {
+    getSurveyProblems().then(setSurveys).catch(() => setSurveys(null))
+  }, [])
 
   /*
    * Rows patched in place from an action's reply.
@@ -157,12 +154,11 @@ export default function CsQueue() {
   }, [d, patched, search])
 
   const grouped = useMemo(() => {
-    const out: Record<GroupKey, CsRow[]> = { act: [], check: [], surveys: [], healthy: [] }
+    const out: Record<GroupKey, CsRow[]> = { act: [], check: [], healthy: [] }
     for (const r of rows) out[groupOf(r)].push(r)
     return {
       act: sortRows(out.act),
       check: sortRows(out.check),
-      surveys: sortRows(out.surveys),
       healthy: out.healthy.slice().sort((a, b) => a.companyName.localeCompare(b.companyName)),
     }
   }, [rows])
@@ -254,7 +250,7 @@ export default function CsQueue() {
             <Kpi
               label="Red accounts"
               value={String(headline.red)}
-              note="never contacted, gone quiet, Red reading or open detractor"
+              note="never contacted, gone quiet or a Red reading"
               tone={headline.red ? 'bad' : undefined}
             />
             <Kpi
@@ -264,16 +260,17 @@ export default function CsQueue() {
               tone={headline.checksDue ? 'warn' : undefined}
             />
             <Kpi
-              label="Open detractors"
-              value={String(headline.openDetractors)}
-              note="a low score nobody has rung back about"
-              tone={headline.openDetractors ? 'bad' : undefined}
+              label="Surveys out"
+              value={surveys ? String(surveys.awaiting) : '-'}
+              note={surveys
+                ? `${surveys.scheduled} scheduled · ${!surveys.enabled ? 'sending is off' : surveys.testMode ? 'test mode' : 'sent automatically'}`
+                : 'sent automatically'}
             />
             <Kpi
-              label="Surveys due"
-              value={String(headline.surveysDue)}
-              note="no invite in the last 90 days"
-              tone={headline.surveysDue ? 'warn' : undefined}
+              label="Survey problems"
+              value={surveys ? String(surveys.problems.length) : '-'}
+              note="stopping a survey from going out"
+              tone={surveys && surveys.problems.length ? 'bad' : undefined}
             />
           </div>
 
@@ -285,6 +282,27 @@ export default function CsQueue() {
               Revenue is hidden for your roles, so these rows carry no MRR. Health does not
               depend on it. Nothing on this screen is missing because of it.
             </p>
+          )}
+
+          {surveys && surveys.problems.length > 0 && (
+            <section className="panel">
+              <header className="panel__head">
+                <h2>Stopping a survey from going out</h2>
+                <span className="panel__n">{surveys.problems.length}</span>
+              </header>
+              <p className="panel__note">
+                Surveys send themselves. These are the only things that need a person.
+              </p>
+              <ul className="facts__wrap">
+                {surveys.problems.map((p, i) => (
+                  <li key={i}>
+                    {p.companyId
+                      ? <><Link className="inlink" to={`/clients/${p.companyId}/contacts`}>{p.companyName}</Link>: {p.detail}</>
+                      : p.detail}
+                  </li>
+                ))}
+              </ul>
+            </section>
           )}
 
           {/*
@@ -344,7 +362,6 @@ export default function CsQueue() {
                       <QueueRow
                         key={r.companyId}
                         row={r}
-                        group={group.key}
                         mayEdit={mayEdit}
                         busy={busy}
                         open={open}
@@ -375,10 +392,9 @@ export default function CsQueue() {
 /* ------------------------------------------------------------------ one row */
 
 function QueueRow({
-  row, group, mayEdit, busy, open, isOpen, setOpen, vocabularies, run, patch,
+  row, mayEdit, busy, open, isOpen, setOpen, vocabularies, run, patch,
 }: {
   row: CsRow
-  group: GroupKey
   mayEdit: boolean
   busy: string
   open: OpenForm
@@ -398,9 +414,6 @@ function QueueRow({
         <p className="fu__title">
           <Link className="inlink" to={`/clients/${id}/success`}>{row.companyName}</Link>{' '}
           <span className="pill" data-tone={row.health.toLowerCase()}>{row.health}</span>
-          {row.openDetractor && (
-            <> <span className="flag flag--bad">detractor unanswered</span></>
-          )}
         </p>
 
         <p className="fu__step">{row.reason}</p>
@@ -427,6 +440,10 @@ function QueueRow({
               <span>{row.temperature} on {row.temperatureDate}</span>
             </>
           )}
+          <span className="dot" aria-hidden="true">·</span>
+          <span className={row.survey && row.survey.status === 'Held' ? 'bad' : undefined}>
+            survey {surveyStateLabel(row.survey)}
+          </span>
           {/* Presence, not a flag: a redacted row has no `mrr` key at all. */}
           {row.mrr !== null && row.mrr !== undefined && (
             <>
@@ -465,13 +482,6 @@ function QueueRow({
             })} />
         )}
 
-        {isOpen('invite', id) && (
-          <InviteForm row={row} busy={working}
-            onCancel={() => setOpen({ kind: 'none' })}
-            onSend={(email, contactName, then) =>
-              run(id, createSurveyInvite(id, email, contactName), result => then(result))} />
-        )}
-
         {isOpen('intensity', id) && (
           <IntensityForm row={row} levels={vocabularies.supportIntensities} busy={working}
             onCancel={() => setOpen({ kind: 'none' })}
@@ -488,12 +498,6 @@ function QueueRow({
             onClick={() => setOpen({ kind: 'log', companyId: id })}>
             Log touchpoint
           </button>
-          {(group === 'surveys' || row.surveyDue) && (
-            <button type="button" className="btn btn--ghost btn--sm" disabled={working}
-              onClick={() => setOpen({ kind: 'invite', companyId: id })}>
-              Copy invite
-            </button>
-          )}
           <button type="button" className="btn btn--ghost btn--sm" disabled={working}
             onClick={() => setOpen({ kind: 'intensity', companyId: id })}>
             Intensity
@@ -592,183 +596,6 @@ function LogForm({ row, types, busy, onCancel, onSave }: {
             : 'Logging resets this account’s cadence clock.'}
         </span>
       </div>
-    </div>
-  )
-}
-
-/* ------------------------------------------------------------ copy an invite */
-
-type Minted = { url: string; subject: string; body: string }
-
-function InviteForm({ row, busy, onCancel, onSend }: {
-  row: CsRow
-  busy: boolean
-  onCancel: () => void
-  onSend: (email: string, contactName: string, then: (result: unknown) => void) => void
-}) {
-  const [contacts, setContacts] = useState<Contact[]>([])
-  const [loading, setLoading] = useState(true)
-  const [pick, setPick] = useState('')
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
-  const [minted, setMinted] = useState<Minted | null>(null)
-  const [copied, setCopied] = useState('')
-
-  useEffect(() => {
-    let live = true
-    getContacts(row.companyId)
-      .then(list => {
-        if (!live) return
-        const withEmail = (list.rows || []).filter(c => c.email)
-        setContacts(withEmail)
-        const primary = withEmail.find(c => c.primary) || withEmail[0]
-        if (primary) {
-          setPick(primary.entryId)
-          setName(primary.fullName || `${primary.firstName} ${primary.lastName}`.trim())
-          setEmail(primary.email)
-        }
-      })
-      // A failed contact list is not fatal: the name and address can be typed.
-      .catch(() => {})
-      .finally(() => { if (live) setLoading(false) })
-    return () => { live = false }
-  }, [row.companyId])
-
-  function choose(entryId: string) {
-    setPick(entryId)
-    const c = contacts.find(x => x.entryId === entryId)
-    if (c) {
-      setName(c.fullName || `${c.firstName} ${c.lastName}`.trim())
-      setEmail(c.email)
-    }
-  }
-
-  function copy(what: string, text: string) {
-    navigator.clipboard.writeText(text)
-      .then(() => setCopied(what))
-      // Clipboard permission can be refused; the text is on screen either way.
-      .catch(() => setCopied(''))
-  }
-
-  return (
-    <div className="editcard">
-      <header className="editcard__head">
-        <h2>Survey invite: {row.companyName}</h2>
-        <p className="note">
-          Cobalt writes the email; you send it from your own address, with your name on
-          it. There is no mail robot here, and no promise of anonymity we would have to
-          break to act on a 3/10.
-        </p>
-      </header>
-
-      {!minted && (
-        <>
-          {loading && <p className="empty">Reading this company’s contacts…</p>}
-
-          {!loading && contacts.length === 0 && (
-            <div className="callout callout--plain">
-              <p className="callout__title">No contact has an email address</p>
-              <p>
-                Add one on{' '}
-                <Link className="inlink" to={`/clients/${row.companyId}/contacts`}>Contacts</Link>,
-                or type a name and address below.
-              </p>
-            </div>
-          )}
-
-          <div className="efgrid">
-            {contacts.length > 0 && (
-              <div className="ef">
-                <label htmlFor={`c-${row.companyId}`}>Contact</label>
-                <select id={`c-${row.companyId}`} value={pick} onChange={e => choose(e.target.value)}>
-                  {contacts.map(c => (
-                    <option key={c.entryId} value={c.entryId}>
-                      {c.fullName || `${c.firstName} ${c.lastName}`.trim()}
-                      {c.primary ? ' (primary)' : ''} · {c.email}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-            <div className="ef">
-              <label htmlFor={`in-${row.companyId}`}>Name<span className="ef__req">*</span></label>
-              <input id={`in-${row.companyId}`} type="text" value={name}
-                onChange={e => setName(e.target.value)} placeholder="Who it is addressed to" />
-            </div>
-            <div className="ef">
-              <label htmlFor={`ie-${row.companyId}`}>Email<span className="ef__req">*</span></label>
-              <input id={`ie-${row.companyId}`} type="email" value={email}
-                onChange={e => setEmail(e.target.value)} placeholder="name@example.com" />
-            </div>
-          </div>
-
-          <div className="editcard__foot">
-            <button type="button" className="btn" disabled={busy || !name.trim() || !email.trim()}
-              onClick={() => onSend(email.trim(), name.trim(), result => {
-                const r = result as Minted
-                setMinted({ url: r.url, subject: r.subject, body: r.body })
-              })}>
-              {busy ? 'Recording…' : 'Create the invite'}
-            </button>
-            <button type="button" className="btn btn--ghost" disabled={busy} onClick={onCancel}>
-              Cancel
-            </button>
-            <span className="editcard__status">
-              Copying records this invite as sent. It starts the 90-day clock whether or
-              not the email leaves.
-            </span>
-          </div>
-        </>
-      )}
-
-      {minted && (
-        <>
-          <p className="board2__notice" role="status">
-            Invite recorded. {row.companyName} has left the Surveys-due group.
-          </p>
-
-          <div className="efgrid">
-            <div className="ef ef--wide">
-              <label htmlFor={`u-${row.companyId}`}>Link</label>
-              <input id={`u-${row.companyId}`} type="text" readOnly value={minted.url} />
-              <p className="ef__hint">
-                <button type="button" className="linkbtn" onClick={() => copy('url', minted.url)}>
-                  Copy the link
-                </button>
-                {copied === 'url' && <span className="muted">· copied</span>}
-              </p>
-            </div>
-            <div className="ef ef--wide">
-              <label htmlFor={`s-${row.companyId}`}>Subject</label>
-              <input id={`s-${row.companyId}`} type="text" readOnly value={minted.subject} />
-              <p className="ef__hint">
-                <button type="button" className="linkbtn" onClick={() => copy('subject', minted.subject)}>
-                  Copy the subject
-                </button>
-                {copied === 'subject' && <span className="muted">· copied</span>}
-              </p>
-            </div>
-            <div className="ef ef--wide">
-              <label htmlFor={`b-${row.companyId}`}>Body</label>
-              <textarea id={`b-${row.companyId}`} rows={10} readOnly value={minted.body} />
-              <p className="ef__hint">
-                <button type="button" className="linkbtn" onClick={() => copy('body', minted.body)}>
-                  Copy the body
-                </button>
-                {copied === 'body' && <span className="muted">· copied</span>}
-              </p>
-            </div>
-          </div>
-
-          <div className="editcard__foot">
-            <button type="button" className="btn" onClick={onCancel}>Done</button>
-            <span className="editcard__status">
-              Paste it into your own mail client. The answers come back to this company’s
-              record, identified.
-            </span>
-          </div>
-        </>
-      )}
     </div>
   )
 }

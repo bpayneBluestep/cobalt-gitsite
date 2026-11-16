@@ -76,8 +76,8 @@ export default function CsQuarter() {
         <p className="eyebrow">Client Success</p>
         <h1>Quarter review{d ? `: ${d.quarter}` : ''}</h1>
         <p className="page__sub-text">
-          Who is healthy, who is at risk and who owns them, what we did about every
-          detractor and how fast, and whether the number moved.
+          Who is healthy, who is at risk and who owns them, what the surveys said, and
+          whether the number moved.
         </p>
       </header>
 
@@ -227,19 +227,19 @@ export default function CsQuarter() {
 
           <section className="panel">
             <header className="panel__head">
-              <h2>Detractors, and what we did</h2>
+              <h2>Low scores</h2>
               <span className="panel__n">{d.surveys.detractors.length}</span>
             </header>
             <p className="panel__note">
-              Days to acknowledgment, not who was scored what. Acknowledgment is a
-              by-product of ringing them: logging the call answers the response.
+              Responses with a score of 6 or below this quarter. Brandon and Noel are
+              emailed every response as it lands; nothing here is tracked beyond that.
             </p>
 
             {d.surveys.detractors.length === 0 ? (
               <p className="empty">
                 {d.surveys.responses === 0
                   ? 'No responses came in this quarter, so there is nothing to have answered.'
-                  : 'No response scored 6 or below. Nothing to chase.'}
+                  : 'No response scored 6 or below.'}
               </p>
             ) : (
               <div className="tablewrap">
@@ -249,7 +249,6 @@ export default function CsQuarter() {
                       <th scope="col">Date</th>
                       <th scope="col">Company</th>
                       <th scope="col">Dimension</th>
-                      <th scope="col">Answered in</th>
                       {maySeeSurveys && <th scope="col">Said</th>}
                     </tr>
                   </thead>
@@ -263,11 +262,6 @@ export default function CsQuarter() {
                           </Link>
                         </td>
                         <td>{x.dimension} {x.score}/10</td>
-                        <td className="num">
-                          {x.acknowledgedInDays === null
-                            ? <span className="bad">still open</span>
-                            : `${x.acknowledgedInDays}d`}
-                        </td>
                         {maySeeSurveys && (
                           <td className="facts__wrap">
                             {x.comment || <span className="muted">nothing written</span>}

@@ -5,6 +5,7 @@ import {
   setSupportIntensity, npsTone, INTENSITY_DEFINITIONS, SURVEY_DIMENSIONS, TEMPERATURES,
   TOUCHPOINT_TYPES,
   type CsInfo, type SurveyList, type Touchpoint, type TouchpointList,
+  surveyStateLabel, surveyStatusTone,
 } from '../api'
 import { useRecord } from './CompanyRecord'
 import { useSession } from '../session'
@@ -71,9 +72,9 @@ function HealthCard({ cs }: { cs: CsInfo }) {
         <div>
           <dt>Survey</dt>
           <dd>
-            {cs.surveyDue
-              ? <span className="flag flag--warn">due</span>
-              : <>last invite {cs.lastInviteAt || <span className="muted">never</span>}</>}
+            {cs.survey && cs.survey.status
+              ? surveyStateLabel(cs.survey)
+              : <span className="muted">not scheduled yet</span>}
           </dd>
         </div>
       </dl>
@@ -381,15 +382,14 @@ export default function CompanySuccess() {
 
               {surveys && surveys.rows.length === 0 && surveys.invites.length === 0 && (
                 <p className="empty">
-                  No invite has been sent to this client yet. Send one from the{' '}
-                  <Link className="inlink" to="/cs">queue</Link>. It takes a copy and a paste.
+                  No survey has gone to this client yet. Cobalt sends them on its own,
+                  to the primary contact, every 90 days.
                 </p>
               )}
 
               {surveys && surveys.rows.length === 0 && surveys.invites.length > 0 && (
                 <p className="empty">
-                  {surveys.invites.length} invite{surveys.invites.length === 1 ? '' : 's'} sent,
-                  no answer yet. Nothing here is overdue until the next quarter comes round.
+                  No answer yet. The log below shows where each survey stands.
                 </p>
               )}
 
@@ -457,17 +457,22 @@ export default function CompanySuccess() {
                   <table className="fields compact">
                     <thead>
                       <tr>
-                        <th scope="col">Invite sent</th>
+                        <th scope="col">Survey</th>
                         <th scope="col">To</th>
-                        <th scope="col">By</th>
+                        <th scope="col">Status</th>
                       </tr>
                     </thead>
                     <tbody>
                       {surveys.invites.map(i => (
                         <tr key={i.entryId}>
-                          <th scope="row" className="nowrap">{i.sentAt || '-'}</th>
+                          <th scope="row" className="nowrap">{i.sentAt || i.dueDate || '-'}</th>
                           <td>{i.contactName || <span className="muted">unnamed</span>}{i.sentTo ? ` · ${i.sentTo}` : ''}</td>
-                          <td>{i.sentBy || <span className="muted">-</span>}</td>
+                          <td>
+                            {i.status
+                              ? <span className="pill" data-tone={surveyStatusTone(i.status)}>{i.status}</span>
+                              : <span className="muted">-</span>}
+                            {i.status === 'Held' && i.lastError ? ` ${i.lastError}` : ''}
+                          </td>
                         </tr>
                       ))}
                     </tbody>

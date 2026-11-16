@@ -975,6 +975,10 @@ export interface OutlookSettings {
   azureScope: string
   outlookConnectEnabled: boolean
   outlookNotes: string
+  /** The survey runner's switch. Off, no survey is ever sent. */
+  surveysEnabled: boolean
+  /** When set, every client survey email goes to this address instead of the client. */
+  surveyTestRecipient: string
   /** Whether a client secret is stored. The value itself is never sent. */
   secretSet: boolean
   /** Field keys still empty. Lets the form point at the specific box. */
@@ -2932,12 +2936,40 @@ export const INTENSITY_DEFINITIONS: { level: string; what: string }[] = [
   { level: 'White Glove', what: 'Requires constant strategic oversight or dedicated resources.' },
 ]
 
-/** A detractor response nobody has answered yet. Score and dimension only, never the words. */
-export interface OpenDetractor {
-  date: string
-  dimension: string
-  score: number
-  daysAgo: number
+/**
+ * Where a client's survey stands. Surveys are sent by the Cobalt Survey Runner, never by
+ * a person, so this is a read-out: the open log when there is one, else the latest
+ * closed one. Null for an account that has never had one.
+ */
+export interface SurveyState {
+  status: SurveyStatus | ''
+  dueDate: string
+  sentAt: string
+  expiresAt: string
+  lastError: string
+}
+
+export type SurveyStatus = 'Scheduled' | 'Sent' | 'Reminded' | 'Completed' | 'Expired' | 'Held'
+
+/** A status as a sentence fragment: what the runner did or will do, with its date. */
+export function surveyStateLabel(s: SurveyState | null | undefined): string {
+  if (!s || !s.status) return 'not scheduled yet'
+  switch (s.status) {
+    case 'Scheduled': return s.dueDate ? `goes out ${s.dueDate}` : 'scheduled'
+    case 'Sent': return s.sentAt ? `sent ${s.sentAt}, no answer yet` : 'sent, no answer yet'
+    case 'Reminded': return 'follow-up sent, no answer yet'
+    case 'Completed': return s.sentAt ? `answered (sent ${s.sentAt})` : 'answered'
+    case 'Expired': return s.sentAt ? `no answer (sent ${s.sentAt})` : 'closed, never sent'
+    case 'Held': return s.lastError ? `held: ${s.lastError}` : 'held'
+    default: return s.status
+  }
+}
+
+export function surveyStatusTone(status: string): 'good' | 'warn' | 'bad' | undefined {
+  if (status === 'Completed') return 'good'
+  if (status === 'Held') return 'bad'
+  if (status === 'Expired') return 'warn'
+  return undefined
 }
 
 /**
@@ -2962,8 +2994,7 @@ export interface CsInfo {
   checkDue: boolean
   goneQuiet: boolean
   neverTouched: boolean
-  openDetractor: OpenDetractor | null
-  surveyDue: boolean
+  survey: SurveyState | null
   lastInviteAt: string
 }
 
@@ -2997,8 +3028,6 @@ export interface CsHeadline {
   yellow: number
   red: number
   checksDue: number
-  openDetractors: number
-  surveysDue: number
 }
 
 export interface CsVocabularies {
@@ -3059,6 +3088,12 @@ export interface SurveyInvite {
   sentTo: string
   contactName: string
   sentBy: string
+  /** The survey log: written by the runner, read here. Blank on a row from before it. */
+  status: SurveyStatus | ''
+  dueDate: string
+  expiresAt: string
+  lastStepName: string
+  lastError: string
   /** Present on the org-wide list, absent when the call named one company. */
   companyId?: string
   companyName?: string
@@ -3100,8 +3135,6 @@ export interface CsSummaryDetractor {
   companyName: string
   dimension: string
   score: number
-  /** Null means still unanswered. Nobody has logged a contact since it arrived. */
-  acknowledgedInDays: number | null
   /** Absent, not blank, for a caller without `viewSurveys`. */
   comment?: string
 }
@@ -3200,17 +3233,28 @@ export const setSupportIntensity = (
 ): Promise<{ cs: CsInfo; supportIntensity: string; cadenceDays: number }> =>
   maestroPost('setSupportIntensity', { companyId, ...body })
 
-/**
- * Mint a survey link and the email to send with it.
- *
- * Creating the invite IS the send record: the 90-day clock starts here, not when the
- * mail actually leaves. Accepted out loud: an invite copied and never sent still counts,
- * and the response rate is what exposes that.
- */
-export const createSurveyInvite = (
-  companyId: string, email: string, contactName: string,
-): Promise<{ invite: SurveyInvite; url: string; subject: string; body: string }> =>
-  maestroPost('createSurveyInvite', { companyId, email, contactName })
+/** One thing stopping a survey from going out. The runner emails the same list. */
+export interface SurveyProblem {
+  kind: 'outlook' | 'contact' | 'held'
+  detail: string
+  who?: string
+  companyId?: string
+  companyName?: string
+}
+
+export interface SurveyProblems {
+  /** The runner's switch. Off, nothing is ever sent. */
+  enabled: boolean
+  /** A test recipient is set: every client email goes there instead of the client. */
+  testMode: boolean
+  scheduled: number
+  awaiting: number
+  problems: SurveyProblem[]
+}
+
+/** There is no manual invite: surveys are sent by the Cobalt Survey Runner. */
+export const getSurveyProblems = (): Promise<SurveyProblems> =>
+  maestroGet('surveyProblems').then((d: SurveyProblems) => ({ ...d, problems: d.problems || [] }))
 
 /*
  * `invites` is defaulted rather than trusted. Two screens count it before rendering

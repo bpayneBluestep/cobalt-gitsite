@@ -36,6 +36,8 @@ interface Draft {
   azureScope: string
   outlookConnectEnabled: boolean
   outlookNotes: string
+  surveysEnabled: boolean
+  surveyTestRecipient: string
 }
 
 function draftOf(r: OutlookSettings): Draft {
@@ -48,6 +50,8 @@ function draftOf(r: OutlookSettings): Draft {
     azureScope: r.azureScope || '',
     outlookConnectEnabled: !!r.outlookConnectEnabled,
     outlookNotes: r.outlookNotes || '',
+    surveysEnabled: !!r.surveysEnabled,
+    surveyTestRecipient: r.surveyTestRecipient || '',
   }
 }
 
@@ -246,6 +250,16 @@ export default function OutlookSettingsPanel() {
                         <dt>Connecting</dt>
                         <dd>{row.outlookConnectEnabled ? 'On' : 'Off'}</dd>
                       </div>
+                      <div>
+                        <dt>Client surveys</dt>
+                        <dd>
+                          {!row.surveysEnabled
+                            ? 'Off'
+                            : row.surveyTestRecipient
+                              ? `Test mode, everything goes to ${row.surveyTestRecipient}`
+                              : 'On, sending to clients'}
+                        </dd>
+                      </div>
                       {row.outlookNotes && (
                         <div>
                           <dt>Notes</dt>
@@ -335,6 +349,30 @@ export default function OutlookSettingsPanel() {
                         <p className="ef__hint">
                           Off until the app is registered and tested. Nothing sends mail while
                           this is off.
+                        </p>
+                      </div>
+
+                      <div className="ef ef--wide">
+                        <label className="checkline">
+                          <input type="checkbox" checked={draft.surveysEnabled}
+                            onChange={e => set('surveysEnabled', e.target.checked)} />
+                          <span>Send client surveys automatically</span>
+                        </label>
+                        <p className="ef__hint">
+                          Off, no survey is ever sent. On, Cobalt emails each client's primary
+                          contact every 90 days on weekday mornings: first from Noel, then a
+                          follow-up from Brandon ten days later.
+                        </p>
+                      </div>
+
+                      <div className="ef ef--wide">
+                        <label htmlFor={`o-test-${row.orgId}`}>Survey test recipient</label>
+                        <input id={`o-test-${row.orgId}`} type="text"
+                          value={draft.surveyTestRecipient}
+                          onChange={e => set('surveyTestRecipient', e.target.value)} />
+                        <p className="ef__hint">
+                          While an address is here, every client survey email goes to it
+                          instead of the client. Clear it to go live.
                         </p>
                       </div>
 

@@ -1,8 +1,9 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  ApiError, getSurveys, npsTone, quarterOf, recentQuarters, SURVEY_DIMENSIONS,
-  type SurveyList,
+  ApiError, getSurveyProblems, getSurveys, npsTone, quarterOf, recentQuarters,
+  surveyStatusTone, SURVEY_DIMENSIONS,
+  type SurveyList, type SurveyProblems,
 } from '../api'
 import CsNav from '../components/CsNav'
 
@@ -52,6 +53,10 @@ export default function CsSurveys() {
   const [quarter, setQuarter] = useState(ALL)
   const [state, setState] = useState<State>({ phase: 'loading' })
   const [openRow, setOpenRow] = useState('')
+  const [problems, setProblems] = useState<SurveyProblems | null>(null)
+  useEffect(() => {
+    getSurveyProblems().then(setProblems).catch(() => setProblems(null))
+  }, [])
 
   const quarters = useMemo(() => recentQuarters(quarterOf(), 8), [])
 
@@ -76,8 +81,9 @@ export default function CsSurveys() {
         <p className="eyebrow">Client Success</p>
         <h1>Surveys</h1>
         <p className="page__sub-text">
-          Four questions, four times a year, answered with a name attached, so a 3/10 is
-          a phone call tomorrow rather than a dot on a chart.
+          Four questions every 90 days, sent by Cobalt to each client's primary contact
+          and answered with a name attached. Every response is emailed to Brandon and Noel
+          the moment it lands.
         </p>
       </header>
 
@@ -86,7 +92,12 @@ export default function CsSurveys() {
       <div className="pipebar">
         <div className="pipebar__totals">
           <span><strong>{d ? d.rows.length : 0}</strong> response{d && d.rows.length === 1 ? '' : 's'}</span>
-          <span className="muted"><strong>{d ? d.invites.length : 0}</strong> invited</span>
+          <span className="muted"><strong>{d ? d.invites.filter(i => i.sentAt).length : 0}</strong> sent</span>
+          {problems && (
+            <span className="muted">
+              {!problems.enabled ? 'sending is off' : problems.testMode ? 'test mode' : 'sending is on'}
+            </span>
+          )}
         </div>
         <div className="pipebar__tools">
           <label className="scope__label" htmlFor="cs-quarter">Quarter</label>
@@ -112,6 +123,28 @@ export default function CsSurveys() {
               : <button type="button" className="btn" onClick={() => load(quarter)}>Try again</button>}
           </p>
         </div>
+      )}
+
+      {problems && problems.problems.length > 0 && (
+        <section className="panel">
+          <header className="panel__head">
+            <h2>Stopping a survey from going out</h2>
+            <span className="panel__n">{problems.problems.length}</span>
+          </header>
+          <p className="panel__note">
+            Nothing sends for these until each one is fixed. The same list is emailed to
+            Brandon and Noel on weekdays while anything is on it.
+          </p>
+          <ul className="facts__wrap">
+            {problems.problems.map((p, i) => (
+              <li key={i}>
+                {p.companyId
+                  ? <><Link className="inlink" to={`/clients/${p.companyId}/contacts`}>{p.companyName}</Link>: {p.detail}</>
+                  : p.detail}
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       {d && (
@@ -148,13 +181,11 @@ export default function CsSurveys() {
             <div className="callout callout--plain">
               <p className="callout__title">No responses yet</p>
               <p>
-                {d.invites.length > 0
-                  ? <>{d.invites.length} invite{d.invites.length === 1 ? ' has' : 's have'} gone
-                      out and none have come back yet. Nothing is wrong until a quarter closes
-                      with a response rate near zero.</>
-                  : <>No invites have been sent. Copy one from the{' '}
-                      <Link className="inlink" to="/cs">queue</Link>: Cobalt writes the email
-                      and you send it.</>}
+                {d.invites.some(i => i.sentAt)
+                  ? <>Surveys have gone out and none have come back yet. Nothing is wrong
+                      until a quarter closes with a response rate near zero.</>
+                  : <>No survey has gone out yet. Cobalt sends them on its own once sending
+                      is switched on, a few each weekday.</>}
               </p>
             </div>
           )}
@@ -251,27 +282,27 @@ export default function CsSurveys() {
           {d.invites.length > 0 && (
             <section className="panel">
               <header className="panel__head">
-                <h2>Invites sent</h2>
+                <h2>Survey log</h2>
                 <span className="panel__n">{d.invites.length}</span>
               </header>
               <p className="panel__note">
-                Recorded when the invite was copied. An invite copied and never sent still
-                counts: the response rate is what exposes that.
+                One row per survey per client. Email 1 comes from Noel; a follow-up comes
+                from Brandon ten days later if there is no answer; the link closes at 30 days.
               </p>
               <div className="tablewrap">
                 <table className="fields compact">
                   <thead>
                     <tr>
-                      <th scope="col">Sent</th>
+                      <th scope="col">Date</th>
                       <th scope="col">Company</th>
                       <th scope="col">To</th>
-                      <th scope="col">By</th>
+                      <th scope="col">Status</th>
                     </tr>
                   </thead>
                   <tbody>
                     {d.invites.map(i => (
                       <tr key={i.entryId}>
-                        <th scope="row" className="nowrap">{i.sentAt || '-'}</th>
+                        <th scope="row" className="nowrap">{i.sentAt || i.dueDate || '-'}</th>
                         <td>
                           {i.companyId
                             ? <Link className="rowlink__a" to={`/clients/${i.companyId}/success`}>
@@ -283,7 +314,13 @@ export default function CsSurveys() {
                           {i.contactName || <span className="muted">unnamed</span>}
                           {i.sentTo ? ` · ${i.sentTo}` : ''}
                         </td>
-                        <td>{i.sentBy || <span className="muted">-</span>}</td>
+                        <td>
+                          {i.status
+                            ? <span className="pill" data-tone={surveyStatusTone(i.status)}>{i.status}</span>
+                            : <span className="muted">-</span>}
+                          {i.status === 'Scheduled' && i.dueDate ? ' goes out on the date shown' : ''}
+                          {i.status === 'Held' && i.lastError ? ` ${i.lastError}` : ''}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

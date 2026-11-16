@@ -13,8 +13,8 @@ type State =
 /**
  * What the Last touch pill knows about one client.
  *
- * `band` is deliberately NOT the CS health colour. Health folds in an unanswered
- * detractor and the last temperature reading, so a client rung yesterday can be Red —
+ * `band` is deliberately NOT the CS health colour. Health folds in the last
+ * temperature reading, so a client rung yesterday can be Red —
  * true, and completely wrong under a column headed "Last touch". This bands on contact
  * recency alone, using the account's own cadence, so the colour means what the label says.
  */
