@@ -178,6 +178,8 @@ export type Capability =
    *  because it is the one action here nothing can undo. */
   | 'deleteCompanies'
   | 'viewReports'
+  /** The Scorecard report. Leadership alone, and checked in the `scorecard` action itself. */
+  | 'viewScorecard'
   | 'viewSchema'
   /*
    * Client Success. `viewCs` opens the section; `viewSurveys` is the narrower one,
@@ -3522,6 +3524,65 @@ export interface FinanceInputs {
 }
 
 export const getFinanceData = (): Promise<FinanceInputs> => maestroGet('financeData', {})
+
+/*
+ * ── Scorecard ────────────────────────────────────────────────────────────────
+ *
+ * The record-backed half of the Scorecard report: four numbers, each with the rows that
+ * produce it, from one walk on the server so a figure and its Verify table cannot
+ * disagree. The finance cards are built in the browser from `getFinanceData`.
+ * Leadership only (`viewScorecard`).
+ */
+export interface ScorecardDueRow {
+  companyId: string
+  companyName: string
+  /** `yyyy-mm-dd`, or '' when the client has never been contacted. */
+  lastContact: string
+  contactAgeDays: number | null
+  cadenceDays: number
+  supportIntensity: string
+}
+export interface ScorecardTempRow {
+  companyId: string
+  companyName: string
+  /** The newest reading of any age, or '' when there is none. */
+  temperature: string
+  temperatureDate: string
+  green: boolean
+}
+export interface ScorecardDemoRow {
+  companyId: string
+  companyName: string
+  dealId: string
+  title: string
+  owner: string
+  demoDate: string
+  daysAgo: number
+}
+export interface ScorecardNpsRow {
+  companyId: string
+  companyName: string
+  overall: number
+  date: string
+}
+export interface ScorecardData {
+  asOf: string
+  clients: number
+  tempChecks: { due: number; total: number; rows: ScorecardDueRow[] }
+  greenRate: { green: number; total: number; pct: number | null; rows: ScorecardTempRow[] }
+  demos: { windowDays: number; count: number; rows: ScorecardDemoRow[] }
+  nps: {
+    windowDays: number
+    nps: number | null
+    n: number
+    promoters: number
+    passives: number
+    detractors: number
+    rows: ScorecardNpsRow[]
+  }
+}
+
+export const getScorecard = (): Promise<ScorecardData> => maestroGet('scorecard', {})
 
 /*
  * ── Ticket templates ────────────────────────────────────────────────────────

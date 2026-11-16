@@ -46,9 +46,9 @@ type TabId = typeof TABS[number]['id']
 
 type Source = 'revenue' | 'expenses'
 /** A file that did not make it into the numbers, and why. */
-interface Problem { source: Source; kind: 'missing' | 'unreadable'; message: string }
+export interface Problem { source: Source; kind: 'missing' | 'unreadable'; message: string }
 
-interface Loaded { inputs: FinanceInputs; data: FinanceData; problems: Problem[] }
+export interface Loaded { inputs: FinanceInputs; data: FinanceData; problems: Problem[] }
 
 type State =
   | { phase: 'loading' }
@@ -67,8 +67,11 @@ function decode(b64: string): Uint8Array {
   return out
 }
 
-/** Fetch, decode, parse, build. Each file fails on its own; the other still renders. */
-async function load(): Promise<Loaded> {
+/**
+ * Fetch, decode, parse, build. Each file fails on its own; the other still renders.
+ * Exported for the Scorecard, whose finance cards must be this report's numbers.
+ */
+export async function load(): Promise<Loaded> {
   const inputs = await getFinanceData()
   const problems: Problem[] = []
   const read = async (source: Source, file: FinanceFile | null): Promise<SheetInput | null> => {

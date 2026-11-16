@@ -33,6 +33,7 @@ import TimeReport from './routes/TimeReport'
 import BillableReport from './routes/BillableReport'
 import AgreementsReport from './routes/AgreementsReport'
 import FinanceReport from './routes/FinanceReport'
+import Scorecard from './routes/Scorecard'
 import TicketPage from './routes/TicketPage'
 import Intake from './routes/Intake'
 import CompanyAgreements from './routes/CompanyAgreements'
@@ -102,6 +103,7 @@ const CAPABILITY_LABELS: Record<Capability, string> = {
   viewSettings: 'Leadership',
   grantRoles: 'Leadership',
   viewReports: 'Leadership or Accounting',
+  viewScorecard: 'Leadership',
   viewSchema: 'Leadership, Relate Engineer or Infra Engineer',
   deleteCompanies: 'Leadership',
   viewResources: 'any role',
@@ -259,6 +261,9 @@ function Shell() {
               element={<Guarded needs="viewAgreements" what="The agreements report"><AgreementsReport /></Guarded>} />
             <Route path="/reports/finance"
               element={<Guarded needs="viewReports" what="The finance report"><FinanceReport /></Guarded>} />
+            {/* Leadership alone: the one report with a narrower gate than its section. */}
+            <Route path="/reports/scorecard"
+              element={<Guarded needs="viewScorecard" what="The scorecard"><Scorecard /></Guarded>} />
 
             <Route path="/settings" element={<Guarded needs="viewSettings" what="Settings"><Settings /></Guarded>} />
             {/* A person gets a page of their own, the same as a company. Same gate as the

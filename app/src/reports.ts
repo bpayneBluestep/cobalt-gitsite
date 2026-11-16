@@ -28,6 +28,19 @@ export interface ReportCard {
 
 export const REPORTS: ReportCard[] = [
   {
+    key: 'scorecard',
+    path: '/reports/scorecard',
+    name: 'Scorecard',
+    description:
+      'The numbers leadership reviews each week: one figure per measure, green, yellow ' +
+      'or red against its target, who owns it, and the rows behind it so it can be checked.',
+    source:
+      'Client touchpoints and survey scores, demo dates on deals, and the QuickBooks ' +
+      'exports the Finance report reads. Measures Cobalt has no data for yet are listed ' +
+      'as coming soon.',
+    needs: 'viewScorecard',
+  },
+  {
     key: 'time',
     path: '/reports/time',
     name: 'Time Logging',
