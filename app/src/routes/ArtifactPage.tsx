@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import {
   ApiError, getArtifact, getArtifactFile, getArtifactProposals, decideArtifactProposal,
-  publishArtifactVersion, proposeArtifactVersion,
+  publishArtifactVersion, proposeArtifactVersion, updateArtifactMeta, ARTIFACT_CATEGORIES,
   type ArtifactFull, type ArtifactProposal, type ManifestRow,
 } from '../api'
 import { useSession } from '../session'
@@ -289,6 +289,44 @@ function VersionForm({ full, reload }: { full: ArtifactFull; reload: () => void 
   )
 }
 
+/*
+ * The artifact's category: a badge for everyone, a select for the owner (the endpoint
+ * enforces owner-only on updateArtifactMeta, so this is display courtesy, not security).
+ */
+function CategoryControl({ full, reload }: { full: ArtifactFull; reload: () => void }) {
+  const { session } = useSession()
+  const a = full.artifact
+  const isOwner = !!session && String(session.userId) === String(a.ownerId)
+  const [busy, setBusy] = useState(false)
+  const [failure, setFailure] = useState('')
+
+  if (!isOwner) return a.category ? <span className="res-cat">{a.category}</span> : null
+
+  const change = (next: string) => {
+    if (!next || next === a.category) return
+    setBusy(true); setFailure('')
+    updateArtifactMeta({ id: a.id, category: next })
+      .then(() => { setBusy(false); reload() })
+      .catch(err => {
+        setBusy(false)
+        setFailure(err instanceof ApiError ? err.message : 'Could not change the category.')
+      })
+  }
+
+  return (
+    <>
+      <label className="res-cat-edit">
+        <span className="visually-hidden">Category</span>
+        <select value={a.category} disabled={busy} onChange={e => change(e.target.value)}>
+          {!a.category && <option value="">Choose a category…</option>}
+          {ARTIFACT_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+      </label>
+      {failure && <span className="editcard__err" role="alert">{failure}</span>}
+    </>
+  )
+}
+
 export default function ArtifactPage() {
   const { id } = useParams()
   const [state, setState] = useState<State>({ phase: 'loading' })
@@ -333,6 +371,7 @@ export default function ArtifactPage() {
           {a.status === 'Archived' && <> · <b>Archived</b></>}
         </p>
         <div className="res-card__meta">
+          <CategoryControl full={full} reload={load} />
           <span className="muted">owner {a.ownerName}</span>
           {a.parentArtifactId && (
             <Link className="inlink" to={`/resources/${a.parentArtifactId}`}>forked from another artifact</Link>

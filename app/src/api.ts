@@ -3288,6 +3288,8 @@ export interface ArtifactCard {
   slug: string
   summary: string
   kind: string
+  /** One of ARTIFACT_CATEGORIES; empty only on old archived test artifacts. */
+  category: string
   status: string
   ownerId: string
   ownerName: string
@@ -3331,7 +3333,7 @@ export interface ArtifactProposal {
 export interface ArtifactFull {
   artifact: {
     id: string; title: string; slug: string; summary: string
-    kind: string; status: string; ownerId: string; ownerName: string
+    kind: string; category: string; status: string; ownerId: string; ownerName: string
     runsLive: { label: string; url: string }[]
     related: Record<string, string>
     parentArtifactId: string
@@ -3345,7 +3347,10 @@ export interface ArtifactFull {
   proposals: { entryId: string; status: string; proposerName: string; baseVersion: number; createdAt: string; decidedAt: string }[]
 }
 
-export const getArtifacts = (params: Record<string, string> = {}): Promise<{ rows: ArtifactCard[]; total: number }> =>
+/** Fallback vocabulary; the server's `categories` on the list response wins. */
+export const ARTIFACT_CATEGORIES = ['Claude Skills', 'Feature Concepts', 'Marketing/Branding', 'Internal Processes']
+
+export const getArtifacts = (params: Record<string, string> = {}): Promise<{ rows: ArtifactCard[]; total: number; categories?: string[] }> =>
   maestroGet('artifacts', params)
 
 export const getArtifact = (id: string, version?: number): Promise<ArtifactFull> =>
@@ -3356,6 +3361,9 @@ export const getArtifactFile = (id: string, fileEntryId: string): Promise<{ path
 
 export const createArtifact = (payload: Record<string, unknown>): Promise<ArtifactFull> =>
   maestroPost('createArtifact', payload)
+
+export const updateArtifactMeta = (payload: Record<string, unknown>): Promise<ArtifactFull> =>
+  maestroPost('updateArtifactMeta', payload)
 
 export const publishArtifactVersion = (payload: Record<string, unknown>): Promise<ArtifactFull> =>
   maestroPost('publishArtifactVersion', payload)
