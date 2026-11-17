@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  ApiError, deleteTouchpoint, getLists, getSurveys, getTouchpoints, logTouchpoint,
+  ApiError, deleteTouchpoint, getLists, getSurveys, getTouchpoints, logTouchpoint, updateCompany,
   setSupportIntensity, npsTone, INTENSITY_DEFINITIONS, SURVEY_DIMENSIONS, TEMPERATURES,
   TOUCHPOINT_TYPES,
   type CsInfo, type SurveyList, type Touchpoint, type TouchpointList,
@@ -93,6 +93,18 @@ export default function CompanySuccess() {
 
   const [state, setState] = useState<State>({ phase: 'loading' })
   const [surveys, setSurveys] = useState<SurveyList | null>(null)
+  // "Don't send surveys" for this client. Saved on change; the runner reads it each morning.
+  const [surveysOff, setSurveysOff] = useState<boolean>(company.surveysOff === true)
+  const [savingOff, setSavingOff] = useState(false)
+  const [offError, setOffError] = useState('')
+  const toggleSurveysOff = (next: boolean) => {
+    setSavingOff(true)
+    setOffError('')
+    updateCompany(id, { surveysOff: next } as never)
+      .then(() => setSurveysOff(next))
+      .catch((e: unknown) => setOffError(e instanceof Error ? e.message : 'Could not save.'))
+      .finally(() => setSavingOff(false))
+  }
   /*
    * The client's ticket list, if it has one. Read-only, and the reason the escalation
    * button is here rather than on the queue row.
@@ -377,6 +389,19 @@ export default function CompanySuccess() {
                 What this client told us, with their name on it. Verbatim answers are
                 visible to Leadership, Sales and Client Success only.
               </p>
+
+              <label className="checkline">
+                <input type="checkbox" checked={surveysOff} disabled={!mayEdit || savingOff}
+                  onChange={e => toggleSurveysOff(e.target.checked)} />
+                <span>Don't send surveys to this client</span>
+              </label>
+              {surveysOff && (
+                <p className="panel__note">
+                  Surveys are off. This client is skipped every round and any survey not
+                  yet sent is cancelled the next morning.
+                </p>
+              )}
+              {offError && <p className="empty">{offError}</p>}
 
               {!surveys && <p className="empty">Reading the survey history…</p>}
 

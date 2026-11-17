@@ -875,6 +875,8 @@ export async function changeExpiredPassword(fixUrl: string, password: string): P
 export interface Company {
   id: string
   name: string
+  /** "Don't send surveys": the survey runner skips this client every round. */
+  surveysOff?: boolean
   website: string
   /** The client's own BlueStep org, imported from beh. Empty for a company without one. */
   ehrLink: string
@@ -2949,7 +2951,7 @@ export interface SurveyState {
   lastError: string
 }
 
-export type SurveyStatus = 'Scheduled' | 'Sent' | 'Reminded' | 'Completed' | 'Expired' | 'Held'
+export type SurveyStatus = 'Scheduled' | 'Sent' | 'Reminded' | 'Completed' | 'Expired' | 'Held' | 'Off'
 
 /** A status as a sentence fragment: what the runner did or will do, with its date. */
 export function surveyStateLabel(s: SurveyState | null | undefined): string {
@@ -2961,6 +2963,7 @@ export function surveyStateLabel(s: SurveyState | null | undefined): string {
     case 'Completed': return s.sentAt ? `answered (sent ${s.sentAt})` : 'answered'
     case 'Expired': return s.sentAt ? `no answer (sent ${s.sentAt})` : 'closed, never sent'
     case 'Held': return s.lastError ? `held: ${s.lastError}` : 'held'
+    case 'Off': return 'surveys off'
     default: return s.status
   }
 }
