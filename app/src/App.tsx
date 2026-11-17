@@ -34,6 +34,7 @@ import BillableReport from './routes/BillableReport'
 import AgreementsReport from './routes/AgreementsReport'
 import FinanceReport from './routes/FinanceReport'
 import Scorecard from './routes/Scorecard'
+import SurveyReport from './routes/SurveyReport'
 import TicketPage from './routes/TicketPage'
 import Intake from './routes/Intake'
 import CompanyAgreements from './routes/CompanyAgreements'
@@ -264,6 +265,10 @@ function Shell() {
             {/* Leadership alone: the one report with a narrower gate than its section. */}
             <Route path="/reports/scorecard"
               element={<Guarded needs="viewScorecard" what="The scorecard"><Scorecard /></Guarded>} />
+            {/* Leadership and Client Success. Client Success cannot open the Reports
+                directory, so this one is also linked from the Client Success pages. */}
+            <Route path="/reports/surveys"
+              element={<Guarded needs="viewSurveys" what="The client surveys report"><SurveyReport /></Guarded>} />
 
             <Route path="/settings" element={<Guarded needs="viewSettings" what="Settings"><Settings /></Guarded>} />
             {/* A person gets a page of their own, the same as a company. Same gate as the

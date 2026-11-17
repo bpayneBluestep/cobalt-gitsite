@@ -21,6 +21,8 @@ export default function CsNav({ counts }: { counts?: Record<string, number> }) {
     { to: '/cs', label: 'Queue', end: true },
     ...(can('viewSurveys') ? [{ to: '/cs/surveys', label: 'Surveys', end: false }] : []),
     { to: '/cs/quarter', label: 'Quarter', end: false },
+    // The report lives under Reports, which Client Success cannot open, so it is linked here too.
+    ...(can('viewSurveys') ? [{ to: '/reports/surveys', label: 'Survey Report', end: false }] : []),
   ]
 
   return (

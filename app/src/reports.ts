@@ -41,6 +41,18 @@ export const REPORTS: ReportCard[] = [
     needs: 'viewScorecard',
   },
   {
+    key: 'surveys',
+    path: '/reports/surveys',
+    name: 'Client Surveys',
+    description:
+      'How clients rate us and whether it is getting better: response rate, NPS and ' +
+      'average score by month or quarter, and which clients are unhappy or not answering.',
+    source:
+      'Every survey Cobalt has sent and every answer that came back, read fresh each ' +
+      'time the report opens. Account owner and support level come from the client record.',
+    needs: 'viewSurveys',
+  },
+  {
     key: 'time',
     path: '/reports/time',
     name: 'Time Logging',
