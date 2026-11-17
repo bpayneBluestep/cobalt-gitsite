@@ -3395,7 +3395,7 @@ export interface ArtifactFull {
 }
 
 /** Fallback vocabulary; the server's `categories` on the list response wins. */
-export const ARTIFACT_CATEGORIES = ['Claude Skills', 'Feature Concepts', 'Marketing/Branding', 'Internal Processes']
+export const ARTIFACT_CATEGORIES = ['Claude Skills', 'Feature Concepts', 'Marketing/Branding', 'Internal Processes', 'Legal']
 
 export const getArtifacts = (params: Record<string, string> = {}): Promise<{ rows: ArtifactCard[]; total: number; categories?: string[] }> =>
   maestroGet('artifacts', params)

@@ -6664,3 +6664,30 @@ input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) opacit
   padding: 1px 8px; white-space: nowrap;
 }
 .res-cat-edit select { font-size: var(--t-caption1); padding: 2px 6px; }
+
+/* The Resources landing: one big button per category, so the page stays short however
+ * many artifacts the library holds. A category opens to its cards (.res-grid). */
+.res-tiles {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: var(--s-m);
+}
+.res-tile {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+  min-height: 9.5rem; padding: 22px 22px 18px; text-align: left;
+  background: var(--bg-panel); border: 1px solid var(--line);
+  border-radius: var(--r-l); color: var(--text); font: inherit; cursor: pointer;
+  transition: border-color .12s ease, box-shadow .12s ease, transform .12s ease;
+}
+.res-tile:hover { border-color: var(--cobalt); box-shadow: var(--el-4); transform: translateY(-1px); }
+.res-tile:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 2px; }
+.res-tile__name { font-size: var(--t-subtitle1, 1.25rem); font-weight: 700; line-height: 1.2; }
+.res-tile__blurb { font-size: var(--t-caption1); color: var(--text-dim); }
+.res-tile__n {
+  margin-top: auto; font-size: var(--t-caption2); font-weight: 600; color: var(--cobalt);
+  background: color-mix(in srgb, var(--cobalt) 10%, transparent);
+  border-radius: 999px; padding: 2px 10px;
+}
+.res-crumb { display: flex; align-items: center; gap: var(--s-m); flex-wrap: wrap; }
+.res-crumb__name { margin: 0; font-size: var(--t-subtitle2); }
+.res-crumb__hint { margin: 0; }
+@media (prefers-reduced-motion: reduce) { .res-tile { transition: none; } .res-tile:hover { transform: none; } }

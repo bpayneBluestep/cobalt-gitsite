@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { getArtifacts, createArtifact, ApiError, ARTIFACT_CATEGORIES, type ArtifactCard } from '../api'
 
 /*
- * The Resources library: every artifact as a card.
+ * The Resources library. The landing is one big button per category; a category
+ * opens to its artifacts as cards. Searching from the landing cuts across every
+ * category, so a person who knows the name never has to guess the shelf.
  *
  * Filtering is client-side over the full card list — the same call Claude Code makes,
  * so what a person can find here and what an engineer's Claude can find are by
@@ -100,13 +102,29 @@ function NewArtifact({ categories, onDone, onClose }: { categories: string[]; on
   )
 }
 
+/* What lives on each shelf, shown on its button. A category the endpoint adds later
+ * simply gets a button without a blurb. */
+const CATEGORY_BLURB: Record<string, string> = {
+  'Claude Skills': 'Skills and mods for Claude Code',
+  'Feature Concepts': 'Reference builds and ideas for the product',
+  'Marketing/Branding': 'Brand kits, handouts and booth material',
+  'Internal Processes': 'How we migrate, set up and run things',
+  'Legal': 'Agreement templates',
+}
+
+/** The `?category=` value for artifacts with no category (old archived test rows). */
+const NONE = 'none'
+
 export default function Resources() {
   const [state, setState] = useState<State>({ phase: 'loading' })
   const [pubOpen, setPubOpen] = useState(false)
   const [search, setSearch] = useState('')
-  /** '' = all categories. Filtered client-side so the counts on the chips stay honest. */
-  const [category, setCategory] = useState('')
   const [showArchived, setShowArchived] = useState(false)
+  /** The open category lives in the URL so Back returns to the buttons and a
+   *  category can be linked to. '' = the landing. */
+  const [params, setParams] = useSearchParams()
+  const category = params.get('category') || ''
+  const setCategory = (c: string) => setParams(c ? { category: c } : {})
 
   const load = useCallback(() => {
     setState({ phase: 'loading' })
@@ -125,26 +143,25 @@ export default function Resources() {
 
   const rows = state.phase === 'ready' ? state.rows : []
   const categories = state.phase === 'ready' ? state.categories : ARTIFACT_CATEGORIES
+  const q = search.trim().toLowerCase()
 
-  // Search narrows first, then the chips count what search left, so a chip's number is
-  // exactly what clicking it shows.
-  const searched = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    return rows.filter(r => {
-      if (!q) return true
-      return [r.title, r.summary, r.slug, r.ownerName, r.category]
-        .some(v => String(v || '').toLowerCase().includes(q))
-    })
-  }, [rows, search])
+  const inCategory = useCallback(
+    (r: ArtifactCard, c: string) => c === NONE ? !r.category : r.category === c, [])
 
-  const shown = useMemo(
-    () => category ? searched.filter(r => r.category === category) : searched,
-    [searched, category],
-  )
+  const shown = useMemo(() => rows.filter(r => {
+    if (category && !inCategory(r, category)) return false
+    if (!q) return true
+    return [r.title, r.summary, r.slug, r.ownerName, r.category]
+      .some(v => String(v || '').toLowerCase().includes(q))
+  }), [rows, category, q, inCategory])
 
-  // Only archived test artifacts can lack a category; give them a chip only if present.
-  const uncategorised = searched.filter(r => !r.category).length
-  const filtering = !!search.trim() || !!category
+  // Only archived test artifacts can lack a category; they get a button only if present.
+  const uncategorised = rows.filter(r => !r.category).length
+  const tiles = uncategorised > 0 ? [...categories, NONE] : categories
+  const label = (c: string) => c === NONE ? 'Uncategorised' : c
+  /** The landing: no category open and nothing typed in search. */
+  const landing = !category && !q
+  const plural = (n: number) => `${n} resource${n === 1 ? '' : 's'}`
 
   return (
     <div className="page">
@@ -168,7 +185,7 @@ export default function Resources() {
                   type="search"
                   value={search}
                   autoComplete="off"
-                  placeholder="Title, owner…"
+                  placeholder={category ? `Search ${label(category)}…` : 'Search everything…'}
                   onChange={e => setSearch(e.target.value)}
                 />
               </div>
@@ -215,66 +232,78 @@ export default function Resources() {
       {state.phase === 'ready' && rows.length > 0 && (
         <>
           <div className="stage">
-            <div className="ownerbar res-cats" role="group" aria-label="Filter by category">
-              <button type="button" className="ownerchip" aria-pressed={category === ''}
-                onClick={() => setCategory('')}>
-                All <span className="ownerchip__n">{searched.length}</span>
-              </button>
-              {categories.map(c => (
-                <button key={c} type="button" className="ownerchip" aria-pressed={category === c}
-                  onClick={() => setCategory(category === c ? '' : c)}>
-                  {c} <span className="ownerchip__n">{searched.filter(r => r.category === c).length}</span>
+            {category ? (
+              <div className="res-crumb">
+                <button type="button" className="btn btn--ghost" onClick={() => { setSearch(''); setCategory('') }}>
+                  <span aria-hidden="true">←</span> All categories
                 </button>
-              ))}
-              {uncategorised > 0 && (
-                <span className="ownerchip__n res-cats__none">{uncategorised} uncategorised</span>
-              )}
-            </div>
+                <h2 className="res-crumb__name">{label(category)}</h2>
+              </div>
+            ) : (
+              <p className="page__count res-crumb__hint">
+                {landing ? 'Pick a category to open it.' : 'Results from every category'}
+              </p>
+            )}
             <label className="res-archived">
               <input type="checkbox" checked={showArchived}
                 onChange={e => setShowArchived(e.target.checked)} /> archived
             </label>
           </div>
 
-          <p className="page__count">
-            {filtering
-              ? `${shown.length} of ${rows.length} artifact${rows.length === 1 ? '' : 's'}`
-              : `${rows.length} artifact${rows.length === 1 ? '' : 's'}`}
-          </p>
-
-          {shown.length === 0 && (
-            <div className="callout callout--plain">
-              <p className="callout__title">No match</p>
-              <p>
-                Nothing matches{search.trim() ? <> “{search.trim()}”</> : null}
-                {category ? <> in {category}</> : null}.{' '}
-                <button type="button" className="linkbtn"
-                  onClick={() => { setSearch(''); setCategory('') }}>Clear filters</button>.
-              </p>
+          {landing && (
+            <div className="res-tiles">
+              {tiles.map(c => {
+                const n = rows.filter(r => inCategory(r, c)).length
+                return (
+                  <button key={c} type="button" className="res-tile" onClick={() => setCategory(c)}>
+                    <span className="res-tile__name">{label(c)}</span>
+                    {CATEGORY_BLURB[c] && <span className="res-tile__blurb">{CATEGORY_BLURB[c]}</span>}
+                    <span className="res-tile__n">{plural(n)}</span>
+                  </button>
+                )
+              })}
             </div>
           )}
 
-          <div className="res-grid">
-            {shown.map(r => (
-              <Link key={r.id} className="res-card" to={`/resources/${r.slug || r.id}`}>
-                <div className="res-card__top">
-                  <b>{r.title}</b>
-                  <span className="res-card__v">v{r.currentVersion}</span>
+          {!landing && (
+            <>
+              <p className="page__count">{plural(shown.length)}</p>
+
+              {shown.length === 0 && (
+                <div className="callout callout--plain">
+                  <p className="callout__title">{q ? 'No match' : 'Nothing here yet'}</p>
+                  <p>
+                    {q
+                      ? <>Nothing matches “{search.trim()}”{category ? <> in {label(category)}</> : null}.{' '}
+                          <button type="button" className="linkbtn" onClick={() => setSearch('')}>Clear search</button>.</>
+                      : <>No resources in {label(category)} yet.</>}
+                  </p>
                 </div>
-                {r.category && <span className="res-cat">{r.category}</span>}
-                {r.summary && <p className="res-card__sum">{r.summary}</p>}
-                <div className="res-card__foot">
-                  <span>{r.ownerName}</span>
-                  <span className="muted">
-                    {r.fileCount} file{r.fileCount === 1 ? '' : 's'}
-                    {r.openProposals > 0 && <> · {r.openProposals} open proposal{r.openProposals === 1 ? '' : 's'}</>}
-                    {r.status === 'Archived' && <> · archived</>}
-                    {' · '}{r.updatedAt}
-                  </span>
-                </div>
-              </Link>
-            ))}
-          </div>
+              )}
+
+              <div className="res-grid">
+                {shown.map(r => (
+                  <Link key={r.id} className="res-card" to={`/resources/${r.slug || r.id}`}>
+                    <div className="res-card__top">
+                      <b>{r.title}</b>
+                      <span className="res-card__v">v{r.currentVersion}</span>
+                    </div>
+                    {!category && r.category && <span className="res-cat">{r.category}</span>}
+                    {r.summary && <p className="res-card__sum">{r.summary}</p>}
+                    <div className="res-card__foot">
+                      <span>{r.ownerName}</span>
+                      <span className="muted">
+                        {r.fileCount} file{r.fileCount === 1 ? '' : 's'}
+                        {r.openProposals > 0 && <> · {r.openProposals} open proposal{r.openProposals === 1 ? '' : 's'}</>}
+                        {r.status === 'Archived' && <> · archived</>}
+                        {' · '}{r.updatedAt}
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </>
+          )}
         </>
       )}
     </div>
