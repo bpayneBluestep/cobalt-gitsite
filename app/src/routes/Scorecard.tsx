@@ -200,7 +200,7 @@ function buildCards(sc: ScorecardData | null, scNote: string, m: Model | null, f
       name: 'Net Promoter Score',
       definition: 'Promoters (9–10) minus detractors (0–6) as a share of everyone who answered, ' +
         'from each company’s most recent “Overall Recommendation” survey score in the last ' +
-        '12 months. One score per company. Higher is healthier.',
+        '90 days. One score per company. Higher is healthier.',
       bands: { green: '50+', yellow: '20–49', red: 'below 20' },
     }
     if (!sc) cards.push(blank(base, scNote))
@@ -210,10 +210,10 @@ function buildCards(sc: ScorecardData | null, scNote: string, m: Model | null, f
         ...base,
         status: band(n.nps, v => v >= 50, v => v >= 20),
         value: n.nps === null ? '—' : (n.nps > 0 ? '+' : '') + n.nps,
-        note: n.nps === null ? 'no survey scores in the last 12 months' : `${plural(n.n, 'company', 'companies')} answered`,
+        note: n.nps === null ? 'no survey scores in the last 90 days' : `${plural(n.n, 'company', 'companies')} answered`,
         verify: {
           summary: n.nps === null
-            ? 'No company has an Overall Recommendation score in the last 12 months.'
+            ? 'No company has an Overall Recommendation score in the last 90 days.'
             : `${plural(n.promoters, 'promoter')}, ${plural(n.passives, 'passive')} and ` +
               `${plural(n.detractors, 'detractor')} across ${plural(n.n, 'company', 'companies')}: ` +
               `NPS ${(n.nps > 0 ? '+' : '') + n.nps}.`,
@@ -227,7 +227,7 @@ function buildCards(sc: ScorecardData | null, scNote: string, m: Model | null, f
               r.overall >= 9 ? 'Promoter' : r.overall >= 7 ? 'Passive' : 'Detractor',
             ],
           })),
-          empty: 'No survey scores in the last 12 months.',
+          empty: 'No survey scores in the last 90 days.',
         },
       })
     }
