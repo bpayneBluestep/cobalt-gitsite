@@ -47,6 +47,8 @@ import { SessionProvider, useSession } from './session'
 import ToolsMenu from './components/ToolsMenu'
 import OutlookReturn from './components/OutlookReturn'
 import StaffRecord from './routes/StaffRecord'
+import EvaluationLog from './routes/EvaluationLog'
+import SelfAssessment from './routes/SelfAssessment'
 import UserMenu from './components/UserMenu'
 
 /*
@@ -278,6 +280,11 @@ function Shell() {
                 there. Gating the tab while leaving /staff/<id> open would move the door
                 rather than close it. */}
             <Route path="/staff/:id" element={<Guarded needs="viewSettings" what="Staff records"><StaffRecord /></Guarded>} />
+            {/* Quarterly evaluations. No capability gate on either: a supervisor of record who
+                is not Leadership reviews their own reports, and the person opens their own
+                self-assessment link. The Maestro decides, and 404s everyone else. */}
+            <Route path="/staff/:id/evaluations/:entryId" element={<EvaluationLog />} />
+            <Route path="/self-assessment/:staffId/:entryId" element={<SelfAssessment />} />
 
             {/* Clients is live. It sits under /clients rather than the root now that
                 Home has it, and is reached from Home and from CRM.

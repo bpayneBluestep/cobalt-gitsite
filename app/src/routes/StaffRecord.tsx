@@ -5,6 +5,7 @@ import {
   type Staff, type EmployeeWrite,
 } from '../api'
 import PhoneInput from '../components/PhoneInput'
+import EvaluationsPanel from '../components/EvaluationsPanel'
 import { isPhoneOk } from '../lib/phone'
 import { useSession } from '../session'
 
@@ -423,6 +424,9 @@ export default function StaffRecord() {
           </>
         )}
       </div>
+
+      {/* ── Quarterly evaluations ─────────────────────────────────────────── */}
+      <EvaluationsPanel staffId={s.id} name={s.name} />
 
       {/* ── Account & Outlook ──────────────────────────────────────────────── */}
       <div className="panel">

@@ -6691,3 +6691,97 @@ input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) opacit
 .res-crumb__name { margin: 0; font-size: var(--t-subtitle2); }
 .res-crumb__hint { margin: 0; }
 @media (prefers-reduced-motion: reduce) { .res-tile { transition: none; } .res-tile:hover { transform: none; } }
+
+/* ── Quarterly evaluations ────────────────────────────────────────────────────
+ * The staff-record panel, the evaluation log, and the five-value form shared by the
+ * self-assessment and the supervisor review. */
+.page--narrow { max-width: 860px; }
+
+.evstatus {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line);
+  color: var(--text-dim);
+  background: var(--bg-raise);
+  white-space: nowrap;
+}
+.evstatus[data-kind="open"] { color: var(--cobalt); border-color: color-mix(in srgb, var(--cobalt) 40%, transparent); background: var(--cobalt-wash); }
+.evstatus[data-kind="done"] { color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, transparent); background: color-mix(in srgb, var(--good) 10%, transparent); }
+
+.evhead { display: flex; flex-wrap: wrap; gap: 0.4rem 1.25rem; max-width: none; margin-top: 0.35rem; }
+.evhead > span { display: inline-flex; align-items: center; gap: 0.4rem; }
+.evtabs { margin-top: var(--s-l); }
+
+.evpick { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--s-m); margin: var(--s-s) 0 var(--s-l); }
+.evpick .ef { width: 9rem; }
+.evpick select { padding: 0.45rem 0.55rem; font: inherit; font-size: 0.82rem; color: var(--text); background: var(--bg-raise); border: 1px solid var(--line); border-radius: var(--r); }
+.evpick__actions { display: flex; gap: var(--s-s); }
+
+.evlist, .evcompare { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.evlist th, .evcompare th { text-align: left; font-size: 0.7rem; font-weight: 600; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.04em; padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--line); }
+.evlist td, .evcompare td { padding: 0.5rem; border-bottom: 1px solid var(--line); }
+.evcompare td:not(:first-child), .evcompare th:not(:first-child) { text-align: center; width: 6.5rem; }
+.evcompare tr[data-gap="big"] td { background: color-mix(in srgb, var(--warn) 12%, transparent); }
+.evcompare tr[data-gap="big"] td:last-child { font-weight: 700; }
+
+.evlink { display: flex; flex-wrap: wrap; gap: var(--s-s); align-items: center; margin-top: var(--s-m); }
+.evlink input { flex: 1 1 22rem; min-width: 0; padding: 0.4rem 0.55rem; font-family: var(--font-mono); font-size: 0.75rem; color: var(--text); background: var(--bg-sunk); border: 1px solid var(--line); border-radius: var(--r); }
+
+.vform { display: flex; flex-direction: column; gap: var(--s-l); }
+.vcard { padding: var(--s-l) var(--s-xl); background: var(--bg-panel); border: 1px solid var(--line); border-radius: var(--r-xl); }
+.vcard__head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-m); }
+.vcard__head h3 { margin: 0; font-family: var(--font-display); font-size: 1.05rem; }
+.vcard__summary { margin: 0.3rem 0 var(--s-m); font-size: 0.82rem; color: var(--text-dim); max-width: 70ch; }
+.vcard textarea {
+  width: 100%;
+  padding: 0.55rem 0.65rem;
+  font: inherit;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--text);
+  background: var(--bg-raise);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  resize: vertical;
+}
+.vcard textarea:focus { outline: none; box-shadow: inset 0 -2px 0 var(--cobalt); }
+.vcard textarea::placeholder { color: var(--text-mute); }
+.vcard--reflect textarea { margin-top: var(--s-s); min-height: 9rem; }
+
+.vscale { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--s-xs); margin-bottom: var(--s-s); }
+.vscale button {
+  display: flex; flex-direction: column; align-items: center; gap: 0.1rem;
+  padding: 0.45rem 0.25rem;
+  font: inherit; color: var(--text-dim);
+  background: var(--bg-raise);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  cursor: pointer;
+  transition: background var(--d-fast) var(--curve-ease), border-color var(--d-fast) var(--curve-ease);
+}
+.vscale button b { font-size: 1.05rem; color: var(--text); }
+.vscale button span { font-size: 0.68rem; text-align: center; line-height: 1.2; }
+.vscale button:hover { border-color: var(--line-strong); background: var(--bg-sunk); }
+.vscale button[data-on] { background: var(--cobalt); border-color: var(--cobalt); color: #fff; }
+.vscale button[data-on] b { color: #fff; }
+.vscale button:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 1px; }
+
+.vlevel { margin: 0 0 var(--s-s); padding: 0.5rem 0.7rem; font-size: 0.82rem; line-height: 1.45; background: var(--cobalt-wash); border-left: 3px solid var(--cobalt); border-radius: var(--r); }
+.vcard__levels-toggle { margin: 0 0 var(--s-s); font-size: 0.75rem; }
+.vlevels { margin: 0 0 var(--s-m); padding-left: 1.1rem; font-size: 0.8rem; line-height: 1.45; color: var(--text-dim); }
+.vlevels li { margin-bottom: 0.25rem; }
+.vlevels li[data-on] { color: var(--text); }
+.vreason { margin: var(--s-s) 0 0; font-size: 0.85rem; line-height: 1.5; white-space: pre-wrap; }
+.vscore { padding: 0.15rem 0.6rem; font-size: 0.78rem; font-weight: 600; border-radius: var(--r-pill); background: var(--cobalt-wash-strong); color: var(--text); white-space: nowrap; }
+
+.vform__foot { position: sticky; bottom: 0; display: flex; align-items: center; justify-content: flex-end; gap: var(--s-s); padding: var(--s-m) var(--s-l); background: var(--bg-panel); border: 1px solid var(--line); border-radius: var(--r-xl); box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.06); }
+.vform__foot .editcard__status { margin-right: auto; }
+
+@media (max-width: 640px) {
+  .vcard { padding: var(--s-m); }
+  .vscale button span { display: none; }
+  .evlist th:nth-child(4), .evlist td:nth-child(4) { display: none; }
+}
