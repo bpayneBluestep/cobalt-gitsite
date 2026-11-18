@@ -184,7 +184,8 @@ export default function EvaluationLog() {
               <>
                 <p className="note">
                   {firstName} scores themselves on the five values and explains each score. Generate the link,
-                  then send it to them. They sign in to Cobalt to fill it in, and can save a draft and come back.
+                  then send it to them. No sign-in needed: anyone with the link can open and edit it, so send it
+                  only to {firstName}. They can save a draft and come back.
                 </p>
                 {data.can.sendSelf && (
                   <button type="button" className="btn" disabled={!!busy} onClick={send}>
@@ -198,6 +199,11 @@ export default function EvaluationLog() {
                   <div><dt>Sent</dt><dd>{shortDate(ev.self.sentAt)}{ev.self.sentBy ? ` by ${ev.self.sentBy}` : ''}</dd></div>
                   <div><dt>Submitted</dt><dd>{ev.self.submittedAt ? shortDate(ev.self.submittedAt) : <span className="muted">not yet</span>}</dd></div>
                 </dl>
+                {!link && data.can.sendSelf && (
+                  <button type="button" className="btn btn--sm" disabled={!!busy} onClick={send}>
+                    {busy === 'send' ? 'Generating…' : 'Generate link'}
+                  </button>
+                )}
                 {link && ev.self.status !== 'Submitted' && (
                   <div className="evlink">
                     <input type="text" readOnly value={link} aria-label="Self-assessment link"

@@ -26,13 +26,19 @@ const REASON_HINT = {
   self: 'The reasons and specific examples behind your score.',
   supervisor: 'The reasons and specific examples behind your score for them.',
 }
+/* Brandon's wording (2026-11-18), shown under each heading. The self versions are
+   mirrored in the public page (Cobalt Self Assessment endpoint): change both. */
 const PROUD_HINT = {
-  self: 'What you did this quarter that you are proud of.',
-  supervisor: 'What they did this quarter that they should be proud of.',
+  self: "Where would you pat yourself on the back? In what areas do you feel like you're having a lot of success, " +
+    'or are particularly proud of? This is a space to highlight yourself.',
+  supervisor: 'Where would you pat them on the back? In what areas are they having a lot of success, ' +
+    'or should they be particularly proud of? This is a space to highlight them.',
 }
 const IMPROVE_HINT = {
-  self: 'Where you want to grow next quarter, and what you will do about it.',
-  supervisor: 'Where they should grow next quarter, and what would help.',
+  self: 'As you reflect, what areas do you see you can make improvements on? What has held you back from that in the past? ' +
+    "What is one specific thing you'll do differently next quarter, and what support from your supervisor or the team would help you get there?",
+  supervisor: 'What areas do you see they can make improvements on? What has held them back from that in the past? ' +
+    'What is one specific thing they should do differently next quarter, and what support will you or the team give them?',
 }
 
 export default function ValuesForm({ rubric, answers, editable, perspective, busy, onSave }: Props) {
@@ -152,18 +158,18 @@ export default function ValuesForm({ rubric, answers, editable, perspective, bus
 
       <section className="vcard vcard--reflect">
         <header className="vcard__head"><h3>Areas you're proud of</h3></header>
+        {editable && <p className="vcard__summary">{PROUD_HINT[perspective]}</p>}
         {editable ? (
           <textarea rows={7} value={proud} disabled={busy} aria-label="Areas you're proud of"
-            placeholder={PROUD_HINT[perspective]}
             onChange={e => { setProud(e.target.value); setDirty(true) }} />
         ) : <p className="vreason">{proud || <span className="muted">Nothing written.</span>}</p>}
       </section>
 
       <section className="vcard vcard--reflect">
         <header className="vcard__head"><h3>Areas for improvement</h3></header>
+        {editable && <p className="vcard__summary">{IMPROVE_HINT[perspective]}</p>}
         {editable ? (
           <textarea rows={7} value={improve} disabled={busy} aria-label="Areas for improvement"
-            placeholder={IMPROVE_HINT[perspective]}
             onChange={e => { setImprove(e.target.value); setDirty(true) }} />
         ) : <p className="vreason">{improve || <span className="muted">Nothing written.</span>}</p>}
       </section>
