@@ -133,13 +133,13 @@ export default function ValuesForm({ rubric, answers, editable, perspective, bus
               {showAll ? 'Hide what each score means' : 'What does each score mean?'}
             </button>
             {showAll && (
-              <ol className="vlevels">
+              <ul className="vlevels">
                 {rubric.scale.map(s => (
                   <li key={s.score} data-on={a.score === s.score ? '' : undefined}>
                     <b>{s.score} · {s.label}.</b> {v.levels[String(s.score)]}
                   </li>
                 ))}
-              </ol>
+              </ul>
             )}
 
             {editable ? (

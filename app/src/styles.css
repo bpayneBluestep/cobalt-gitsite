@@ -6771,7 +6771,7 @@ input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) opacit
 
 .vlevel { margin: 0 0 var(--s-s); padding: 0.5rem 0.7rem; font-size: 0.82rem; line-height: 1.45; background: var(--cobalt-wash); border-left: 3px solid var(--cobalt); border-radius: var(--r); }
 .vcard__levels-toggle { margin: 0 0 var(--s-s); font-size: 0.75rem; }
-.vlevels { margin: 0 0 var(--s-m); padding-left: 1.1rem; font-size: 0.8rem; line-height: 1.45; color: var(--text-dim); }
+.vlevels { margin: 0 0 var(--s-m); padding-left: 0; list-style: none; font-size: 0.8rem; line-height: 1.45; color: var(--text-dim); }
 .vlevels li { margin-bottom: 0.25rem; }
 .vlevels li[data-on] { color: var(--text); }
 .vreason { margin: var(--s-s) 0 0; font-size: 0.85rem; line-height: 1.5; white-space: pre-wrap; }
