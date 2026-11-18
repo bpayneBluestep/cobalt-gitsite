@@ -71,6 +71,12 @@ export interface Kpis {
   netMoM: number | null
   margin: number | null
   ndr: number | null
+  /** Gross dollar retention: the NDR cohort with each account capped at its base, so expansion can't count. */
+  grr: number | null
+  /** Share of the NDR cohort accounts that did not churn. */
+  logoRet: number | null
+  logoKept: number
+  logoBase: number
   newMrr: number
   newLines: number
   activeCustomers: number
@@ -120,6 +126,9 @@ export interface WfStep { label: string; value: number; kind: 'total' | 'inc' | 
 
 export const ndrTone = (n: number | null): Tone =>
   n === null ? undefined : n >= 100 ? 'good' : n >= 90 ? 'warn' : 'bad'
+/** Gross retention can't pass 100%; 90%+ is healthy for B2B SaaS. */
+export const grrTone = (n: number | null): Tone =>
+  n === null ? undefined : n >= 90 ? 'good' : n >= 80 ? 'warn' : 'bad'
 export const netTone = (n: number): Tone =>
   n > NET_BAND ? 'good' : n >= -NET_BAND ? 'warn' : 'bad'
 export const newMrrTone = (n: number): Tone =>
@@ -189,6 +198,28 @@ export function makeModel(D: FinanceData, today: Date) {
     profitBy[ym] ? num(profitBy[ym].expenses.total) : num(expenses.monthTotal[ym])
   const netOf = (ym: string): number => (profitBy[ym] ? num(profitBy[ym].net) : revTotal(ym) - expTotal(ym))
 
+  /*
+   * Retention without expansion, over the same year-ago cohort as NDR. Dollars: each
+   * account counts at most what it billed a year ago. Accounts: anyone who did not churn
+   * (CHURN_LOSS_PCT), so a cheap data-retention plan is not "kept".
+   */
+  const grossRetention = (ym: string) => {
+    const rows = ndrBy[ym]?.rows ?? []
+    let base = 0, kept$ = 0, kept = 0
+    for (const r of rows) {
+      const b = num(r.base), cur = num(r.current)
+      if (b <= 0) continue
+      base += b
+      kept$ += Math.min(Math.max(cur, 0), b)
+      if (!isChurn(b, cur)) kept += 1
+    }
+    return {
+      grr: base > 0 ? (kept$ / base) * 100 : null,
+      logoRet: rows.length ? (kept / rows.length) * 100 : null,
+      logoKept: kept, logoBase: rows.length, keptMrr: kept$, baseMrr: base,
+    }
+  }
+
   const computeKpis = (ym: string): Kpis => {
     const prev = addMonthsYm(ym, -1)
     const prevY = addMonthsYm(ym, -12)
@@ -202,6 +233,7 @@ export function makeModel(D: FinanceData, today: Date) {
       : expenses.monthTotal[prev] !== undefined ? num(expenses.monthTotal[prev]) : null
     const margin = profitBy[ym]?.margin
     const ndr = ndrBy[ym]?.ndr
+    const g = grossRetention(ym)
     return {
       mrr: mrrNow,
       mrrMoM: mrrPrev && mrrPrev > 0 ? ((mrrNow - mrrPrev) / mrrPrev) * 100 : null,
@@ -210,6 +242,7 @@ export function makeModel(D: FinanceData, today: Date) {
       netMoM: netPrev !== null && netPrev !== 0 ? ((net - netPrev) / Math.abs(netPrev)) * 100 : null,
       margin: margin !== null && margin !== undefined ? num(margin) : null,
       ndr: ndr !== null && ndr !== undefined ? num(ndr) : null,
+      grr: g.grr, logoRet: g.logoRet, logoKept: g.logoKept, logoBase: g.logoBase,
       newMrr: newMrrBy[ym] ? num(newMrrBy[ym].total) : 0,
       newLines: newMrrBy[ym] ? num(newMrrBy[ym].newLines) : 0,
       activeCustomers: mrrBy[ym] ? num(mrrBy[ym].activeCustomers) : 0,
@@ -260,6 +293,10 @@ export function makeModel(D: FinanceData, today: Date) {
       const rc = retentionCounts(ym)
       parts.push('Net retention was ' + pct1(k.ndr) + ' — ' + rc.expanded + ' accounts expanded, ' +
         rc.contracted + ' contracted, ' + rc.churned + ' churned.')
+      if (k.grr !== null) {
+        parts.push('Without expansion, gross retention was ' + pct1(k.grr) + ', and ' + k.logoKept + ' of ' +
+          k.logoBase + ' accounts from a year ago are still with us (' + pct1(k.logoRet ?? 0) + ').')
+      }
     }
     return parts
   }
@@ -703,7 +740,7 @@ export function makeModel(D: FinanceData, today: Date) {
     D, months, defaultMonth, nowYm,
     hasRevenue: !!D.mrr, hasExpenses: !!D.expenses,
     hasExpenseData, earliestExpMonth, expMonthsSorted,
-    revTotal, expTotal, netOf, computeKpis, largestExpenseCategory, retentionCounts, buildNarrative, trailing,
+    revTotal, expTotal, netOf, computeKpis, largestExpenseCategory, retentionCounts, grossRetention, buildNarrative, trailing,
     mrrWaterfall, momChurn, ndrWaterfall, concentration, streamsAt, newMrrAt, ndrAt, marginAt,
     payrollOf, platformOf, catsForMonth, vendorsForMonth, topCategoriesOverall, expenseAnomalies,
     expenseWindow, expenseMonthTotal, categoryAt, categoryNames,

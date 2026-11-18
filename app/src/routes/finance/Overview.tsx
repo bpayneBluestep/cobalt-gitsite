@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import TrendChart from '../../components/TrendChart'
 import { addMonthsYm, moneyShort, pct1, ymLabel } from '../../lib/finance'
-import { SEV_TONE, ndrTone, netTone, newMrrTone, type Model } from './compute'
+import { SEV_TONE, grrTone, ndrTone, netTone, newMrrTone, type Model } from './compute'
 import { Delta, Kpi, Panel, Pill, fmtMoney, toPoints } from './ui'
 
 export interface TabProps {
@@ -45,7 +45,9 @@ export function KpiStrip({ m, ym }: { m: Model; ym: string }) {
         deltas={<Delta pct={k.netMoM} upIsGood suffix="MoM" />}
         note={k.margin !== null ? `${pct1(k.margin)} margin` : undefined} />
       <Kpi label="Net dollar retention" value={k.ndr !== null ? pct1(k.ndr) : '—'} tone={ndrTone(k.ndr)}
-        note={k.ndr !== null ? `vs ${ymLabel(addMonthsYm(ym, -12))}` : 'no prior-year cohort'} />
+        note={k.ndr !== null ? `vs ${ymLabel(addMonthsYm(ym, -12))}, incl. expansion` : 'no prior-year cohort'} />
+      <Kpi label="Gross retention" value={k.grr !== null ? pct1(k.grr) : '—'} tone={grrTone(k.grr)}
+        note={k.logoRet !== null ? `${k.logoKept} of ${k.logoBase} accounts kept (${pct1(k.logoRet)})` : 'no prior-year cohort'} />
       <Kpi label="New MRR" value={moneyShort(k.newMrr)} tone={newMrrTone(k.newMrr)}
         note={`${k.newLines} new line${k.newLines === 1 ? '' : 's'}`} />
       <Kpi label="Monthly expenses" value={moneyShort(k.expenses)}

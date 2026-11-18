@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import TrendChart from '../../components/TrendChart'
-import { money, moneyShort, pct1, ymLabel } from '../../lib/finance'
-import { CHURN_LOSS_PCT, COHORT_TONE, MRR_CHURN_RED, cohortTag } from './compute'
+import { addMonthsYm, money, moneyShort, pct1, ymLabel } from '../../lib/finance'
+import { CHURN_LOSS_PCT, COHORT_TONE, MRR_CHURN_RED, cohortTag, grrTone, ndrTone } from './compute'
 import type { TabProps } from './Overview'
 import { Kpi, MoneyDelta, Panel, Pill, Waterfall, fmtPct, toPoints } from './ui'
 
@@ -83,19 +83,38 @@ export default function Retention(props: TabProps) {
     const v = m.ndrAt(x)?.ndr
     return v === null || v === undefined ? null : v
   }
+  const g = m.grossRetention(ym)
+  const ndrNow = ndrOf(ym)
+  const baseL = ymLabel(addMonthsYm(ym, -12))
 
   return (
     <>
+      <Panel
+        title={`Year-over-year retention: ${baseL} → ${ymLabel(ym)}`}
+        note={`The accounts billing recurring revenue in ${baseL}, and what's left of them now. Net counts expansion; gross and accounts don't.`}
+      >
+        <div className="kpis">
+          <Kpi label="Net dollar retention" value={ndrNow !== null ? pct1(ndrNow) : '—'} tone={ndrTone(ndrNow)}
+            note="incl. expansion" />
+          <Kpi label="Gross dollar retention" value={g.grr !== null ? pct1(g.grr) : '—'} tone={grrTone(g.grr)}
+            note={g.grr !== null ? `${money(g.keptMrr)} of ${money(g.baseMrr)}/mo kept` : 'no prior-year cohort'} />
+          <Kpi label="Accounts retained" value={g.logoRet !== null ? pct1(g.logoRet) : '—'} tone={grrTone(g.logoRet)}
+            note={g.logoRet !== null ? `${g.logoKept} of ${g.logoBase} still with us` : 'no prior-year cohort'} />
+        </div>
+      </Panel>
+
       <MomChurn {...props} />
 
       <Panel
-        title="Net dollar retention: trailing 24 months"
-        note="Recurring revenue this month from the accounts billing a year earlier, as a share of what they billed then. 100% is the target: the base holding its value."
+        title="Retention: trailing 24 months"
+        note="Each month against the accounts billing a year earlier. Net includes expansion (100% is the target: the base holding its value). Gross caps each account at what it billed then. Accounts is the share that didn't churn."
       >
         <TrendChart
           points={toPoints(win)}
           series={[
-            { key: 'ndr', name: 'NDR', kind: 'line', color: 'var(--cobalt)', values: win.map(ndrOf) },
+            { key: 'ndr', name: 'Net', kind: 'line', color: 'var(--cobalt)', values: win.map(ndrOf) },
+            { key: 'grr', name: 'Gross', kind: 'line', color: 'var(--warn)', values: win.map(x => m.grossRetention(x).grr) },
+            { key: 'logo', name: 'Accounts', kind: 'line', color: 'var(--good)', values: win.map(x => m.grossRetention(x).logoRet) },
             { key: 'target', name: 'Target', kind: 'line', color: 'var(--text-mute)', dashed: true, values: win.map(() => 100) },
           ]}
           format={fmtPct}
