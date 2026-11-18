@@ -210,6 +210,8 @@ export interface FinanceMeta {
  */
 export interface FinanceData {
   ok: boolean
+  /** Every key in every view is a month ('2026-08') or, for 'quarter', a quarter ('2026-Q3'). */
+  grain?: Grain
   version: number
   /** YYYY-MM-DD, the `today` the views were built for. */
   generatedAt: string
@@ -269,11 +271,43 @@ export function addMonthsYm(ym: string, delta: number): string {
   return Math.floor(idx / 12) + '-' + pad2((idx % 12) + 1)
 }
 
+/*
+ * Periods. The report runs by month ('2026-08') or by quarter ('2026-Q3'); the key says
+ * which, so the helpers below work on either without being told. Both sort as strings.
+ */
+export type Grain = 'month' | 'quarter'
+
+export const isQuarterKey = (k: string): boolean => /-Q[1-4]$/.test(k)
+
+/** The period a calendar month falls in. */
+export function periodKey(y: number, m: number, grain: Grain): string {
+  return grain === 'quarter' ? y + '-Q' + Math.ceil(m / 3) : y + '-' + pad2(m)
+}
+
+/** Shift a month or quarter key by `n` of its own periods. */
+export function shiftPeriod(k: string, n: number): string {
+  if (!isQuarterKey(k)) return addMonthsYm(k, n)
+  const idx = parseInt(k, 10) * 4 + (parseInt(k.slice(-1), 10) - 1) + n
+  return Math.floor(idx / 4) + '-Q' + ((idx % 4) + 1)
+}
+
+/** The same period a year earlier. */
+export const yearAgo = (k: string): string => shiftPeriod(k, isQuarterKey(k) ? -4 : -12)
+
+/** A month key → its quarter key; a quarter key → its last month. For switching grain. */
+export function monthToQuarter(ym: string): string {
+  return isQuarterKey(ym) ? ym : periodKey(parseInt(ym, 10), parseInt(ym.slice(5, 7), 10), 'quarter')
+}
+export function quarterToMonth(k: string): string {
+  return isQuarterKey(k) ? parseInt(k, 10) + '-' + pad2(parseInt(k.slice(-1), 10) * 3) : k
+}
+
 const MONTHS_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 /** '2026-08' → 'Aug 2026'; '' → '—'. */
 export function ymLabel(ym: string): string {
   if (!ym) return '—'
+  if (isQuarterKey(ym)) return ym.slice(-2) + ' ' + ym.slice(0, 4)
   const p = ym.split('-')
   return (MONTHS_ABBR[parseInt(p[1], 10) - 1] || '?') + ' ' + p[0]
 }
@@ -436,10 +470,11 @@ export interface RevenueData {
   months: string[]
   earliest: string
   latest: string
+  grain: Grain
 }
 
 /** Revenue rows → the flattened model. Throws on a missing or changed header. */
-export function parseRevenue(sheet: SheetInput, companies: CompanyAlias[]): RevenueData {
+export function parseRevenue(sheet: SheetInput, companies: CompanyAlias[], grain: Grain = 'month'): RevenueData {
   const data: RevenueData = {
     ok: false, error: '',
     totalRows: 0, recurringRows: 0, psRows: 0, setupRows: 0,
@@ -448,7 +483,7 @@ export function parseRevenue(sheet: SheetInput, companies: CompanyAlias[]): Reve
     psByMonth: {}, setupByMonth: {},
     custPsByMonth: {}, custSetupByMonth: {},
     codeFirstRecur: {}, codeMrrByMonth: {}, codeProgram: {}, codeStream: {}, aliasMapSize: 0,
-    months: [], earliest: '', latest: '',
+    months: [], earliest: '', latest: '', grain,
   }
   const nameMap = buildAliasMap(companies)
   data.aliasMapSize = Object.keys(nameMap).length
@@ -476,7 +511,7 @@ export function parseRevenue(sheet: SheetInput, companies: CompanyAlias[]): Reve
     const full = (cells[6] || '').trim()
     const amt = parseAmount(cells[10])
     if (isNaN(amt)) { data.skippedNoAmount += 1; return }
-    const ym = d.y + '-' + pad2(d.m)
+    const ym = periodKey(d.y, d.m, grain)
     if (full === STREAM_RECURRING) {
       const program = canon(rawCode)
       data.recurringRows += 1
@@ -533,7 +568,12 @@ export function parseRevenue(sheet: SheetInput, companies: CompanyAlias[]): Reve
 export function computeDefaultMonth(rev: RevenueData, today: Date = new Date()): { ym: string; reason: string } {
   const mrrMonths = Object.keys(rev.mrrByMonth).sort()
   if (mrrMonths.length === 0) return { ym: '', reason: 'no months' }
-  const targetYm = addMonthsYm(today.getFullYear() + '-' + pad2(today.getMonth() + 1), -3)
+  let targetYm = addMonthsYm(today.getFullYear() + '-' + pad2(today.getMonth() + 1), -3)
+  // By quarter: the newest quarter whose every month is settled (three months back).
+  if (rev.grain === 'quarter') {
+    const q = monthToQuarter(targetYm)
+    targetYm = quarterToMonth(q) === targetYm ? q : shiftPeriod(q, -1)
+  }
   if (rev.mrrByMonth[targetYm] !== undefined) {
     return { ym: targetYm, reason: '3 months before current month' }
   }
@@ -568,7 +608,7 @@ export interface ExpenseData {
 }
 
 /** Expense rows → the flattened model. Throws on a missing or changed header. */
-export function parseExpenses(sheet: SheetInput): ExpenseData {
+export function parseExpenses(sheet: SheetInput, grain: Grain = 'month'): ExpenseData {
   const data: ExpenseData = {
     ok: false, error: '',
     totalRows: 0, countedRows: 0, skippedNoDate: 0, skippedNoAmount: 0,
@@ -585,7 +625,7 @@ export function parseExpenses(sheet: SheetInput): ExpenseData {
     const vendor = (cells[4] || '').trim() || '(unspecified vendor)'
     const fullName = (cells[6] || '').trim()
     const category = (fullName.split(':')[0] || '').trim() || '(uncategorized)'
-    const ym = d.y + '-' + pad2(d.m)
+    const ym = periodKey(d.y, d.m, grain)
     data.countedRows += 1
     monthSet[ym] = true
     data.monthTotal[ym] = (data.monthTotal[ym] || 0) + amt
@@ -681,7 +721,8 @@ function buildClientsView(rev: RevenueData): ClientsView {
 function buildNewMrrView(rev: RevenueData): NewMrrView {
   const byMonth: { [ym: string]: NewMrrMonth } = {}
   Object.keys(rev.codeFirstRecur).forEach(code => {
-    const firstYm = rev.codeFirstRecur[code].slice(0, 7)
+    const fr = rev.codeFirstRecur[code]
+    const firstYm = periodKey(parseInt(fr, 10), parseInt(fr.slice(5, 7), 10), rev.grain)
     const mrr = (rev.codeMrrByMonth[code] && rev.codeMrrByMonth[code][firstYm]) || 0
     if (!byMonth[firstYm]) byMonth[firstYm] = { total: 0, newLines: 0, lines: [] }
     byMonth[firstYm].total += mrr
@@ -706,7 +747,7 @@ function buildNdrView(rev: RevenueData): NdrView {
   const months = Object.keys(rev.mrrByMonth).sort()
   const byMonth: { [ym: string]: NdrMonth } = {}
   months.forEach(ym => {
-    const baseYm = addMonthsYm(ym, -12)
+    const baseYm = yearAgo(ym)
     const baseMap = rev.custMrrByMonth[baseYm]
     const curMap = rev.custMrrByMonth[ym] || {}
     if (!baseMap) {
@@ -829,8 +870,10 @@ export function buildFinanceData(input: {
   expenses: SheetInput | null
   companies: CompanyAlias[]
   today?: Date
+  grain?: Grain
 }): FinanceData {
   const today = input.today ?? new Date()
+  const grain: Grain = input.grain ?? 'month'
   const errors: string[] = []
 
   let rev: RevenueData | null = null
@@ -838,7 +881,7 @@ export function buildFinanceData(input: {
     errors.push('revenue: file not attached')
   } else {
     try {
-      rev = parseRevenue(input.revenue, input.companies)
+      rev = parseRevenue(input.revenue, input.companies, grain)
       if (!rev.ok) errors.push('revenue: ' + (rev.error || 'parse failed'))
     } catch (e) {
       errors.push('revenue: ' + messageOf(e))
@@ -850,7 +893,7 @@ export function buildFinanceData(input: {
     errors.push('expenses: file not attached')
   } else {
     try {
-      exp = parseExpenses(input.expenses)
+      exp = parseExpenses(input.expenses, grain)
       if (!exp.ok) errors.push('expenses: ' + (exp.error || 'parse failed'))
     } catch (e) {
       errors.push('expenses: ' + messageOf(e))
@@ -860,6 +903,7 @@ export function buildFinanceData(input: {
   const generatedAt = today.getFullYear() + '-' + pad2(today.getMonth() + 1) + '-' + pad2(today.getDate())
   const out: FinanceData = {
     ok: !!(rev && rev.ok),
+    grain,
     version: VERSION,
     generatedAt,
     dataset: 'all',

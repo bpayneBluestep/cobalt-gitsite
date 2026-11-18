@@ -1,5 +1,5 @@
 import {
-  addMonthsYm, money, pct1, signedPct, ymLabel,
+  money, pct1, shiftPeriod, signedPct, yearAgo, ymLabel,
   type ClientEntry, type FinanceData, type MrrCustomer, type NdrRow, type RevenueStream,
 } from '../../lib/finance'
 
@@ -129,10 +129,27 @@ export const ndrTone = (n: number | null): Tone =>
 /** Gross retention can't pass 100%; 90%+ is healthy for B2B SaaS. */
 export const grrTone = (n: number | null): Tone =>
   n === null ? undefined : n >= 90 ? 'good' : n >= 80 ? 'warn' : 'bad'
-export const netTone = (n: number): Tone =>
-  n > NET_BAND ? 'good' : n >= -NET_BAND ? 'warn' : 'bad'
-export const newMrrTone = (n: number): Tone =>
-  n >= NEW_MRR_GOOD ? 'good' : n >= NEW_MRR_FLOOR ? 'warn' : 'bad'
+/** Dollar bands are per month; pass `m.scale` (3 by quarter) to stretch them. */
+export const netTone = (n: number, scale = 1): Tone =>
+  n > NET_BAND * scale ? 'good' : n >= -NET_BAND * scale ? 'warn' : 'bad'
+export const newMrrTone = (n: number, scale = 1): Tone =>
+  n >= NEW_MRR_GOOD * scale ? 'good' : n >= NEW_MRR_FLOOR * scale ? 'warn' : 'bad'
+
+/** The words that change with the period. */
+export interface PeriodWords {
+  unit: 'month' | 'quarter'
+  Unit: 'Month' | 'Quarter'
+  /** 'MoM' / 'QoQ' */
+  vs: string
+  /** 'Monthly' / 'Quarterly' */
+  ly: string
+  /** '/mo' / '/qtr' */
+  per: string
+  /** 'MRR' / 'QRR': recurring revenue for one period. */
+  rr: string
+}
+const MONTH_WORDS: PeriodWords = { unit: 'month', Unit: 'Month', vs: 'MoM', ly: 'Monthly', per: '/mo', rr: 'MRR' }
+const QUARTER_WORDS: PeriodWords = { unit: 'quarter', Unit: 'Quarter', vs: 'QoQ', ly: 'Quarterly', per: '/qtr', rr: 'QRR' }
 
 /** `prev` → `cur` lost at least CHURN_LOSS_PCT of a positive `prev`. */
 export const isChurn = (prev: number, cur: number): boolean =>
@@ -163,6 +180,20 @@ export const ymShort = (ym: string): string => {
 export type Model = ReturnType<typeof makeModel>
 
 export function makeModel(D: FinanceData, today: Date) {
+  /*
+   * By quarter every key is 'YYYY-Qn' and every amount is the quarter's total, so the
+   * month-sized dollar thresholds stretch by `scale` and month-counted windows shrink.
+   */
+  const byQuarter = D.grain === 'quarter'
+  const scale = byQuarter ? 3 : 1
+  const w = byQuarter ? QUARTER_WORDS : MONTH_WORDS
+  /** A window given in months, in this model's periods (24 months → 8 quarters). */
+  const span = (monthsN: number): number => (byQuarter ? Math.max(1, Math.ceil(monthsN / 3)) : monthsN)
+  /** '24 months' / '8 quarters'. */
+  const spanLabel = (monthsN: number): string => {
+    const n = span(monthsN)
+    return n + ' ' + w.unit + (n === 1 ? '' : 's')
+  }
   const mrrBy = D.mrr?.byMonth ?? {}
   const streamsBy = D.streams?.byMonth ?? {}
   const newMrrBy = D.newMrr?.byMonth ?? {}
@@ -190,7 +221,7 @@ export function makeModel(D: FinanceData, today: Date) {
   const defaultMonth: string =
     D.mrr?.defaultMonth && mrrBy[D.mrr.defaultMonth] ? D.mrr.defaultMonth : months[months.length - 1] ?? ''
 
-  const nowYm = ymOf(today)
+  const nowYm = byQuarter ? today.getFullYear() + '-Q' + Math.ceil((today.getMonth() + 1) / 3) : ymOf(today)
 
   // ── Revenue / expense / net per month ──
   const revTotal = (ym: string): number => (profitBy[ym] ? num(profitBy[ym].revenue.total) : 0)
@@ -221,8 +252,8 @@ export function makeModel(D: FinanceData, today: Date) {
   }
 
   const computeKpis = (ym: string): Kpis => {
-    const prev = addMonthsYm(ym, -1)
-    const prevY = addMonthsYm(ym, -12)
+    const prev = shiftPeriod(ym, -1)
+    const prevY = yearAgo(ym)
     const mrrNow = mrrBy[ym] ? num(mrrBy[ym].mrr) : 0
     const mrrPrev = mrrBy[prev] ? num(mrrBy[prev].mrr) : null
     const mrrPrevY = mrrBy[prevY] ? num(mrrBy[prevY].mrr) : null
@@ -278,12 +309,12 @@ export function makeModel(D: FinanceData, today: Date) {
     let s = 'In ' + ymLabel(ym) + ', recurring revenue was ' + money(k.mrr)
     const tags: string[] = []
     if (k.mrrYoY !== null) tags.push(signedPct(k.mrrYoY) + ' YoY')
-    if (k.mrrMoM !== null) tags.push(signedPct(k.mrrMoM) + ' MoM')
+    if (k.mrrMoM !== null) tags.push(signedPct(k.mrrMoM) + ' ' + w.vs)
     if (tags.length) s += ' (' + tags.join(', ') + ')'
     parts.push(s + '.')
 
     const word = k.net >= 0 ? 'profit' : 'loss'
-    let p2 = 'The month netted a ' + money(Math.abs(k.net)) + ' ' + word + ' — ' +
+    let p2 = 'The ' + w.unit + ' netted a ' + money(Math.abs(k.net)) + ' ' + word + ' — ' +
       money(k.expenses) + ' of expenses against ' + money(revTotal(ym)) + ' of total revenue'
     const lc = largestExpenseCategory(ym)
     if (lc) p2 += ', with ' + lc.name + ' (' + money(lc.amt) + ') the largest expense'
@@ -305,14 +336,14 @@ export function makeModel(D: FinanceData, today: Date) {
   const trailing = (ym: string, n: number): string[] => {
     const all = D.profitability?.months.length ? D.profitability.months.slice() : months.slice()
     const upto = all.filter(m => m <= ym)
-    return upto.slice(Math.max(0, upto.length - n))
+    return upto.slice(Math.max(0, upto.length - span(n)))
   }
 
   // ── Revenue ──
 
   /** MoM MRR movement, decomposed from per-customer recurring (M vs M-1). */
   const mrrWaterfall = (ym: string) => {
-    const prev = addMonthsYm(ym, -1)
+    const prev = shiftPeriod(ym, -1)
     const prevMap: { [n: string]: number } = {}
     const curMap: { [n: string]: number } = {}
     for (const c of mrrBy[prev]?.customers ?? []) prevMap[c.name] = num(c.amount)
@@ -354,7 +385,7 @@ export function makeModel(D: FinanceData, today: Date) {
     let m = prevYm
     let peakSince = 0
     for (let i = 0; i < 36; i++) {
-      const before = addMonthsYm(m, -1)
+      const before = shiftPeriod(m, -1)
       const b = mrrOf(name, before), c = mrrOf(name, m)
       peakSince = Math.max(peakSince, c)
       // The most recent churn: still churned if nothing since climbed back over it.
@@ -372,7 +403,7 @@ export function makeModel(D: FinanceData, today: Date) {
    * billed so far would read as churned.
    */
   const momChurn = (ym: string) => {
-    const prev = addMonthsYm(ym, -1)
+    const prev = shiftPeriod(ym, -1)
     const prevCusts = (mrrBy[prev]?.customers ?? []).filter(c => num(c.amount) > 0)
     const curMap: { [n: string]: number } = {}
     for (const c of mrrBy[ym]?.customers ?? []) curMap[c.name] = num(c.amount)
@@ -459,7 +490,7 @@ export function makeModel(D: FinanceData, today: Date) {
     Object.keys(catMonth).map(c => ({ name: c, amt: num(catMonth[c][ym]) }))
       .filter(o => o.amt !== 0).sort((a, b) => b.amt - a.amt)
   const vendorsForMonth = (ym: string): { name: string; amt: number; delta: number }[] => {
-    const prev = addMonthsYm(ym, -1)
+    const prev = shiftPeriod(ym, -1)
     return Object.keys(vendorMonth)
       .map(v => ({ name: v, amt: num(vendorMonth[v][ym]), delta: num(vendorMonth[v][ym]) - num(vendorMonth[v][prev]) }))
       .filter(o => o.amt !== 0).sort((a, b) => b.amt - a.amt)
@@ -470,20 +501,20 @@ export function makeModel(D: FinanceData, today: Date) {
       .sort((a, b) => b.total - a.total).slice(0, n).map(o => o.name)
   /** Categories whose spend jumped sharply MoM, or appeared new. */
   const expenseAnomalies = (ym: string) => {
-    const prev = addMonthsYm(ym, -1)
+    const prev = shiftPeriod(ym, -1)
     const out: { kind: string; name: string; prev: number; cur: number; pct: number | null }[] = []
     for (const name of Object.keys(catMonth)) {
       const cur = num(catMonth[name][ym])
       const pv = num(catMonth[name][prev])
       const delta = cur - pv
-      if (delta > ANOMALY_FLOOR && (pv <= 0 || (delta / pv) * 100 > ANOMALY_PCT)) {
+      if (delta > ANOMALY_FLOOR * scale && (pv <= 0 || (delta / pv) * 100 > ANOMALY_PCT)) {
         out.push({ kind: 'Category', name, prev: pv, cur, pct: pv > 0 ? (delta / pv) * 100 : null })
       }
     }
     return out.sort((a, b) => (b.cur - b.prev) - (a.cur - a.prev))
   }
   /** Expense months up to `ym`, at most 24: the expense and profit charts' window. */
-  const expenseWindow = (ym: string): string[] => expMonthsSorted.filter(m => m <= ym).slice(-24)
+  const expenseWindow = (ym: string): string[] => expMonthsSorted.filter(m => m <= ym).slice(-span(24))
   const expenseMonthTotal = (ym: string): number => num(expenses.monthTotal[ym])
   const categoryAt = (cat: string, ym: string): number => num(catMonth[cat]?.[ym])
   const categoryNames = Object.keys(catMonth)
@@ -494,7 +525,7 @@ export function makeModel(D: FinanceData, today: Date) {
     return { revenue: rev, expenses: exp, gap: exp - rev }
   }
   const trailingBurn = (ym: string, n: number): number => {
-    const ms = expMonthsSorted.filter(m => m <= ym).slice(-n)
+    const ms = expMonthsSorted.filter(m => m <= ym).slice(-span(n))
     if (!ms.length) return 0
     let sumLoss = 0
     for (const m of ms) { const net = netOf(m); if (net < 0) sumLoss += -net }
@@ -540,7 +571,7 @@ export function makeModel(D: FinanceData, today: Date) {
       const rate = ch.mrrRate ?? 0
       a.push({
         area: 'Retention', severity: rate >= MRR_CHURN_RED ? 'red' : 'yellow',
-        title: ch.rows.length + ' account' + (ch.rows.length === 1 ? '' : 's') + ' churned MoM (−' + money(ch.lostMrr) + ' MRR)',
+        title: ch.rows.length + ' account' + (ch.rows.length === 1 ? '' : 's') + ' churned ' + w.vs + ' (−' + money(ch.lostMrr) + ' ' + w.rr + ')',
         detail: pct1(rate) + ' of ' + ymLabel(ch.prev) + ' recurring revenue. Largest: ' +
           ch.rows.slice(0, 3).map(r => r.name).join(', ') + '.',
         action: 'See who churned (Retention).',
@@ -548,21 +579,21 @@ export function makeModel(D: FinanceData, today: Date) {
     }
     if (k.mrrMoM !== null && k.mrrMoM < 0) {
       a.push({
-        area: 'Revenue', severity: 'yellow', title: 'Recurring revenue down ' + signedPct(k.mrrMoM) + ' MoM',
-        detail: 'MRR ' + money(k.mrr) + '.', action: 'Check churn/contraction and new-line pace (Revenue).',
+        area: 'Revenue', severity: 'yellow', title: 'Recurring revenue down ' + signedPct(k.mrrMoM) + ' ' + w.vs,
+        detail: w.rr + ' ' + money(k.mrr) + '.', action: 'Check churn/contraction and new-line pace (Revenue).',
       })
     }
-    if (k.newMrr < NEW_MRR_FLOOR) {
+    if (k.newMrr < NEW_MRR_FLOOR * scale) {
       a.push({
-        area: 'Revenue', severity: 'yellow', title: 'New MRR only ' + money(k.newMrr) + ' this month',
-        detail: 'Below the ' + money(NEW_MRR_FLOOR) + ' floor.', action: 'New-business / onboarding pace (Revenue).',
+        area: 'Revenue', severity: 'yellow', title: 'New ' + w.rr + ' only ' + money(k.newMrr) + ' this ' + w.unit,
+        detail: 'Below the ' + money(NEW_MRR_FLOOR * scale) + ' floor.', action: 'New-business / onboarding pace (Revenue).',
       })
     }
     const conc = concentration(ym)
     if (conc.custs.length && conc.total > 0 && conc.flagged) {
       a.push({
         area: 'Revenue', severity: 'yellow',
-        title: 'Concentration: ' + conc.custs[0].name + ' is ' + pct1(conc.topShare) + ' of MRR',
+        title: 'Concentration: ' + conc.custs[0].name + ' is ' + pct1(conc.topShare) + ' of ' + w.rr,
         detail: 'Single-customer dependency.', action: 'Diversify the book (Revenue).',
       })
     }
@@ -571,11 +602,11 @@ export function makeModel(D: FinanceData, today: Date) {
         a.push({
           area: 'Expenses', severity: 'yellow',
           title: an.name + ' spend ' + (an.pct !== null ? signedPct(an.pct) : 'new line'),
-          detail: money(an.prev) + ' → ' + money(an.cur) + ' MoM.', action: 'Verify the increase (Expenses).',
+          detail: money(an.prev) + ' → ' + money(an.cur) + ' ' + w.vs + '.', action: 'Verify the increase (Expenses).',
         })
       }
     }
-    if (hasExp && payrollOf(ym) > 0 && payrollOf(ym) < PAYROLL_INCOMPLETE) {
+    if (hasExp && payrollOf(ym) > 0 && payrollOf(ym) < PAYROLL_INCOMPLETE * scale) {
       a.push({
         area: 'Data', severity: 'yellow', title: 'Payroll looks incomplete (' + money(payrollOf(ym)) + ')',
         detail: 'Net figures may understate true cost.', action: 'Re-check the expense export.',
@@ -626,7 +657,7 @@ export function makeModel(D: FinanceData, today: Date) {
   const clientsWithStream = (stream: StreamId): string[] => clientNames.filter(p => hasStream(p, stream))
   const clientDelta = (program: string, ym: string, stream: StreamId, back: number) => {
     const cur = streamVal(program, ym, stream)
-    const prev = streamVal(program, addMonthsYm(ym, back), stream)
+    const prev = streamVal(program, (back === -12 ? yearAgo(ym) : shiftPeriod(ym, back)), stream)
     return { cur, prev, abs: cur - prev, pct: prev > 0 ? ((cur - prev) / prev) * 100 : null }
   }
   /** From recurring (the durable signal) against the prior month. */
@@ -634,7 +665,7 @@ export function makeModel(D: FinanceData, today: Date) {
     const c = byClient[program]
     if (!c) return 'Inactive'
     const cur = num(c.recurring[ym])
-    const prev = num(c.recurring[addMonthsYm(ym, -1)])
+    const prev = num(c.recurring[shiftPeriod(ym, -1)])
     if (cur <= 0 && prev <= 0) return 'Inactive'
     if (isChurn(prev, cur)) return 'Churned'
     if (cur > prev) return 'Growing'
@@ -655,7 +686,7 @@ export function makeModel(D: FinanceData, today: Date) {
     (ndrBy[ym]?.rows ?? []).find(r => r.program === program) ?? null
   const clientTrailing = (ym: string, n: number): string[] => {
     const upto = clientMonthsAll.filter(m => m <= ym)
-    return upto.slice(Math.max(0, upto.length - n))
+    return upto.slice(Math.max(0, upto.length - span(n)))
   }
   /** Per revenue code for one month, honouring the stream; largest first. */
   const clientProductsAt = (program: string, ym: string, stream: StreamId): ProdLine[] => {
@@ -734,10 +765,10 @@ export function makeModel(D: FinanceData, today: Date) {
   // ── Freshness ──
   /** The newest revenue month that is not forward-dated: how current the export is. */
   const revenueThrough: string | null = (D.mrr?.months ?? []).filter(m => m <= nowYm).slice(-1)[0] ?? null
-  const revenueStale = revenueThrough !== null && monthsBetween(revenueThrough, nowYm) > STALE_MONTHS
+  const revenueStale = revenueThrough !== null && (byQuarter ? false : monthsBetween(revenueThrough, nowYm) > STALE_MONTHS)
 
   return {
-    D, months, defaultMonth, nowYm,
+    D, months, defaultMonth, nowYm, byQuarter, scale, w, span, spanLabel,
     hasRevenue: !!D.mrr, hasExpenses: !!D.expenses,
     hasExpenseData, earliestExpMonth, expMonthsSorted,
     revTotal, expTotal, netOf, computeKpis, largestExpenseCategory, retentionCounts, grossRetention, buildNarrative, trailing,

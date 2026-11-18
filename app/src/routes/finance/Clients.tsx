@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import TrendChart from '../../components/TrendChart'
-import { addMonthsYm, money, moneyShort, pct1, signedPct, ymLabel } from '../../lib/finance'
+import { yearAgo, money, moneyShort, pct1, signedPct, ymLabel } from '../../lib/finance'
 import {
   COHORT_TONE, STATUS_TONE, STREAMS, STREAM_TAG, cohortTag, sortClientRows, streamLabel,
   type ClientSortKey, type ProdLine, type StreamId,
@@ -142,7 +142,7 @@ function Comparison({ m, ym, href, stream, setStream }: ClientsProps) {
       </div>
 
       <div className="trep__two">
-        <Panel title={`Top gainers: ${ymLabel(ym)}`} note="Largest increase on the month before.">
+        <Panel title={`Top gainers: ${ymLabel(ym)}`} note={`Largest increase on the ${m.w.unit} before.`}>
           {gainers.length ? (
             <ul className="frep__movers">
               {gainers.map(o => (
@@ -152,9 +152,9 @@ function Comparison({ m, ym, href, stream, setStream }: ClientsProps) {
                 </li>
               ))}
             </ul>
-          ) : <p className="muted chart__empty">No gainers this month.</p>}
+          ) : <p className="muted chart__empty">No gainers this {m.w.unit}.</p>}
         </Panel>
-        <Panel title={`Top decliners: ${ymLabel(ym)}`} note="Largest decrease on the month before.">
+        <Panel title={`Top decliners: ${ymLabel(ym)}`} note={`Largest decrease on the ${m.w.unit} before.`}>
           {losers.length ? (
             <ul className="frep__movers">
               {losers.map(o => (
@@ -164,7 +164,7 @@ function Comparison({ m, ym, href, stream, setStream }: ClientsProps) {
                 </li>
               ))}
             </ul>
-          ) : <p className="muted chart__empty">No decliners this month.</p>}
+          ) : <p className="muted chart__empty">No decliners this {m.w.unit}.</p>}
         </Panel>
       </div>
 
@@ -177,7 +177,7 @@ function Comparison({ m, ym, href, stream, setStream }: ClientsProps) {
               value={query} onChange={e => setQuery(e.target.value)} />
           </div>
         }
-        note={`${rows.length} client${rows.length === 1 ? '' : 's'} with ${streamLabel(stream).toLowerCase()} on record. The caret lists a client's products this month; the name opens the deep dive. Trend is the last 12 months.`}
+        note={`${rows.length} client${rows.length === 1 ? '' : 's'} with ${streamLabel(stream).toLowerCase()} on record. The caret lists a client's products this ${m.w.unit}; the name opens the deep dive. Trend is the last ${m.spanLabel(12)}.`}
       >
         <div className="tablewrap frep__tall">
           <table className="fields compact frep__t frep__t--wide">
@@ -198,7 +198,7 @@ function Comparison({ m, ym, href, stream, setStream }: ClientsProps) {
                         <span className="frep__cname">
                           <button type="button" className="bexp frep__caret" disabled={!r.products.length}
                             aria-expanded={isOpen} onClick={() => toggle(r.name)}
-                            title={r.products.length ? (isOpen ? 'Hide the products' : 'Show the products') : 'No itemized products this month'}>
+                            title={r.products.length ? (isOpen ? 'Hide the products' : 'Show the products') : `No itemized products this ${m.w.unit}`}>
                             <span className="bexp__caret" aria-hidden="true">{isOpen ? '▾' : '▸'}</span>
                             <span className="visually-hidden">Products for {r.name}</span>
                           </button>
@@ -210,7 +210,7 @@ function Comparison({ m, ym, href, stream, setStream }: ClientsProps) {
                       <td className="num">{r.share !== null ? pct1(r.share) : '—'}</td>
                       <DeltaCell pct={r.momPct} abs={r.momAbs} />
                       <DeltaCell pct={r.yoyPct} abs={r.yoyAbs} />
-                      <td><Spark values={r.spark} label={`${r.name}, last 12 months`} /></td>
+                      <td><Spark values={r.spark} label={`${r.name}, last ${m.spanLabel(12)}`} /></td>
                       <td><Pill tone={STATUS_TONE[r.status]}>{r.status}</Pill></td>
                     </tr>
                     {isOpen && (
@@ -243,7 +243,7 @@ function DeepDive({ m, ym, href, client: p, stream, setStream }: ClientsProps) {
   const prods = m.clientProductsAt(p, ym, stream)
   const win = m.clientTrailing(ym, 24)
   const tenure = s.firstM && s.lastM ? `${ymLabel(s.firstM)} – ${ymLabel(s.lastM)}` : '—'
-  const rank = s.rank > 0 ? `#${s.rank} of ${s.rankOf} by ${streamLabel(stream).toLowerCase()}` : 'not ranked this month'
+  const rank = s.rank > 0 ? `#${s.rank} of ${s.rankOf} by ${streamLabel(stream).toLowerCase()}` : `not ranked this ${m.w.unit}`
   const streamKeys = stream === 'all' ? (['recurring', 'ps', 'setup'] as const) : [stream]
   const names = useMemo(() => m.clientNames.slice().sort((a, b) => a.localeCompare(b)), [m])
 
@@ -273,17 +273,17 @@ function DeepDive({ m, ym, href, client: p, stream, setStream }: ClientsProps) {
       </div>
 
       <div className="kpis">
-        <Kpi label="Recurring (MRR)" value={moneyShort(s.curMrr)}
-          deltas={<Delta pct={s.mom.pct} upIsGood suffix="MoM" />} note={ymLabel(ym)} />
+        <Kpi label={`Recurring (${m.w.rr})`} value={moneyShort(s.curMrr)}
+          deltas={<Delta pct={s.mom.pct} upIsGood suffix={m.w.vs} />} note={ymLabel(ym)} />
         <Kpi label="YoY change" value={s.yoy.pct !== null ? signedPct(s.yoy.pct) : '—'}
-          note={s.yoy.prev > 0 ? `vs ${ymLabel(addMonthsYm(ym, -12))}` : 'no prior year'} />
-        <Kpi label="Peak MRR" value={moneyShort(s.peak)} note="best recurring month" />
+          note={s.yoy.prev > 0 ? `vs ${ymLabel(yearAgo(ym))}` : 'no prior year'} />
+        <Kpi label={`Peak ${m.w.rr}`} value={moneyShort(s.peak)} note={`best recurring ${m.w.unit}`} />
         <Kpi label="Lifetime recurring" value={moneyShort(s.lifetime)} note="total booked" />
-        <Kpi label="Months active" value={String(s.monthsActive)} note="with recurring revenue" />
+        <Kpi label={`${m.w.Unit}s active`} value={String(s.monthsActive)} note="with recurring revenue" />
         <Kpi label="Share of book" value={s.share !== null ? pct1(s.share) : '—'} note={streamLabel(stream)} />
       </div>
 
-      <Panel title={`${p}: revenue by stream, trailing 24 months`}>
+      <Panel title={`${p}: revenue by stream, trailing ${m.spanLabel(24)}`}>
         <TrendChart
           points={toPoints(win)}
           series={streamKeys.map(k => ({
@@ -291,14 +291,14 @@ function DeepDive({ m, ym, href, client: p, stream, setStream }: ClientsProps) {
             values: win.map(x => m.streamVal(p, x, k)),
           }))}
           format={fmtMoney}
-          empty="No months to draw."
+          empty={`No ${m.w.unit}s to draw.`}
           highlight={ym}
         />
       </Panel>
 
       <Panel
         title={<>Products: {ymLabel(ym)} {prods.length > 0 && <span className="subnav__n">{prods.length}</span>}</>}
-        note="What each revenue code billed this month, in the selected stream."
+        note={`What each revenue code billed this ${m.w.unit}, in the selected stream.`}
       >
         <div className="tablewrap">
           <Products prods={prods} ym={ym} stream={stream} total />
@@ -306,14 +306,14 @@ function DeepDive({ m, ym, href, client: p, stream, setStream }: ClientsProps) {
       </Panel>
 
       <div className="trep__two">
-        <Panel title="New billing lines and upsells" note="The month each revenue code first billed recurring.">
+        <Panel title="New billing lines and upsells" note={`The ${m.w.unit} each revenue code first billed recurring.`}>
           <div className="tablewrap">
             <table className="fields compact frep__t">
               <thead>
                 <tr>
-                  <th scope="col">Month</th>
+                  <th scope="col">{m.w.Unit}</th>
                   <th scope="col">Revenue code</th>
-                  <th scope="col" className="num">New MRR</th>
+                  <th scope="col" className="num">New {m.w.rr}</th>
                 </tr>
               </thead>
               <tbody>
@@ -337,8 +337,8 @@ function DeepDive({ m, ym, href, client: p, stream, setStream }: ClientsProps) {
               <table className="fields compact frep__t">
                 <thead>
                   <tr>
-                    <th scope="col" className="num">Base ({ymLabel(addMonthsYm(ym, -12))})</th>
-                    <th scope="col" className="num">This month</th>
+                    <th scope="col" className="num">Base ({ymLabel(yearAgo(ym))})</th>
+                    <th scope="col" className="num">This {m.w.unit}</th>
                     <th scope="col" className="num">Change</th>
                     <th scope="col">Status</th>
                   </tr>

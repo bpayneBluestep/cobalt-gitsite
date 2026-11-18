@@ -16,7 +16,7 @@ export default function Revenue({ m, ym }: TabProps) {
 
   return (
     <>
-      <Panel title="Revenue by stream: trailing 24 months">
+      <Panel title={`Revenue by stream: trailing ${m.spanLabel(24)}`}>
         <TrendChart
           points={toPoints(win)}
           series={[
@@ -25,32 +25,32 @@ export default function Revenue({ m, ym }: TabProps) {
             { key: 'setup', name: 'Setup & licensing', kind: 'bar', color: STREAM_COLORS.setup, values: win.map(x => m.streamsAt(x)?.setup ?? 0) },
           ]}
           format={fmtMoney}
-          empty="No revenue months to draw."
+          empty={`No revenue ${m.w.unit}s to draw.`}
           highlight={ym}
         />
       </Panel>
 
       <div className="trep__two">
         <Panel
-          title={`MRR movement: ${ymLabel(ym)}`}
+          title={`${m.w.rr} movement: ${ymLabel(ym)}`}
           note={wf.hasPrev
             ? `Recurring revenue per customer, ${ymLabel(wf.prev)} against ${ymLabel(ym)}.`
-            : `No recurring revenue on file for ${ymLabel(wf.prev)}, so everything this month counts as new.`}
+            : `No recurring revenue on file for ${ymLabel(wf.prev)}, so everything this ${m.w.unit} counts as new.`}
         >
-          <Waterfall steps={wf.steps} label={`MRR movement from ${ymLabel(wf.prev)} to ${ymLabel(ym)}`} />
+          <Waterfall steps={wf.steps} label={`${m.w.rr} movement from ${ymLabel(wf.prev)} to ${ymLabel(ym)}`} />
         </Panel>
 
         <Panel
           title={`Customer concentration: ${ymLabel(ym)}`}
           aside={conc.flagged ? <Pill tone="warn">top account {pct1(conc.topShare)}</Pill> : undefined}
-          note={`Top 12 by MRR. A single account at ${CONCENTRATION_FLAG}% or more of the book is flagged.`}
+          note={`Top 12 by ${m.w.rr}. A single account at ${CONCENTRATION_FLAG}% or more of the book is flagged.`}
         >
           <div className="tablewrap">
             <table className="fields compact frep__t">
               <thead>
                 <tr>
                   <th scope="col">Customer</th>
-                  <th scope="col" className="num">MRR</th>
+                  <th scope="col" className="num">{m.w.rr}</th>
                   <th scope="col" className="num">% of total</th>
                 </tr>
               </thead>
@@ -62,7 +62,7 @@ export default function Revenue({ m, ym }: TabProps) {
                     <td className="num">{conc.total > 0 ? pct1((c.amount / conc.total) * 100) : '—'}</td>
                   </tr>
                 )) : (
-                  <tr><td colSpan={3} className="muted">No recurring revenue this month.</td></tr>
+                  <tr><td colSpan={3} className="muted">No recurring revenue this {m.w.unit}.</td></tr>
                 )}
               </tbody>
             </table>
@@ -70,12 +70,12 @@ export default function Revenue({ m, ym }: TabProps) {
         </Panel>
       </div>
 
-      <Panel title="New MRR by month" note="New customers plus upsells: billing lines whose first recurring month this is.">
+      <Panel title={`New ${m.w.rr} by ${m.w.unit}`} note={`New customers plus upsells: billing lines whose first recurring ${m.w.unit} this is.`}>
         <TrendChart
           points={toPoints(win)}
-          series={[{ key: 'new', name: 'New MRR', kind: 'bar', color: 'var(--good)', values: win.map(x => m.newMrrAt(x)?.total ?? 0) }]}
+          series={[{ key: 'new', name: `New ${m.w.rr}`, kind: 'bar', color: 'var(--good)', values: win.map(x => m.newMrrAt(x)?.total ?? 0) }]}
           format={fmtMoney}
-          empty="No months to draw."
+          empty={`No ${m.w.unit}s to draw.`}
           height={180}
           highlight={ym}
         />
@@ -88,7 +88,7 @@ export default function Revenue({ m, ym }: TabProps) {
               <tr>
                 <th scope="col">Program</th>
                 <th scope="col">Revenue code</th>
-                <th scope="col" className="num">New MRR</th>
+                <th scope="col" className="num">New {m.w.rr}</th>
               </tr>
             </thead>
             <tbody>
@@ -99,7 +99,7 @@ export default function Revenue({ m, ym }: TabProps) {
                   <td className="num">{money(l.newMrr)}</td>
                 </tr>
               )) : (
-                <tr><td colSpan={3} className="muted">No new billing lines this month.</td></tr>
+                <tr><td colSpan={3} className="muted">No new billing lines this {m.w.unit}.</td></tr>
               )}
             </tbody>
           </table>

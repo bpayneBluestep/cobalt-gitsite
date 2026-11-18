@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import TrendChart from '../../components/TrendChart'
-import { addMonthsYm, money, moneyShort, pct1, ymLabel } from '../../lib/finance'
+import { money, yearAgo, moneyShort, pct1, ymLabel } from '../../lib/finance'
 import { CHURN_LOSS_PCT, COHORT_TONE, MRR_CHURN_RED, cohortTag, grrTone, ndrTone } from './compute'
 import type { TabProps } from './Overview'
 import { Kpi, MoneyDelta, Panel, Pill, Waterfall, fmtPct, toPoints } from './ui'
@@ -11,7 +11,7 @@ function MomChurn({ m, ym, href }: TabProps) {
   const prevL = ymLabel(ch.prev), curL = ymLabel(ym)
   return (
     <Panel
-      title={`Month-over-month churn: ${prevL} → ${curL}`}
+      title={`${m.w.Unit}-over-${m.w.unit} churn: ${prevL} → ${curL}`}
       note={`Accounts that billed recurring revenue in ${prevL} and lost ${CHURN_LOSS_PCT}% or more of it in ${curL}. Dropping to a cheap data-retention plan counts as churn.`}
     >
       {!ch.hasPrev ? (
@@ -19,18 +19,18 @@ function MomChurn({ m, ym, href }: TabProps) {
       ) : ch.partial ? (
         <div className="callout callout--plain">
           <p className="callout__title">{curL} isn't over yet</p>
-          <p>Anyone not billed yet this month would show as churned, so churn is only counted for finished months. Pick an earlier month above.</p>
+          <p>Anyone not billed yet this {m.w.unit} would show as churned, so churn is only counted for finished {m.w.unit}s. Pick an earlier {m.w.unit} above.</p>
         </div>
       ) : (
         <>
           <div className="kpis">
             <Kpi label="Churned accounts" value={String(ch.rows.length)} tone={ch.rows.length ? 'bad' : 'good'}
               note={ch.logoRate !== null ? `${pct1(ch.logoRate)} of ${ch.startCount} billing in ${prevL}` : undefined} />
-            <Kpi label="MRR lost to churn" value={moneyShort(ch.lostMrr)}
+            <Kpi label={`${m.w.rr} lost to churn`} value={moneyShort(ch.lostMrr)}
               tone={ch.mrrRate === null || ch.mrrRate === 0 ? 'good' : ch.mrrRate >= MRR_CHURN_RED ? 'bad' : 'warn'}
-              note={ch.mrrRate !== null ? `${pct1(ch.mrrRate)} of ${moneyShort(ch.startMrr)} MRR` : undefined} />
+              note={ch.mrrRate !== null ? `${pct1(ch.mrrRate)} of ${moneyShort(ch.startMrr)} ${m.w.rr}` : undefined} />
             <Kpi label="Still on retention" value={String(ch.retainedCount)}
-              note={ch.retainedCount ? `${money(ch.retainedMrr)}/mo left` : 'all fully gone'} />
+              note={ch.retainedCount ? `${money(ch.retainedMrr)}${m.w.per} left` : 'all fully gone'} />
           </div>
           <div className="tablewrap">
             <table className="fields compact frep__t">
@@ -85,7 +85,7 @@ export default function Retention(props: TabProps) {
   }
   const g = m.grossRetention(ym)
   const ndrNow = ndrOf(ym)
-  const baseL = ymLabel(addMonthsYm(ym, -12))
+  const baseL = ymLabel(yearAgo(ym))
 
   return (
     <>
@@ -97,7 +97,7 @@ export default function Retention(props: TabProps) {
           <Kpi label="Net dollar retention" value={ndrNow !== null ? pct1(ndrNow) : '—'} tone={ndrTone(ndrNow)}
             note="incl. expansion" />
           <Kpi label="Gross dollar retention" value={g.grr !== null ? pct1(g.grr) : '—'} tone={grrTone(g.grr)}
-            note={g.grr !== null ? `${money(g.keptMrr)} of ${money(g.baseMrr)}/mo kept` : 'no prior-year cohort'} />
+            note={g.grr !== null ? `${money(g.keptMrr)} of ${money(g.baseMrr)}${m.w.per} kept` : 'no prior-year cohort'} />
           <Kpi label="Accounts retained" value={g.logoRet !== null ? pct1(g.logoRet) : '—'} tone={grrTone(g.logoRet)}
             note={g.logoRet !== null ? `${g.logoKept} of ${g.logoBase} still with us` : 'no prior-year cohort'} />
         </div>
@@ -106,8 +106,8 @@ export default function Retention(props: TabProps) {
       <MomChurn {...props} />
 
       <Panel
-        title="Retention: trailing 24 months"
-        note="Each month against the accounts billing a year earlier. Net includes expansion (100% is the target: the base holding its value). Gross caps each account at what it billed then. Accounts is the share that didn't churn."
+        title={`Retention: trailing ${m.spanLabel(24)}`}
+        note={`Each ${m.w.unit} against the accounts billing a year earlier. Net includes expansion (100% is the target: the base holding its value). Gross caps each account at what it billed then. Accounts is the share that didn't churn.`}
       >
         <TrendChart
           points={toPoints(win)}
@@ -118,7 +118,7 @@ export default function Retention(props: TabProps) {
             { key: 'target', name: 'Target', kind: 'line', color: 'var(--text-mute)', dashed: true, values: win.map(() => 100) },
           ]}
           format={fmtPct}
-          empty="No months to draw."
+          empty={`No ${m.w.unit}s to draw.`}
           highlight={ym}
         />
       </Panel>
@@ -131,7 +131,7 @@ export default function Retention(props: TabProps) {
       >
         {wf
           ? <Waterfall steps={wf.steps} label={`Retention from ${ymLabel(wf.baseYm)} to ${ymLabel(ym)}`} />
-          : <p className="muted chart__empty">No prior-year base cohort to compare for this month.</p>}
+          : <p className="muted chart__empty">No prior-year base cohort to compare for this {m.w.unit}.</p>}
       </Panel>
 
       <Panel title={`Cohort accounts: base against ${ymLabel(ym)}`} note={`Worst first. ${rows.length} accounts.`}>
@@ -140,8 +140,8 @@ export default function Retention(props: TabProps) {
             <thead>
               <tr>
                 <th scope="col">Program</th>
-                <th scope="col" className="num">Base MRR</th>
-                <th scope="col" className="num">This month</th>
+                <th scope="col" className="num">Base {m.w.rr}</th>
+                <th scope="col" className="num">This {m.w.unit}</th>
                 <th scope="col" className="num">Change</th>
                 <th scope="col">Status</th>
               </tr>
@@ -159,7 +159,7 @@ export default function Retention(props: TabProps) {
                   </tr>
                 )
               }) : (
-                <tr><td colSpan={5} className="muted">No prior-year cohort for this month.</td></tr>
+                <tr><td colSpan={5} className="muted">No prior-year cohort for this {m.w.unit}.</td></tr>
               )}
             </tbody>
           </table>

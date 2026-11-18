@@ -10,7 +10,7 @@ export default function Actions({ m, ym }: TabProps) {
     return (
       <div className="callout callout--plain">
         <p className="callout__title">All clear for {ymLabel(ym)}</p>
-        <p>No metric is out of its band this month.</p>
+        <p>No metric is out of its band this {m.w.unit}.</p>
       </div>
     )
   }

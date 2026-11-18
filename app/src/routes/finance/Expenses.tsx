@@ -13,7 +13,7 @@ export default function Expenses({ m, ym }: TabProps) {
         <p className="callout__title">No expense data for {ymLabel(ym)}</p>
         <p>
           The expense export starts {m.earliestExpMonth ? ymLabel(m.earliestExpMonth) : 'later'}. Pick a
-          month from then on to see spending.
+          {m.w.unit} from then on to see spending.
         </p>
       </div>
     )
@@ -33,28 +33,28 @@ export default function Expenses({ m, ym }: TabProps) {
     <>
       <div className="kpis">
         <Kpi label="Total expenses" value={moneyShort(k.expenses)}
-          deltas={<Delta pct={k.expMoM} upIsGood={false} suffix="MoM" />}
+          deltas={<Delta pct={k.expMoM} upIsGood={false} suffix={m.w.vs} />}
           note="incl. payroll & platform" />
         <Kpi label="Payroll" value={moneyShort(payroll)}
           tone={payrollPct !== null && payrollPct >= PAYROLL_PCT_FLAG ? 'warn' : undefined}
           note={payrollPct !== null ? `${pct1(payrollPct)} of revenue` : undefined} />
         <Kpi label="Platform fee" value={moneyShort(m.platformOf(ym))} note="intracompany, counted once" />
         <Kpi label="Anomalies" value={String(anomalies.length)} tone={anomalies.length ? 'warn' : 'good'}
-          note={`>${ANOMALY_PCT}% MoM and >${money(ANOMALY_FLOOR)}`} />
+          note={`>${ANOMALY_PCT}% ${m.w.vs} and >${money(ANOMALY_FLOOR * m.scale)}`} />
       </div>
 
-      <Panel title="Total expenses by month">
+      <Panel title={`Total expenses by ${m.w.unit}`}>
         <TrendChart
           points={toPoints(win)}
           series={[{ key: 'exp', name: 'Expenses', kind: 'bar', color: 'var(--danger)', values: win.map(m.expenseMonthTotal) }]}
           format={fmtMoney}
-          empty="No expense months to draw."
+          empty={`No expense ${m.w.unit}s to draw.`}
           height={180}
           highlight={ym}
         />
       </Panel>
 
-      <Panel title="Expense categories by month" note="The seven largest categories over the export; the rest as Other.">
+      <Panel title={`Expense categories by ${m.w.unit}`} note="The seven largest categories over the export; the rest as Other.">
         <TrendChart
           points={toPoints(win)}
           series={[
@@ -68,21 +68,21 @@ export default function Expenses({ m, ym }: TabProps) {
             },
           ]}
           format={fmtMoney}
-          empty="No expense months to draw."
+          empty={`No expense ${m.w.unit}s to draw.`}
           height={240}
           highlight={ym}
         />
       </Panel>
 
       <div className="trep__two">
-        <Panel title={`Category mix: ${ymLabel(ym)}`} note="Every category with spend this month, with its share of the total.">
+        <Panel title={`Category mix: ${ymLabel(ym)}`} note={`Every category with spend this ${m.w.unit}, with its share of the total.`}>
           <BarRows
             rows={mix.map(c => ({
               key: c.name, label: c.name, value: c.amt,
               meta: k.expenses > 0 ? `${pct1((c.amt / k.expenses) * 100)} of total` : undefined,
             }))}
             format={money}
-            empty="No category spend this month."
+            empty={`No category spend this ${m.w.unit}.`}
             limit={8}
           />
         </Panel>
@@ -94,7 +94,7 @@ export default function Expenses({ m, ym }: TabProps) {
                 <tr>
                   <th scope="col">Vendor</th>
                   <th scope="col" className="num">Amount</th>
-                  <th scope="col" className="num">MoM</th>
+                  <th scope="col" className="num">{m.w.vs}</th>
                 </tr>
               </thead>
               <tbody>
@@ -126,7 +126,7 @@ export default function Expenses({ m, ym }: TabProps) {
               </li>
             ))}
           </ul>
-        ) : <p className="muted chart__empty">No expense anomalies this month.</p>}
+        ) : <p className="muted chart__empty">No expense anomalies this {m.w.unit}.</p>}
       </Panel>
     </>
   )

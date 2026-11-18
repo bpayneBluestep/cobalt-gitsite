@@ -2,7 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ApiError, getFinanceData, type FinanceFile, type FinanceInputs } from '../api'
 import { readSheet } from '../lib/xlsx'
-import { buildFinanceData, ymLabel, type FinanceData, type SheetInput } from '../lib/finance'
+import {
+  buildFinanceData, isQuarterKey, monthToQuarter, quarterToMonth, ymLabel,
+  type FinanceData, type Grain, type SheetInput,
+} from '../lib/finance'
 import { STREAMS, makeModel, type Model, type StreamId } from './finance/compute'
 import Overview from './finance/Overview'
 import Revenue from './finance/Revenue'
@@ -48,7 +51,13 @@ type Source = 'revenue' | 'expenses'
 /** A file that did not make it into the numbers, and why. */
 export interface Problem { source: Source; kind: 'missing' | 'unreadable'; message: string }
 
-export interface Loaded { inputs: FinanceInputs; data: FinanceData; problems: Problem[] }
+export interface Loaded {
+  inputs: FinanceInputs
+  data: FinanceData
+  problems: Problem[]
+  /** The parsed sheets, kept so the quarterly view can be built from the same rows. */
+  sheets: { revenue: SheetInput | null; expenses: SheetInput | null }
+}
 
 type State =
   | { phase: 'loading' }
@@ -98,7 +107,7 @@ export async function load(): Promise<Loaded> {
     if (problems.some(p => p.source === source)) continue
     problems.push({ source, kind: 'unreadable', message: part.replace(/^(revenue|expenses):\s*/, '') })
   }
-  return { inputs, data, problems }
+  return { inputs, data, problems, sheets: { revenue, expenses } }
 }
 
 export default function FinanceReport() {
@@ -124,11 +133,29 @@ export default function FinanceReport() {
 
   const loaded = state.phase === 'ready' ? state.loaded : null
   // Built once per load. A month change reads the same model.
-  const model = useMemo(() => (loaded ? makeModel(loaded.data, new Date()) : null), [loaded])
+  const monthly = useMemo(() => (loaded ? makeModel(loaded.data, new Date()) : null), [loaded])
+
+  /*
+   * By quarter is the same rows bucketed into 'YYYY-Qn' instead of months, built the
+   * first time someone asks for it. Every tab reads it through the same model API.
+   */
+  const grain: Grain = params.get('by') === 'quarter' ? 'quarter' : 'month'
+  const quarterly = useMemo(() => {
+    if (!loaded || grain !== 'quarter') return null
+    const data = buildFinanceData({
+      revenue: loaded.sheets.revenue, expenses: loaded.sheets.expenses,
+      companies: loaded.inputs.companies, grain: 'quarter',
+    })
+    return makeModel(data, new Date())
+  }, [loaded, grain])
+  const model = grain === 'quarter' ? quarterly : monthly
 
   const tabParam = params.get('tab') || ''
   const tab: TabId = (TABS.find(t => t.id === tabParam)?.id) ?? 'overview'
-  const monthParam = params.get('month') || ''
+  // A month in the URL under a quarter view (or the other way round) maps across.
+  const rawPeriod = params.get('month') || ''
+  const monthParam = !rawPeriod ? '' : grain === 'quarter' ? monthToQuarter(rawPeriod)
+    : isQuarterKey(rawPeriod) ? quarterToMonth(rawPeriod) : rawPeriod
   const ym = model ? (model.months.includes(monthParam) ? monthParam : model.defaultMonth) : ''
   const streamParam = params.get('stream') as StreamId | null
   const stream: StreamId = STREAMS.some(s => s.id === streamParam) ? streamParam! : 'recurring'
@@ -142,6 +169,7 @@ export default function FinanceReport() {
     }
     if (next.get('tab') === 'overview') next.delete('tab')
     if (next.get('stream') === 'recurring') next.delete('stream')
+    if (next.get('by') === 'month') next.delete('by')
     if (next.get('tab') !== 'clients') next.delete('client')
     const s = next.toString()
     return s ? `?${s}` : ''
@@ -160,7 +188,7 @@ export default function FinanceReport() {
         <div>
           <h1>Finance</h1>
           <p className="page__sub">
-            Recurring revenue, retention, spending and profit, month by month, from the
+            Recurring revenue, retention, spending and profit, by month or by quarter, from the
             QuickBooks exports{loaded?.inputs.orgName ? ` on the ${loaded.inputs.orgName} record` : ''}.
           </p>
         </div>
@@ -183,13 +211,13 @@ export default function FinanceReport() {
         </div>
       )}
 
-      {loaded && model && (
+      {loaded && model && monthly && (
         <>
           <Problems problems={loaded.problems} org={loaded.inputs.orgName} />
 
-          {model.revenueStale && model.revenueThrough && (
+          {monthly.revenueStale && monthly.revenueThrough && (
             <p className="trep__warn trep__warn--soft">
-              The revenue export runs through {ymLabel(model.revenueThrough)}. Drop a fresh
+              The revenue export runs through {ymLabel(monthly.revenueThrough)}. Drop a fresh
               QuickBooks export on the {loaded.inputs.orgName || 'Behavioral'} record's Financial
               Data form to bring it up to date.
             </p>
@@ -204,12 +232,28 @@ export default function FinanceReport() {
             <>
               <div className="trep__filters frep__filters">
                 <div className="ef ef--narrow">
-                  <label htmlFor="frep-month">Month</label>
+                  <label id="frep-by">View by</label>
+                  <div className="seg" role="group" aria-labelledby="frep-by">
+                    {(['month', 'quarter'] as const).map(g => (
+                      <button key={g} type="button" aria-pressed={grain === g}
+                        data-on={grain === g ? '' : undefined}
+                        onClick={() => replace({
+                          by: g,
+                          // Keep the place: a month opens its quarter, a quarter its last month.
+                          month: rawPeriod ? (g === 'quarter' ? monthToQuarter(ym) : quarterToMonth(ym)) : null,
+                        })}>
+                        {g === 'month' ? 'Month' : 'Quarter'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="ef ef--narrow">
+                  <label htmlFor="frep-month">{model.w.Unit}</label>
                   <div className="bweek">
                     <button type="button" className="btn btn--ghost btn--sm bweek__step"
                       disabled={idx < 0 || idx >= newestFirst.length - 1}
                       onClick={() => replace({ month: newestFirst[idx + 1] })}
-                      title="The month before">‹</button>
+                      title={`The ${model.w.unit} before`}>‹</button>
                     <select id="frep-month" className="frep__month" value={ym}
                       onChange={e => replace({ month: e.target.value })}>
                       {newestFirst.map(m => (
@@ -221,7 +265,7 @@ export default function FinanceReport() {
                     <button type="button" className="btn btn--ghost btn--sm bweek__step"
                       disabled={idx <= 0}
                       onClick={() => replace({ month: newestFirst[idx - 1] })}
-                      title="The month after">›</button>
+                      title={`The ${model.w.unit} after`}>›</button>
                   </div>
                 </div>
                 {ym !== model.defaultMonth && (
@@ -232,7 +276,9 @@ export default function FinanceReport() {
                 )}
                 <span className="tpage__spacer" />
                 <p className="muted frep__hint">
-                  Opens three months back, the latest month QuickBooks has settled.
+                  {grain === 'quarter'
+                    ? 'Opens on the latest quarter whose months QuickBooks has all settled (three months back).'
+                    : 'Opens three months back, the latest month QuickBooks has settled.'}
                 </p>
               </div>
 
@@ -254,7 +300,7 @@ export default function FinanceReport() {
             </>
           )}
 
-          <SourceNotes loaded={loaded} m={model} />
+          <SourceNotes loaded={loaded} m={monthly} />
         </>
       )}
     </section>

@@ -12,7 +12,7 @@ export default function Profitability({ m, ym }: TabProps) {
         <p className="callout__title">No profit figure for {ymLabel(ym)}</p>
         <p>
           The expense export starts {m.earliestExpMonth ? ymLabel(m.earliestExpMonth) : 'later'}, so
-          there is nothing to subtract from this month's revenue.
+          there is nothing to subtract from this {m.w.unit}'s revenue.
         </p>
       </div>
     )
@@ -27,19 +27,19 @@ export default function Profitability({ m, ym }: TabProps) {
   return (
     <>
       <div className="kpis">
-        <Kpi label="Net profit" value={moneyShort(k.net)} tone={netTone(k.net)}
-          deltas={<Delta pct={k.netMoM} upIsGood suffix="MoM" />} note={ymLabel(ym)} />
+        <Kpi label="Net profit" value={moneyShort(k.net)} tone={netTone(k.net, m.scale)}
+          deltas={<Delta pct={k.netMoM} upIsGood suffix={m.w.vs} />} note={ymLabel(ym)} />
         <Kpi label="Net margin" value={k.margin !== null ? pct1(k.margin) : '—'}
           tone={k.margin !== null ? (k.margin >= 0 ? 'good' : 'bad') : undefined} note="net ÷ revenue" />
         <Kpi label="Contribution margin" value={cm !== null ? pct1(cm) : '—'} note="excluding payroll" />
-        <Kpi label="Average burn, 3 months" value={burn3 > 0 ? moneyShort(burn3) : '$0'}
-          tone={burn3 > 0 ? 'bad' : 'good'} note="average monthly net loss" />
+        <Kpi label={`Average burn, ${m.spanLabel(3)}`} value={burn3 > 0 ? moneyShort(burn3) : '$0'}
+          tone={burn3 > 0 ? 'bad' : 'good'} note={`average ${m.w.ly.toLowerCase()} net loss`} />
         <Kpi label="Path to break-even" value={be.gap > 0 ? moneyShort(be.gap) : 'Profitable'}
           tone={be.gap > 0 ? 'warn' : 'good'}
-          note={be.gap > 0 ? 'more revenue needed a month' : `${money(-be.gap)} above break-even`} />
+          note={be.gap > 0 ? `more revenue needed a ${m.w.unit}` : `${money(-be.gap)} above break-even`} />
       </div>
 
-      <Panel title="Net profit and margin by month" note="Net as bars, margin as the line on the right-hand axis.">
+      <Panel title={`Net profit and margin by ${m.w.unit}`} note="Net as bars, margin as the line on the right-hand axis.">
         <TrendChart
           points={toPoints(win)}
           series={[
@@ -51,7 +51,7 @@ export default function Profitability({ m, ym }: TabProps) {
           ]}
           format={fmtMoney}
           rightFormat={fmtPct}
-          empty="No months with both revenue and expenses."
+          empty={`No ${m.w.unit}s with both revenue and expenses.`}
           highlight={ym}
         />
       </Panel>
@@ -63,7 +63,7 @@ export default function Profitability({ m, ym }: TabProps) {
             { key: 'exp', label: 'Expenses', value: be.expenses },
           ]}
           format={money}
-          empty="Nothing booked this month."
+          empty={`Nothing booked this ${m.w.unit}.`}
         />
         <p className="note frep__after">
           {be.gap > 0

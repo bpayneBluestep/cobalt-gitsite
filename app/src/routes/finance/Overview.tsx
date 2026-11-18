@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import TrendChart from '../../components/TrendChart'
-import { addMonthsYm, moneyShort, pct1, ymLabel } from '../../lib/finance'
+import { yearAgo, moneyShort, pct1, ymLabel } from '../../lib/finance'
 import { SEV_TONE, grrTone, ndrTone, netTone, newMrrTone, type Model } from './compute'
 import { Delta, Kpi, Panel, Pill, fmtMoney, toPoints } from './ui'
 
@@ -39,21 +39,21 @@ export function KpiStrip({ m, ym }: { m: Model; ym: string }) {
   return (
     <div className="kpis">
       <Kpi label="Recurring revenue" value={moneyShort(k.mrr)}
-        deltas={<><Delta pct={k.mrrYoY} upIsGood suffix="YoY" /><Delta pct={k.mrrMoM} upIsGood suffix="MoM" /></>}
+        deltas={<><Delta pct={k.mrrYoY} upIsGood suffix="YoY" /><Delta pct={k.mrrMoM} upIsGood suffix={m.w.vs} /></>}
         note={`${k.activeCustomers} active customers`} />
-      <Kpi label="Net profit" value={moneyShort(k.net)} tone={netTone(k.net)}
-        deltas={<Delta pct={k.netMoM} upIsGood suffix="MoM" />}
+      <Kpi label="Net profit" value={moneyShort(k.net)} tone={netTone(k.net, m.scale)}
+        deltas={<Delta pct={k.netMoM} upIsGood suffix={m.w.vs} />}
         note={k.margin !== null ? `${pct1(k.margin)} margin` : undefined} />
       <Kpi label="Net dollar retention" value={k.ndr !== null ? pct1(k.ndr) : '—'} tone={ndrTone(k.ndr)}
-        note={k.ndr !== null ? `vs ${ymLabel(addMonthsYm(ym, -12))}, incl. expansion` : 'no prior-year cohort'} />
+        note={k.ndr !== null ? `vs ${ymLabel(yearAgo(ym))}, incl. expansion` : 'no prior-year cohort'} />
       <Kpi label="Gross retention" value={k.grr !== null ? pct1(k.grr) : '—'} tone={grrTone(k.grr)}
         note={k.logoRet !== null ? `${k.logoKept} of ${k.logoBase} accounts kept (${pct1(k.logoRet)})` : 'no prior-year cohort'} />
-      <Kpi label="New MRR" value={moneyShort(k.newMrr)} tone={newMrrTone(k.newMrr)}
+      <Kpi label={`New ${m.w.rr}`} value={moneyShort(k.newMrr)} tone={newMrrTone(k.newMrr, m.scale)}
         note={`${k.newLines} new line${k.newLines === 1 ? '' : 's'}`} />
-      <Kpi label="Monthly expenses" value={moneyShort(k.expenses)}
-        deltas={<Delta pct={k.expMoM} upIsGood={false} suffix="MoM" />}
+      <Kpi label={`${m.w.ly} expenses`} value={moneyShort(k.expenses)}
+        deltas={<Delta pct={k.expMoM} upIsGood={false} suffix={m.w.vs} />}
         note="incl. payroll & platform" />
-      <Kpi label="Monthly burn" value={k.burn > 0 ? moneyShort(k.burn) : '$0'} tone={k.burn > 0 ? 'bad' : 'good'}
+      <Kpi label={`${m.w.ly} burn`} value={k.burn > 0 ? moneyShort(k.burn) : '$0'} tone={k.burn > 0 ? 'bad' : 'good'}
         note={k.burn > 0 ? 'net cash loss' : 'net positive'} />
     </div>
   )
@@ -73,7 +73,7 @@ export default function Overview(props: TabProps) {
       </section>
 
       <Panel
-        title="Revenue, expenses and net: trailing 24 months"
+        title={`Revenue, expenses and net: trailing ${m.spanLabel(24)}`}
         note={m.earliestExpMonth
           ? `The expense export starts ${ymLabel(m.earliestExpMonth)}, so expenses and net begin there rather than at $0.`
           : 'No expense export is attached, so only revenue is drawn.'}
@@ -92,7 +92,7 @@ export default function Overview(props: TabProps) {
             },
           ]}
           format={fmtMoney}
-          empty="No months to draw."
+          empty={`No ${m.w.unit}s to draw.`}
           highlight={ym}
         />
       </Panel>
