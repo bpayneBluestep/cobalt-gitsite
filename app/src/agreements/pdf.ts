@@ -24,8 +24,18 @@ let PDFJS_P: Promise<any> | null = null
 export function loadPdfJs(): Promise<any> {
   if (PDFJS_P) return PDFJS_P
   const dynImport = new Function('u', 'return import(u)') as (u: string) => Promise<any>
-  PDFJS_P = dynImport(vendorUrl('pdf.min.mjs')).then((lib: any) => {
-    lib.GlobalWorkerOptions.workerSrc = vendorUrl('pdf.worker.min.mjs')
+  // THE LEGACY BUILD PLUS ONE PATCH (".p1"), ON PURPOSE (2026-11-18). The default
+  // pdf.js build (pdf.min.mjs) assumes a browser from about early 2026 and carries
+  // no fallbacks; on anything older nothing renders and a signer sees empty boxes
+  // with nothing to sign (a customer family declined a packet over exactly that).
+  // The legacy build has the fallbacks but still calls
+  // ArrayBuffer.prototype.transferToFixedLength bare (Chrome 114 / Firefox 122 /
+  // Safari 17.4); the .p1 files are the 6.2.108 legacy files with a few lines in
+  // front that add it when missing. Re-create them the same way on an upgrade.
+  // pdf.min.mjs / pdf.worker.min.mjs stay in vendor/ only so a tab opened before
+  // this deploy still finds them.
+  PDFJS_P = dynImport(vendorUrl('pdf.legacy.p1.min.mjs')).then((lib: any) => {
+    lib.GlobalWorkerOptions.workerSrc = vendorUrl('pdf.worker.legacy.p1.min.mjs')
     return lib
   })
   return PDFJS_P

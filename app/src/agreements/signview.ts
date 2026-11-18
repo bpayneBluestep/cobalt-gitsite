@@ -156,12 +156,28 @@ async function svRenderPages(): Promise<void> {
   svUpdateProgress()
 }
 
+/* Say so. An empty outlined box reads as "the documents are blank", and a signer
+   who sees that declines instead of asking. */
+function svPageFailed(el: Element): void {
+  el.classList.remove('sv-page-loading'); el.classList.add('sv-page-err')
+  if (el.querySelector('.sv-page-errmsg')) return
+  const d = document.createElement('div'); d.className = 'sv-page-errmsg'
+  d.innerHTML = '<strong>This page could not be displayed.</strong><br>'
+    + 'Your browser may be out of date. Please update it, or open this link on another device '
+    + 'using a current version of Chrome, Edge, Safari or Firefox.<br>'
+    + 'If it still does not work, please contact the person who sent you these documents.'
+  el.appendChild(d)
+}
+
 async function svRenderDoc(docId: string): Promise<void> {
   const host = SV; if (!host || !docId || SV_DOCS_RENDERED[docId]) return
   SV_DOCS_RENDERED[docId] = true
   const width = Math.min(SV_BASE_W, Math.max(320, (host.container.clientWidth || SV_BASE_W) - 8))
   const docMeta = (host.env.documents || []).find((d: any) => d.id === docId)
   const els = host.container.querySelectorAll(`.sv-page[data-doc="${docId}"]`)
+  /* A page that neither renders nor fails (seen on older browsers) must not sit
+     on "Loading page" forever. A late render still clears this. */
+  setTimeout(() => { for (let i = 0; i < els.length; i++) if (els[i].classList.contains('sv-page-loading')) els[i].classList.add('sv-page-stuck') }, 60000)
   let pdf: any = null
   try {
     if (docMeta && docMeta.dataB64) pdf = await pdfOpenData(docMeta.dataB64)
@@ -169,7 +185,7 @@ async function svRenderDoc(docId: string): Promise<void> {
     else if (docMeta && docMeta.sourceUrl) pdf = await pdfOpen(docMeta.sourceUrl)
     else throw new Error('no document source')
   } catch {
-    for (let i = 0; i < els.length; i++) { els[i].classList.remove('sv-page-loading'); els[i].classList.add('sv-page-err') }
+    for (let i = 0; i < els.length; i++) svPageFailed(els[i])
     return
   }
   for (let i = 0; i < els.length; i++) {
@@ -182,7 +198,7 @@ async function svRenderDoc(docId: string): Promise<void> {
       el.style.width = canvas.style.width; el.style.height = canvas.style.height
       el.classList.remove('sv-page-loading')
       svPaintOverlay(el, docId, pageNum, width)
-    } catch { el.classList.remove('sv-page-loading'); el.classList.add('sv-page-err') }
+    } catch { svPageFailed(el) }
   }
   // Rehydrate saved values into the just-painted controls, then refresh state.
   svRestore(SV_PROGVALS)
