@@ -6789,7 +6789,7 @@ input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) opacit
 /* ── Evaluation print (EvaluationLog) ────────────────────────────────
    The Print button on the Self-assessment / Supervisor review tabs prints .evprint
    alone: a read-only copy of that side's saved answers under a header naming the
-   person, quarter and status, with signature lines for the file copy. Everything else
+   person, quarter and status. Everything else
    on the page (head, tabs, the editable form) stays on screen only. */
 .evprintbar { display: flex; align-items: center; justify-content: flex-end; gap: var(--s-m); margin: 0 0 var(--s-m); font-size: 0.78rem; }
 .evprint { display: none; }
@@ -6824,7 +6824,4 @@ input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) opacit
   .evprint .vcard__levels-toggle, .evprint .vlevels { display: none !important; }
   .evprint .muted { color: #666 !important; }
 
-  .evprint__sign { display: grid; grid-template-columns: 2.2fr 1fr; gap: 26pt 24pt; margin-top: 30pt; break-inside: avoid; }
-  .evprint__sign span { display: block; height: 18pt; border-bottom: 0.75pt solid #000; }
-  .evprint__sign p { margin: 3pt 0 0; font-size: 8.5pt; color: #444; }
 }

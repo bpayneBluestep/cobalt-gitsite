@@ -150,7 +150,7 @@ export default function EvaluationLog() {
   /*
    * Print one side as a clean, read-only page. The screen view (tabs, buttons, an
    * editable form) is hidden on paper; .evprint holds the saved answers read-only under
-   * a header naming whose evaluation it is, plus signature lines for the file copy.
+   * a header naming whose evaluation it is.
    * The document title becomes the PDF file name when "Save as PDF" is picked.
    */
   const printSide: 'self' | 'supervisor' | null =
@@ -372,12 +372,6 @@ export default function EvaluationLog() {
             editable={false}
             perspective={printSide}
           />
-          <div className="evprint__sign">
-            <div><span /><p>Employee signature</p></div>
-            <div><span /><p>Date</p></div>
-            <div><span /><p>Supervisor signature</p></div>
-            <div><span /><p>Date</p></div>
-          </div>
         </div>
       )}
 
