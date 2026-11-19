@@ -147,6 +147,31 @@ export default function EvaluationLog() {
 
   const deletable = data.isReviewer && ev.self.status !== 'Submitted' && sup?.status !== 'Submitted' && !doc?.hasFile
 
+  /*
+   * Print one side as a clean, read-only page. The screen view (tabs, buttons, an
+   * editable form) is hidden on paper; .evprint holds the saved answers read-only under
+   * a header naming whose evaluation it is, plus signature lines for the file copy.
+   * The document title becomes the PDF file name when "Save as PDF" is picked.
+   */
+  const printSide: 'self' | 'supervisor' | null =
+    tab === 'self' && selfVisible ? 'self' : tab === 'supervisor' && sup ? 'supervisor' : null
+  function print() {
+    const was = document.title
+    const what = printSide === 'self' ? 'Self-assessment' : 'Supervisor review'
+    document.title = `${data.name} - ${ev.quarter} ${what}`
+    const restore = () => { document.title = was; window.removeEventListener('afterprint', restore) }
+    window.addEventListener('afterprint', restore)
+    window.print()
+  }
+  const printBar = printSide && (
+    <p className="evprintbar">
+      {printSide === 'supervisor' && data.can.editSupervisor && (
+        <span className="muted">Prints the last saved version.</span>
+      )}
+      <button type="button" className="btn btn--sm btn--ghost" onClick={print}>Print</button>
+    </p>
+  )
+
   return (
     <section className="page">
       <header className="page__head">
@@ -324,9 +349,44 @@ export default function EvaluationLog() {
         </>
       )}
 
+      {printSide && (
+        <div className="evprint" aria-hidden="true">
+          <header className="evprint__head">
+            <p className="evprint__kicker">Quarterly evaluation · {ev.quarter}</p>
+            <h1>{printSide === 'self' ? 'Self-assessment' : 'Supervisor review'}</h1>
+            <dl className="evprint__facts">
+              <div><dt>Employee</dt><dd>{data.name}</dd></div>
+              {printSide === 'supervisor' && sup?.by && <div><dt>Supervisor</dt><dd>{sup.by}</dd></div>}
+              <div>
+                <dt>Status</dt>
+                <dd>{printSide === 'self'
+                  ? `Submitted ${shortDate(ev.self.submittedAt)}`
+                  : sup?.status === 'Submitted' ? `Submitted ${shortDate(sup.submittedAt)}` : `${sup?.status} (not submitted)`}
+                </dd>
+              </div>
+            </dl>
+          </header>
+          <ValuesForm
+            rubric={data.rubric}
+            answers={printSide === 'self' ? ev.self.answers : sup?.answers}
+            editable={false}
+            perspective={printSide}
+          />
+          <div className="evprint__sign">
+            <div><span /><p>Employee signature</p></div>
+            <div><span /><p>Date</p></div>
+            <div><span /><p>Supervisor signature</p></div>
+            <div><span /><p>Date</p></div>
+          </div>
+        </div>
+      )}
+
       {tab === 'self' && (
         ev.self.status === 'Submitted' ? (
-          <ValuesForm rubric={data.rubric} answers={ev.self.answers} editable={false} perspective="self" />
+          <>
+            {printBar}
+            <ValuesForm rubric={data.rubric} answers={ev.self.answers} editable={false} perspective="self" />
+          </>
         ) : (
           <div className="callout">
             <p className="callout__title">Not submitted yet</p>
@@ -340,6 +400,7 @@ export default function EvaluationLog() {
 
       {tab === 'supervisor' && sup && (
         <>
+          {printBar}
           {data.can.editSupervisor && (
             <p className="page__sub-text">{data.rubric.instructions}</p>
           )}
